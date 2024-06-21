@@ -90,7 +90,7 @@ modify_launch_daemon() {
     sed -i '' \
         -e 's/re\.frida\.server/re.'"${FRIDA_NAME}"'.server/g' \
         -e 's/frida-server/'"${FRIDA_NAME}"'/g' \
-        -e 's@</array>@<string>-l</string><string>0.0.0.0:'"${FRIDA_SERVER_PORT}"'</string></array>@g' \
+        -e 's@</array>@\t<string>-l</string>\n\t\t<string>0.0.0.0:'"${FRIDA_SERVER_PORT}"'</string>\n\t</array>@g' \
         "$plist"
 
     if [ $? -ne 0 ]; then
@@ -205,43 +205,54 @@ modify_binary() {
     fi
     
     RES_NAME_HEX=$(echo -n "$FRIDA_NAME" | xxd -pu)
-    # 将二进制文件转换为十六进制文本
-    xxd -p -c 0 "$frida_server_path" > "${frida_server_path}.hex"
-    local replacements=(
-        "0066726964612d6d61696e2d6c6f6f70:00${RES_NAME_HEX}2d6d61696e2d6c6f6f70"
-        "0066726964615f7365727665725f6170:00${RES_NAME_HEX}5f7365727665725f6170"
-        "0066726964615f7365727665725f6d61:00${RES_NAME_HEX}5f7365727665725f6d61"
-        "0066726964612d7365727665722d6d61:00${RES_NAME_HEX}2d7365727665722d6d61"
-        "00467269646100:00${RES_NAME_HEX}0000"
-        "0066726964612d7365727665722d6d61696e2d6c6f:00${RES_NAME_HEX}2d7365727665722d6d61696e2d6c6f"
-        "0066726964612d6d61696e2d6c6f:00${RES_NAME_HEX}2d6d61696e2d6c6f"
-    )
+    # # 将二进制文件转换为十六进制文本
+    # xxd -p -c 0 "$frida_server_path" > "${frida_server_path}.hex"
+    # local replacements=(
+    #     "0066726964612d6d61696e2d6c6f6f70:00${RES_NAME_HEX}2d6d61696e2d6c6f6f70"
+    #     "0066726964615f7365727665725f6170:00${RES_NAME_HEX}5f7365727665725f6170"
+    #     "0066726964615f7365727665725f6d61:00${RES_NAME_HEX}5f7365727665725f6d61"
+    #     "0066726964612d7365727665722d6d61:00${RES_NAME_HEX}2d7365727665722d6d61"
+    #     "00467269646100:00${RES_NAME_HEX}0000"
+    #     "0066726964612d7365727665722d6d61696e2d6c6f:00${RES_NAME_HEX}2d7365727665722d6d61696e2d6c6f"
+    #     "0066726964612d6d61696e2d6c6f:00${RES_NAME_HEX}2d6d61696e2d6c6f"
+    # )
     
-    local success=false
+    # 有问题，暂时不用
+    # ../hexreplace/hexreplace $frida_server_path 0066726964612d6d61696e2d6c6f6f70 00${RES_NAME_HEX}2d6d61696e2d6c6f6f70
+    # ../hexreplace/hexreplace $frida_server_path 0066726964615f7365727665725f6170 00${RES_NAME_HEX}5f7365727665725f6170
+    # ../hexreplace/hexreplace $frida_server_path 0066726964615f7365727665725f6d61 00${RES_NAME_HEX}5f7365727665725f6d61
+    # ../hexreplace/hexreplace $frida_server_path 0066726964612d7365727665722d6d61 00${RES_NAME_HEX}2d7365727665722d6d61
+    # ../hexreplace/hexreplace $frida_server_path 00467269646100 00${RES_NAME_HEX}0000
+    # ../hexreplace/hexreplace $frida_server_path 0066726964612d7365727665722d6d61696e2d6c6f 00${RES_NAME_HEX}2d7365727665722d6d61696e2d6c6f
+    # ../hexreplace/hexreplace $frida_server_path 0066726964612d6d61696e2d6c6f 00${RES_NAME_HEX}2d6d61696e2d6c6f
 
-    for replacement in "${replacements[@]}"; do
-        IFS=':' read -r search replace <<< "$replacement"
-        if sed -i '' "s/$search/$replace/g" "${frida_server_path}.hex"; then
-            success=true
-            echo "替换完成: $search -> $replace"
-        else
-            echo "警告: 替换失败 - $search"
-        fi
-    done
+    mv $frida_server_path $new_path
+
+    # local success=false
+
+    # for replacement in "${replacements[@]}"; do
+    #     IFS=':' read -r search replace <<< "$replacement"
+    #     if sed -i '' "s/$search/$replace/g" "${frida_server_path}.hex"; then
+    #         success=true
+    #         echo "替换完成: $search -> $replace"
+    #     else
+    #         echo "警告: 替换失败 - $search"
+    #     fi
+    # done
     
-    if $success; then
-        # 将修改后的十六进制文本转回二进制文件
-        xxd -r -p "${frida_server_path}.hex" > "$new_path"
-        echo "二进制文件修改完成"
-        rm -f "$frida_server_path" "${frida_server_path}.hex"
-    else
-        echo "警告: 没有成功的替换"
-        rm -f "${frida_server_path}.hex"
-        return 1
-    fi
+    # if $success; then
+    #     # 将修改后的十六进制文本转回二进制文件
+    #     xxd -r -p "${frida_server_path}.hex" > "$new_path"
+    #     echo "二进制文件修改完成"
+    #     rm -f "$frida_server_path" "${frida_server_path}.hex"
+    # else
+    #     echo "警告: 没有成功的替换"
+    #     rm -f "${frida_server_path}.hex"
+    #     return 1
+    # fi
 
-    # 确保新文件有执行权限
-    chmod +x "$new_path"
+    # # 确保新文件有执行权限
+    # chmod +x "$new_path"
 }
 
 # 函数：重新打包 deb 文件
