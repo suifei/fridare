@@ -109,6 +109,7 @@ modify_launch_daemon() {
     else
         new_plist="${build}/Library/LaunchDaemons/re.${FRIDA_NAME}.server.plist"
     fi
+
     mv "$plist" "$new_plist"
     sudo chown root:wheel $new_plist
 
@@ -148,6 +149,7 @@ modify_debian_files() {
     else
         echo "警告: control 文件不存在: $control_file"
     fi
+    sudo chown root:wheel $control_file
 
     # 修改 extrainst_ 文件
     local extrainst_file="${debian_dir}/extrainst_"
@@ -165,6 +167,7 @@ modify_debian_files() {
     else
         echo "警告: extrainst_ 文件不存在: $extrainst_file"
     fi
+    sudo chown root:wheel $extrainst_file
 
     # 修改 prerm 文件
     local prerm_file="${debian_dir}/prerm"
@@ -182,6 +185,7 @@ modify_debian_files() {
     else
         echo "警告: prerm 文件不存在: $prerm_file"
     fi
+    sudo chown root:wheel $prerm_file
 
     echo "DEBIAN 文件夹中的文件修改完成"
 }
@@ -191,7 +195,6 @@ modify_binary() {
     local arch=$2
     local frida_server_path
     local new_path
-    
     if [ "$arch" = "arm64" ]; then
         frida_server_path="${build}/var/jb/usr/sbin/frida-server"
         new_path="${build}/var/jb/usr/sbin/${FRIDA_NAME}"
@@ -199,51 +202,17 @@ modify_binary() {
         frida_server_path="${build}/usr/sbin/frida-server"
         new_path="${build}/usr/sbin/${FRIDA_NAME}"
     fi
-    
     echo "正在修改二进制文件: $frida_server_path"
-    
     if [ ! -f "$frida_server_path" ]; then
         echo "错误: frida-server 文件不存在于路径: $frida_server_path"
         return 1
     fi
-    
-    RES_NAME_HEX=$(echo -n "$FRIDA_NAME" | xxd -pu)
-    # # 将二进制文件转换为十六进制文本
-    # xxd -p -c 0 "$frida_server_path" > "${frida_server_path}.hex"
-    # local replacements=(
-    #     "0066726964612d6d61696e2d6c6f6f70:00${RES_NAME_HEX}2d6d61696e2d6c6f6f70"
-    #     "0066726964615f7365727665725f6170:00${RES_NAME_HEX}5f7365727665725f6170"
-    #     "0066726964615f7365727665725f6d61:00${RES_NAME_HEX}5f7365727665725f6d61"
-    #     "0066726964612d7365727665722d6d61:00${RES_NAME_HEX}2d7365727665722d6d61"
-    #     "00467269646100:00${RES_NAME_HEX}0000"
-    #     "0066726964612d7365727665722d6d61696e2d6c6f:00${RES_NAME_HEX}2d7365727665722d6d61696e2d6c6f"
-    #     "0066726964612d6d61696e2d6c6f:00${RES_NAME_HEX}2d6d61696e2d6c6f"
-    # )
-    
-
-    # local success=false
-
-    # for replacement in "${replacements[@]}"; do
-    #     IFS=':' read -r search replace <<< "$replacement"
-    #     if sed -i '' "s/$search/$replace/g" "${frida_server_path}.hex"; then
-    #         success=true
-    #         echo "替换完成: $search -> $replace"
-    #     else
-    #         echo "警告: 替换失败 - $search"
-    #     fi
-    # done
-    
-    # if $success; then
-    #     # 将修改后的十六进制文本转回二进制文件
-    #     xxd -r -p "${frida_server_path}.hex" > "$new_path"
-    #     echo "二进制文件修改完成"
-    #     rm -f "$frida_server_path" "${frida_server_path}.hex"
-    # else
-    #     echo "警告: 没有成功的替换"
-    #     rm -f "${frida_server_path}.hex"
-    #     return 1
-    # fi    
-
+    cd ../hexreplace
+    go build
+    mv hexreplace ../build/
+    cd ../build
+    chmod +x hexreplace
+    ./hexreplace $frida_server_path $FRIDA_NAME
     mv $frida_server_path $new_path
     # 确保新文件有执行权限
     sudo chmod +x $new_path
@@ -256,14 +225,7 @@ repackage_deb() {
     local output_filename=$2
     # 在打包之前删除 .DS_Store 文件
     remove_ds_store "$build"
-
-    if [ -f "$output_filename" ]; then
-        read -p "${output_filename} 已经存在，是否覆盖？(y/n):" is_cover
-        if [ "$is_cover" != "y" ]; then
-            output_filename="${output_filename%.*}_1.deb"
-        fi
-    fi
-    
+    # 打包
     dpkg-deb -b "$build" "$output_filename" || { echo "打包 $output_filename 失败"; exit 1; }
 
     rm -rf "$build"
@@ -274,6 +236,7 @@ main() {
     check_and_install_dpkg
     
     mkdir -p build
+    mkdir -p dist
     cd build
     
     FRIDA_NAME=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 5 | grep -E '^[a-z]+$' | head -n 1)
