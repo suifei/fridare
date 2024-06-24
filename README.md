@@ -1,4 +1,19 @@
 # Fridare
+![Github stars](https://img.shields.io/github/stars/suifei/fridare?style=social)
+![Github forks](https://img.shields.io/github/forks/suifei/fridare?style=social)
+![Github watchers](https://img.shields.io/github/watchers/suifei/fridare?style=social)
+![Github license](https://img.shields.io/github/license/suifei/fridare)
+![Github issues](https://img.shields.io/github/issues/suifei/fridare)
+![Github pull requests](https://img.shields.io/github/issues-pr/suifei/fridare)
+![Github contributors](https://img.shields.io/github/contributors/suifei/fridare)
+![Github last commit](https://img.shields.io/github/last-commit/suifei/fridare)
+![Github repo size](https://img.shields.io/github/repo-size/suifei/fridare)
+![Github code size](https://img.shields.io/github/languages/code-size/suifei/fridare)
+![Github language count](https://img.shields.io/github/languages/count/suifei/fridare)
+![Github top language](https://img.shields.io/github/languages/top/suifei/fridare)
+![Github tag](https://img.shields.io/github/v/tag/suifei/fridare)
+[![GitHub followers](https://img.shields.io/github/followers/suifei.svg?style=social&label=Follow&maxAge=2592000)](https://github.com/suifei?tab=followers)
+[![Twitter Follow](https://img.shields.io/twitter/follow/csuifei?style=social)](https://twitter.com/csuifei)
 
 Fridare 是一个用于修改和定制 Frida（魔改） 服务器的工具，专为 iOS 越狱设备设计。它允许用户更改 Frida 服务器的名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
 
@@ -22,7 +37,7 @@ Fridare 是一个用于修改和定制 Frida（魔改） 服务器的工具，�
 
 1. 克隆此仓库：
 ```shell
-git clone https://github.com/your-username/fridare.git
+git clone https://github.com/suifei/fridare.git
 cd fridare
 ```
 
@@ -42,102 +57,9 @@ CURL_PROXY 为可以访问github的代理地址，如果不需要代理，可以
 
 ```shell
 $ ./build.sh 16.3.1 8888 http://127.0.0.1:1081
-Frida 版本：16.3.1
-Frida 端口：8888
-dpkg 已安装
-下载 frida_16.3.1_iphoneos-arm.deb
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-100 17.1M  100 17.1M    0     0  1199k      0  0:00:14  0:00:14 --:--:-- 1247k
-正在修改 Frida 16.3.1 版本 (arm)
-正在修改 plist 文件: frida_16.3.1_iphoneos-arm/Library/LaunchDaemons/re.frida.server.plist
-FRIDA_NAME: zdskj
-FRIDA_SERVER_PORT: 8888
-plist 文件修改完成
-plist 文件已重命名为: frida_16.3.1_iphoneos-arm/Library/LaunchDaemons/re.zdskj.server.plist
-Launch daemon 修改完成
-正在修改 DEBIAN 文件夹中的文件: frida_16.3.1_iphoneos-arm/DEBIAN
-FRIDA_NAME: zdskj
-修改 control 文件
-修改 extrainst_ 文件
-修改 prerm 文件
-DEBIAN 文件夹中的文件修改完成
-DEBIAN 文件修改完成
-正在修改二进制文件: frida_16.3.1_iphoneos-arm/usr/sbin/frida-server
-替换完成: 0066726964612d6d61696e2d6c6f6f70 -> 007a64736b6a2d6d61696e2d6c6f6f70
-替换完成: 0066726964615f7365727665725f6170 -> 007a64736b6a5f7365727665725f6170
-替换完成: 0066726964615f7365727665725f6d61 -> 007a64736b6a5f7365727665725f6d61
-替换完成: 0066726964612d7365727665722d6d61 -> 007a64736b6a2d7365727665722d6d61
-替换完成: 00467269646100 -> 007a64736b6a0000
-替换完成: 0066726964612d7365727665722d6d61696e2d6c6f -> 007a64736b6a2d7365727665722d6d61696e2d6c6f
-替换完成: 0066726964612d6d61696e2d6c6f -> 007a64736b6a2d6d61696e2d6c6f
-二进制文件修改完成
-二进制文件修改完成
-正在删除 frida_16.3.1_iphoneos-arm 中的 .DS_Store 文件...
-.DS_Store 文件删除完成
-dpkg-deb: 正在 'frida_16.3.1_iphoneos-arm_tcp.deb' 中构建软件包 're.zdskj.server'。
-Frida 16.3.1 版本 (arm) 修改完成
-新版本名：zdskj
-请使用新版本名：zdskj 进行调试
-请使用端口：8888 进行调试
-新版本 deb 文件：../dist/frida_16.3.1_iphoneos-arm_tcp.deb
--------------------------------------------------
-iPhone 安装：
-scp dist/frida_16.3.1_iphoneos-arm_tcp.deb root@<iPhone-IP>:/var/root
-ssh root@<iPhone-IP>
-dpkg -i /var/root/frida_16.3.1_iphoneos-arm_tcp.deb
-PC 连接：
-frida -U -f com.xxx.xxx -l
-frida -H <iPhone-IP>:8888 -f com.xxx.xxx --no-pause
--------------------------------------------------
-下载 frida_16.3.1_iphoneos-arm64.deb
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-100 17.1M  100 17.1M    0     0  1207k      0  0:00:14  0:00:14 --:--:-- 1324k
-正在修改 Frida 16.3.1 版本 (arm64)
-正在修改 plist 文件: frida_16.3.1_iphoneos-arm64/var/jb/Library/LaunchDaemons/re.frida.server.plist
-FRIDA_NAME: zdskj
-FRIDA_SERVER_PORT: 8888
-plist 文件修改完成
-plist 文件已重命名为: frida_16.3.1_iphoneos-arm64/var/jb/Library/LaunchDaemons/re.zdskj.server.plist
-Launch daemon 修改完成
-正在修改 DEBIAN 文件夹中的文件: frida_16.3.1_iphoneos-arm64/DEBIAN
-FRIDA_NAME: zdskj
-修改 control 文件
-修改 extrainst_ 文件
-修改 prerm 文件
-DEBIAN 文件夹中的文件修改完成
-DEBIAN 文件修改完成
-正在修改二进制文件: frida_16.3.1_iphoneos-arm64/var/jb/usr/sbin/frida-server
-替换完成: 0066726964612d6d61696e2d6c6f6f70 -> 007a64736b6a2d6d61696e2d6c6f6f70
-替换完成: 0066726964615f7365727665725f6170 -> 007a64736b6a5f7365727665725f6170
-替换完成: 0066726964615f7365727665725f6d61 -> 007a64736b6a5f7365727665725f6d61
-替换完成: 0066726964612d7365727665722d6d61 -> 007a64736b6a2d7365727665722d6d61
-替换完成: 00467269646100 -> 007a64736b6a0000
-替换完成: 0066726964612d7365727665722d6d61696e2d6c6f -> 007a64736b6a2d7365727665722d6d61696e2d6c6f
-替换完成: 0066726964612d6d61696e2d6c6f -> 007a64736b6a2d6d61696e2d6c6f
-二进制文件修改完成
-二进制文件修改完成
-正在删除 frida_16.3.1_iphoneos-arm64 中的 .DS_Store 文件...
-.DS_Store 文件删除完成
-dpkg-deb: 正在 'frida_16.3.1_iphoneos-arm64_tcp.deb' 中构建软件包 're.zdskj.server'。
-Frida 16.3.1 版本 (arm64) 修改完成
-新版本名：zdskj
-请使用新版本名：zdskj 进行调试
-请使用端口：8888 进行调试
-新版本 deb 文件：../dist/frida_16.3.1_iphoneos-arm64_tcp.deb
--------------------------------------------------
-iPhone 安装：
-scp dist/frida_16.3.1_iphoneos-arm64_tcp.deb root@<iPhone-IP>:/var/root
-ssh root@<iPhone-IP>
-dpkg -i /var/root/frida_16.3.1_iphoneos-arm64_tcp.deb
-PC 连接：
-frida -U -f com.xxx.xxx -l
-frida -H <iPhone-IP>:8888 -f com.xxx.xxx --no-pause
--------------------------------------------------
 ```
+![build](screenshots/1.png)
+![setup](screenshots/2.png)
 
 4. 将生成的 .deb 包传输到您的 iOS 设备：
 ```shell
@@ -218,7 +140,7 @@ build.sh 脚本自动化了整个过程：
 
 ### 7. 二进制修改技术
 
-使用 perl 来执行二进制替换，在不重新编译 Frida 的情况下修改二进制文件。这种方法虽然有效，但也有局限性，因为它只能替换固定长度的字符串。
+使用 [hexreplace](hexreplace/main.go) 来执行二进制替换，在不重新编译 Frida 的情况下修改二进制文件。这种方法虽然有效，但也有局限性，因为它只能替换固定长度的字符串。
 
 ## 注意事项
 
@@ -232,4 +154,4 @@ build.sh 脚本自动化了整个过程：
 
 ## 许可证
 
-[MIT](https://choosealicense.com/licenses/mit/)
+[MIT LICENSE](LICENSE)
