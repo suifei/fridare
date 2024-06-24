@@ -5,6 +5,8 @@
 
 set -e  # 遇到错误立即退出
 
+echo "期间可能会要求输入 sudo 密码，用于修改文件权限"
+
 DEF_FRIDA_VERSION=16.3.3
 DEF_FRIDA_SERVER_PORT=8899
 DEF_HTTP_PROXY=
@@ -108,6 +110,7 @@ modify_launch_daemon() {
         new_plist="${build}/Library/LaunchDaemons/re.${FRIDA_NAME}.server.plist"
     fi
     mv "$plist" "$new_plist"
+    sudo chown root:wheel $new_plist
 
     if [ $? -ne 0 ]; then
         echo "错误: 重命名 plist 文件失败"
@@ -137,7 +140,7 @@ modify_debian_files() {
     local control_file="${debian_dir}/control"
     if [ -f "$control_file" ]; then
         echo "修改 control 文件"
-        sed -i '' 's/re\.frida\.server/re.'"${FRIDA_NAME}"'.server/g' "$control_file"
+        sed -i '' 's/Package: re\.frida\.server/Package: re.'"${FRIDA_NAME}"'.server/g' "$control_file"
         if [ $? -ne 0 ]; then
             echo "错误: 修改 control 文件失败"
             return 1
@@ -217,16 +220,6 @@ modify_binary() {
     #     "0066726964612d6d61696e2d6c6f:00${RES_NAME_HEX}2d6d61696e2d6c6f"
     # )
     
-    # 有问题，暂时不用
-    # ../hexreplace/hexreplace $frida_server_path 0066726964612d6d61696e2d6c6f6f70 00${RES_NAME_HEX}2d6d61696e2d6c6f6f70
-    # ../hexreplace/hexreplace $frida_server_path 0066726964615f7365727665725f6170 00${RES_NAME_HEX}5f7365727665725f6170
-    # ../hexreplace/hexreplace $frida_server_path 0066726964615f7365727665725f6d61 00${RES_NAME_HEX}5f7365727665725f6d61
-    # ../hexreplace/hexreplace $frida_server_path 0066726964612d7365727665722d6d61 00${RES_NAME_HEX}2d7365727665722d6d61
-    # ../hexreplace/hexreplace $frida_server_path 00467269646100 00${RES_NAME_HEX}0000
-    # ../hexreplace/hexreplace $frida_server_path 0066726964612d7365727665722d6d61696e2d6c6f 00${RES_NAME_HEX}2d7365727665722d6d61696e2d6c6f
-    # ../hexreplace/hexreplace $frida_server_path 0066726964612d6d61696e2d6c6f 00${RES_NAME_HEX}2d6d61696e2d6c6f
-
-    mv $frida_server_path $new_path
 
     # local success=false
 
@@ -249,17 +242,18 @@ modify_binary() {
     #     echo "警告: 没有成功的替换"
     #     rm -f "${frida_server_path}.hex"
     #     return 1
-    # fi
+    # fi    
 
-    # # 确保新文件有执行权限
-    # chmod +x "$new_path"
+    mv $frida_server_path $new_path
+    # 确保新文件有执行权限
+    sudo chmod +x $new_path
+    sudo chown root:wheel $new_path
 }
 
 # 函数：重新打包 deb 文件
 repackage_deb() {
     local build=$1
     local output_filename=$2
-    
     # 在打包之前删除 .DS_Store 文件
     remove_ds_store "$build"
 
@@ -299,7 +293,7 @@ main() {
         modify_binary "$BUILD_DIR" "$arch"
         echo "二进制文件修改完成"
         
-        OUTPUT_FILENAME="frida_${FRIDA_VERSION}_iphoneos-${arch}_tcp.deb"
+        OUTPUT_FILENAME="frida_${FRIDA_VERSION}_iphoneos-${arch}_${FRIDA_NAME}_tcp.deb"
         repackage_deb "$BUILD_DIR" "$OUTPUT_FILENAME"
         
         mkdir -p ../dist
