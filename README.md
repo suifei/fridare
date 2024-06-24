@@ -15,14 +15,15 @@
 [![GitHub followers](https://img.shields.io/github/followers/suifei.svg?style=social&label=Follow&maxAge=2592000)](https://github.com/suifei?tab=followers)
 [![Twitter Follow](https://img.shields.io/twitter/follow/csuifei?style=social)](https://twitter.com/csuifei)
 
-Fridare 是一个用于修改和定制 Frida（魔改） 服务器的工具，专为 iOS 越狱设备设计。它允许用户更改 Frida 服务器的名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
+Fridare 是一个用于修改和定制 Frida（魔改） 服务器的工具，专为 iOS 越狱设备设计。它允许用户更改 frida-server 的名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
 
 ## 特性
 
-- 自动下载并修改指定版本的 Frida 服务器
-- 随机生成新的 Frida 服务器名称
-- 自定义 Frida 服务器端口
+- 自动下载并修改指定版本的 frida-server 
+- 随机生成新的 frida-server 名称
+- 自定义 frida-server 端口
 - 支持 arm 和 arm64 架构
+- 二进制替换修改 frida-server
 - 生成可直接安装的修改版 .deb 包
 
 ## 前提条件
@@ -85,7 +86,7 @@ npm install frida@16.3.3
 
 ## 使用
 
-如果不使用usb数据线时，可以使用以下命令连接到远程 Frida 服务器：
+如果不使用usb数据线时，可以使用以下命令连接到远程 frida-server ：
 ```shell
 frida -H <iPhone-IP>:8899 -U
 frida-trace -H <iPhone-IP>:8899 ...
@@ -96,9 +97,9 @@ frida-inject -H <iPhone-IP>:8899 ...
 ## 原理
 Fridare 项目的核心原理：
 
-### 1. Frida 服务器修改原理
+### 1. frida-server 修改原理
 
-Fridare 的核心思想是修改 Frida 服务器，使其更难被检测。这主要通过以下几个方面实现：
+Fridare 的核心思想是修改 frida-server ，使其更难被检测。这主要通过以下几个方面实现：
 
 - 重命名服务器文件：
    将 `frida-server` 重命名为随机生成的名称（如 `abcde`），这样可以避免简单的名称检测。
@@ -121,7 +122,7 @@ Fridare 的核心思想是修改 Frida 服务器，使其更难被检测。这�
 
 build.sh 脚本自动化了整个过程：
 
-- 下载指定版本的 Frida 服务器
+- 下载指定版本的 frida-server 
 - 生成随机名称
 - 修改所有必要的文件
 - 重新打包 deb 文件
