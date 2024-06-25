@@ -270,7 +270,7 @@ func buildReplacements(fridaNewName string) map[string]string {
 		"re.frida.server":        "re." + fridaNewName + ".server",
 		"frida_agent_main":       fridaNewName + "_agent_main",
 		"127.0.0.1":              "0.0.0.0",
-		"Frida":                  fridaNewName,
+		// "Frida":                  fridaNewName,
 	}
 }
 
