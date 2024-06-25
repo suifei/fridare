@@ -298,11 +298,11 @@ func replaceInSection(data []byte, replacements map[string]string) []byte {
 		}
 	}
 	// 比较 modifiedData 和 data 的差异部分，并打印出来
-	for i := 0; i < len(data); i++ {
-		if modifiedData[i] != data[i] {
-			fmt.Printf("0x%08X: 0x%02X -> 0x%02X\n", i, data[i], modifiedData[i])
-		}
-	}
+	// for i := 0; i < len(data); i++ {
+	// 	if modifiedData[i] != data[i] {
+	// 		fmt.Printf("0x%08X: 0x%02X -> 0x%02X\n", i, data[i], modifiedData[i])
+	// 	}
+	// }
 	// 返回修改后的数据
 	return modifiedData
 }
