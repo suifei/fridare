@@ -208,11 +208,11 @@ modify_binary() {
         return 1
     fi
     cd ../hexreplace
-    go build
-    mv hexreplace ../build/
+    go build -o ../build/hexreplace
     cd ../build
     chmod +x hexreplace
     ./hexreplace $frida_server_path $FRIDA_NAME
+    cp $frida_server_path ../test
     mv $frida_server_path $new_path
     # 确保新文件有执行权限
     sudo chmod +x $new_path

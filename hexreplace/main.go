@@ -4,203 +4,328 @@ Usage: hexreplace <file path> <frida new name>
 Example: hexreplace /Users/xxx/Desktop/frida-ios-dump/FridaGadget.dylib frida
 Author: suifei@gmail.com
 Github: https://github.com/suifei/fridare/tree/master/hexreplace
-Version: 1.0
+Version: 2.0
+
+changelog:
+- 2.0: support multiple architectures, add more ARM and ARM64 subtypes, add more replacements, macho.File.Section() returns a pointer to macho.Section, add more error handling
+- 1.0: initial version
 */
 package main
 
 import (
+	"debug/macho"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
-	"path"
 )
 
-// isAlpha 判断一个字符是否为英文字母（小写）
-// 参数 c 表示待判断的字符
-// 返回值 bool，表示字符是否为英文字母（小写），是则返回 true，否则返回 false
-func isAlpha(c rune) bool {
-	// 检查字符是否在 'a'-'z' 范围内
-	return (c >= 'a' && c <= 'z')
+type CPUSubtype uint32
+
+// ARM subtypes
+const (
+	CPUSubtypeArmAll    CPUSubtype = 0
+	CPUSubtypeArmV4T    CPUSubtype = 5
+	CPUSubtypeArmV6     CPUSubtype = 6
+	CPUSubtypeArmV5Tej  CPUSubtype = 7
+	CPUSubtypeArmXscale CPUSubtype = 8
+	CPUSubtypeArmV7     CPUSubtype = 9
+	CPUSubtypeArmV7F    CPUSubtype = 10
+	CPUSubtypeArmV7S    CPUSubtype = 11
+	CPUSubtypeArmV7K    CPUSubtype = 12
+	CPUSubtypeArmV8     CPUSubtype = 13
+	CPUSubtypeArmV6M    CPUSubtype = 14
+	CPUSubtypeArmV7M    CPUSubtype = 15
+	CPUSubtypeArmV7Em   CPUSubtype = 16
+	CPUSubtypeArmV8M    CPUSubtype = 17
+)
+
+// ARM64 subtypes
+const (
+	CPUSubtypeArm64All      CPUSubtype = 0
+	CPUSubtypeArm64V8       CPUSubtype = 1
+	CPUSubtypeArm64E        CPUSubtype = 2
+	CPUSubtypeArm64E_pauth0 CPUSubtype = 0x80000002
+)
+
+// ARM64_32 subtypes
+const (
+	CPUSubtypeArm6432All CPUSubtype = 0
+	CPUSubtypeArm6432V8  CPUSubtype = 1
+)
+
+func describeArch(f *macho.File) string {
+	cpu := cpuTypeToString(f.Cpu)
+	subtype := cpuSubtypeToString(f.Cpu, CPUSubtype(f.SubCpu))
+
+	byteOrder := "Little Endian"
+	if f.ByteOrder == binary.BigEndian {
+		byteOrder = "Big Endian"
+	}
+
+	return fmt.Sprintf("CPU: %s, Subtype: %s, Byte Order: %s, File Type: %s",
+		cpu, subtype, byteOrder, f.Type.String())
 }
 
-// isStringAlpha 判断一个字符串是否全部由字母组成
-// 参数 s：待判断的字符串
-// 返回值：若字符串全部由字母组成，则返回true，否则返回false
+func cpuTypeToString(cpu macho.Cpu) string {
+	switch cpu {
+	case macho.Cpu386:
+		return "x86"
+	case macho.CpuAmd64:
+		return "x86_64"
+	case macho.CpuArm:
+		return "ARM"
+	case macho.CpuArm64:
+		return "ARM64"
+	case macho.CpuPpc:
+		return "PowerPC"
+	case macho.CpuPpc64:
+		return "PowerPC 64"
+	default:
+		return fmt.Sprintf("Unknown CPU type: %d", cpu)
+	}
+}
+
+func cpuSubtypeToString(cpu macho.Cpu, subtype CPUSubtype) string {
+	switch cpu {
+	case macho.CpuArm:
+		switch subtype {
+		case CPUSubtypeArmAll:
+			return "All"
+		case CPUSubtypeArmV4T:
+			return "V4T"
+		case CPUSubtypeArmV6:
+			return "V6"
+		case CPUSubtypeArmV5Tej:
+			return "V5TEJ"
+		case CPUSubtypeArmXscale:
+			return "Xscale"
+		case CPUSubtypeArmV7:
+			return "V7"
+		case CPUSubtypeArmV7F:
+			return "V7F"
+		case CPUSubtypeArmV7S:
+			return "V7S"
+		case CPUSubtypeArmV7K:
+			return "V7K"
+		case CPUSubtypeArmV8:
+			return "V8"
+		case CPUSubtypeArmV6M:
+			return "V6M"
+		case CPUSubtypeArmV7M:
+			return "V7M"
+		case CPUSubtypeArmV7Em:
+			return "V7EM"
+		case CPUSubtypeArmV8M:
+			return "V8M"
+		default:
+			return fmt.Sprintf("Unknown ARM subtype: %d", subtype)
+		}
+	case macho.CpuArm64:
+		switch subtype {
+		case CPUSubtypeArm64All:
+			return "All"
+		case CPUSubtypeArm64V8:
+			return "V8"
+		case CPUSubtypeArm64E:
+			return "E"
+		case CPUSubtypeArm64E_pauth0:
+			return "E_pauth0"
+		default:
+			return fmt.Sprintf("Unknown ARM64 subtype: %d", subtype)
+		}
+	case macho.Cpu386, macho.CpuAmd64:
+		return "All" // x86 and x86_64 typically don't have meaningful subtypes in this context
+	default:
+		return fmt.Sprintf("Unknown subtype: %d", subtype)
+	}
+}
+
+func main() {
+	if len(os.Args) != 4 {
+		fmt.Println("Usage: program <input file path> <frida new name> <output file path>")
+		os.Exit(1)
+	}
+
+	inputFilePath := os.Args[1]
+	fridaNewName := os.Args[2]
+	outputFilePath := os.Args[3]
+
+	if len(fridaNewName) != 5 || !isStringAlpha(fridaNewName) {
+		fmt.Println("Error: frida new name must be a 5-character alphabetic string")
+		os.Exit(1)
+	}
+
+	// 首先复制输入文件到输出文件
+	if err := copyFile(inputFilePath, outputFilePath); err != nil {
+		fmt.Println("Error copying file:", err)
+		os.Exit(1)
+	}
+
+	fatFile, err := macho.OpenFat(outputFilePath)
+	if err != nil {
+		if err == macho.ErrNotFat {
+			file, err := macho.Open(outputFilePath)
+			if err == nil {
+				handleSignleArchitecture(file, outputFilePath, fridaNewName)
+			} else {
+				fmt.Println("Error opening file:", err)
+				os.Exit(1)
+			}
+		} else {
+			fmt.Println("Error opening file:", err)
+			os.Exit(1)
+		}
+	}
+	handleMultipleArchitectures(fatFile, outputFilePath, fridaNewName)
+
+	fmt.Println("Patch success")
+}
+
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+
+	os.Chmod(dst, 0755)
+	return err
+}
+
+func handleSignleArchitecture(file *macho.File, outputFilePath, fridaNewName string) {
+	section := file.Section("__cstring")
+	if section == nil {
+		fmt.Println("Warning: __cstring section not found in file")
+		return
+	}
+	data, err := section.Data()
+	if err != nil {
+		fmt.Println("Error reading section data:", err)
+		return
+	}
+	replacements := buildReplacements(fridaNewName)
+	modifiedData := replaceInSection(data, replacements)
+
+	if err := writeModifiedSection(outputFilePath, int64(section.Offset), modifiedData); err != nil {
+		fmt.Println("Error writing modified data:", err)
+		return
+	}
+	fmt.Printf("Successfully patched architecture: %s\n", describeArch(file))
+}
+
+func handleMultipleArchitectures(fatFile *macho.FatFile, filePath, fridaNewName string) {
+	for _, arch := range fatFile.Arches {
+		patchArchitecture(arch, filePath, fridaNewName)
+	}
+}
+
+func patchArchitecture(arch macho.FatArch, filePath, fridaNewName string) {
+	section := arch.Section("__cstring")
+	if section == nil {
+		fmt.Printf("Warning: __cstring section not found in architecture %s\n", describeArch(arch.File))
+		return
+	}
+
+	data, err := section.Data()
+	if err != nil {
+		fmt.Printf("Error reading section data for architecture %s: %v\n", describeArch(arch.File), err)
+		return
+	}
+
+	replacements := buildReplacements(fridaNewName)
+	modifiedData := replaceInSection(data, replacements)
+
+	if err := writeModifiedSection(filePath, int64(arch.Offset+section.Offset), modifiedData); err != nil {
+		fmt.Printf("Error writing modified data for architecture %s: %v\n", describeArch(arch.File), err)
+		return
+	}
+
+	fmt.Printf("Successfully patched architecture: %s\n", describeArch(arch.File))
+}
+
 func isStringAlpha(s string) bool {
 	for _, c := range s {
-		if !isAlpha(c) {
+		if c < 'a' || c > 'z' {
 			return false
 		}
 	}
 	return true
 }
 
-// main 函数是程序的入口点
-func main() {
-	fmt.Println(os.Args)
-	if !parseAndValidateArgs() {
-		os.Exit(1)
-	}
-
-	filePath := os.Args[1]
-	fridaNewName := os.Args[2]
-
-	buf, err := readFile(filePath)
-	if err != nil {
-		fmt.Println("read file failed: ", err)
-		os.Exit(1)
-	}
-
-	resourcePatch := buildResourcePatch(fridaNewName)
-
-	if !patchBinary(buf, resourcePatch) {
-		os.Exit(1)
-	}
-
-	if err := writeFile(filePath, buf); err != nil {
-		fmt.Println("write file failed: ", err)
-		os.Exit(1)
-	}
-
-	fmt.Println("patch success")
-	os.Exit(0)
-}
-
-// parseAndValidateArgs 函数用于解析和验证命令行参数
-// 如果参数解析和验证成功，则返回true；否则返回false
-func parseAndValidateArgs() bool {
-	if len(os.Args) != 3 {
-		fmt.Println("args error: usage: program <file path> <frida new name>")
-		return false
-	}
-
-	filePath := os.Args[1]
-	filePath = path.Join(".", filePath)
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		fmt.Println("args error: file not exist")
-		return false
-	}
-
-	fridaNewName := os.Args[2]
-	if len(fridaNewName) != 5 || !isStringAlpha(fridaNewName) {
-		fmt.Println("args error: frida new name must be a 5-character string")
-		return false
-	}
-
-	return true
-}
-
-// readFile 函数从给定的文件路径中读取文件内容，并返回文件的字节切片和可能发生的错误。
-// 如果文件读取成功，则返回的字节切片包含文件的内容；如果发生错误，则返回非零的错误码。
-//
-// 参数：
-// filePath string - 要读取的文件路径。
-//
-// 返回值：
-// []byte - 文件的字节切片。
-// error - 如果在读取文件时发生错误，则返回非零的错误码；否则为nil。
-func readFile(filePath string) ([]byte, error) {
-	return os.ReadFile(filePath)
-}
-
-// buildResourcePatch 根据给定的 fridaNewName 构建资源补丁映射
-//
-// 参数：
-//
-//	fridaNewName string - Frida 新名称
-//
-// 返回值：
-//
-//	map[string]string - 包含 Frida 相关资源名称映射的字典
-func buildResourcePatch(fridaNewName string) map[string]string {
-	if len(fridaNewName) != 5 {
-		fmt.Println("(buildResourcePatch) frida new name must be a 5-character string")
-		os.Exit(1)
-	}
+func buildReplacements(fridaNewName string) map[string]string {
 	return map[string]string{
 		"frida_server_":          fridaNewName + "_server_",
 		"frida-server-main-loop": fridaNewName + "-server-main-loop",
 		"frida-main-loop":        fridaNewName + "-main-loop",
+		"frida:rpc":              fridaNewName + ":rpc",
+		"re.frida.server":        "re." + fridaNewName + ".server",
+		"frida_agent_main":       fridaNewName + "_agent_main",
+		"127.0.0.1":              "0.0.0.0",
+		"Frida":                  fridaNewName,
 	}
 }
 
-// patchBinary 函数用于在二进制缓冲区中根据资源补丁（resourcePatch）进行替换操作
-// 参数：
-//
-//	buf []byte - 需要进行替换操作的二进制缓冲区
-//	resourcePatch map[string]string - 资源补丁映射，其中key表示原始资源关键字，value表示补丁后的关键字
-//
-// 返回值：
-//
-//	bool - 替换操作是否成功，成功返回true，失败返回false
-func patchBinary(buf []byte, resourcePatch map[string]string) bool {
-	for resourceKey, patchKey := range resourcePatch {
-		indexes := QueryBinaryIndexByKeyword(buf, []byte(resourceKey))
-		resourceKeyCount := len(indexes)
-		fmt.Println("resource_key count: ", resourceKeyCount)
-		buf = ReplaceBinary(buf, indexes, []byte(patchKey))
-		indexes = QueryBinaryIndexByKeyword(buf, []byte(patchKey))
-		patchKeyCount := len(indexes)
-		fmt.Println("patch_key count: ", patchKeyCount)
-		if resourceKeyCount != patchKeyCount {
-			fmt.Println("patch failed: ", resourceKeyCount, "->", patchKeyCount)
+func replaceInSection(data []byte, replacements map[string]string) []byte {
+	modifiedData := make([]byte, len(data))
+	copy(modifiedData, data)
+
+	for old, new := range replacements {
+		oldBytes := []byte(old)
+		newBytes := []byte(new)
+
+		for i := 0; i <= len(modifiedData)-len(oldBytes); i++ {
+			if bytesEqual(modifiedData[i:i+len(oldBytes)], oldBytes) {
+				// 创建一个新的切片，长度与原字符串相同
+				replacement := make([]byte, len(oldBytes))
+				// 复制新字符串
+				copy(replacement, newBytes)
+				// 如果新字符串较短，用0填充剩余部分
+				for j := len(newBytes); j < len(oldBytes); j++ {
+					replacement[j] = 0
+				}
+				// 替换原位置的内容
+				copy(modifiedData[i:i+len(oldBytes)], replacement)
+			}
+		}
+	}
+	// 比较 modifiedData 和 data 的差异部分，并打印出来
+	for i := 0; i < len(data); i++ {
+		if modifiedData[i] != data[i] {
+			fmt.Printf("0x%08X: 0x%02X -> 0x%02X\n", i, data[i], modifiedData[i])
+		}
+	}
+	// 返回修改后的数据
+	return modifiedData
+}
+
+func bytesEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
 			return false
-		} else {
-			fmt.Println("patch ", resourceKeyCount, "->", patchKeyCount)
 		}
 	}
 	return true
 }
 
-// writeFile 函数将给定的字节切片buf写入到指定的文件路径filePath中，并返回可能产生的错误。
-// filePath：要写入的文件路径，字符串类型。
-// buf：要写入文件的字节切片。
-// 返回值：
-// error：如果写入过程中出现错误，则返回非nil的错误对象；否则返回nil。
-func writeFile(filePath string, buf []byte) error {
-	return os.WriteFile(filePath, buf, 0777)
-}
-
-// QueryBinaryIndexByKeyword 从给定的字节切片 buf 中查找与关键字 keyword 相匹配的起始索引，并返回这些索引的切片
-//
-// buf: 待搜索的字节切片
-// keyword: 待查找的关键字字节切片
-//
-// 返回值:
-//
-//	[]int: 包含所有匹配关键字的起始索引的切片
-func QueryBinaryIndexByKeyword(buf []byte, keyword []byte) []int {
-	indexs := []int{}
-	for i := 0; i <= len(buf)-len(keyword); i++ {
-		match := true
-		for j := 0; j < len(keyword); j++ {
-			if buf[i+j] != keyword[j] {
-				match = false
-				break
-			}
-		}
-		if match {
-			indexs = append(indexs, i)
-		}
+func writeModifiedSection(filePath string, offset int64, data []byte) error {
+	f, err := os.OpenFile(filePath, os.O_RDWR, 0)
+	if err != nil {
+		return err
 	}
-	return indexs
-}
+	defer f.Close()
 
-// ReplaceBinary 替换二进制数据中的指定位置为给定的补丁内容
-//
-// buf: 需要替换的原始二进制数据切片
-// indexs: 需要替换的索引位置列表
-// patchKey: 替换内容的补丁字节切片
-//
-// 返回值: 替换后的二进制数据切片
-func ReplaceBinary(buf []byte, indexs []int, patchKey []byte) []byte {
-	newBuf := make([]byte, len(buf))
-	copy(newBuf, buf) // 复制原始buf到新切片newBuf
-
-	for _, index := range indexs {
-		if index+len(patchKey) <= len(buf) { // 检查是否越界
-			copy(newBuf[index:index+len(patchKey)], patchKey)
-		}
-	}
-
-	return newBuf
+	_, err = f.WriteAt(data, offset)
+	return err
 }
