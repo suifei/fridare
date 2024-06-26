@@ -2,6 +2,10 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## [2.1.1] - 2024-06-26
+### Changed
+- 修正了二进制替换可能失败的问题。
+
 ## [2.1] - 2024-06-26
 ### Added
 - 新增 `autoinstall.sh` 脚本，结合 `issh` 命令自动部署最新 Frida 插件版本。
@@ -28,24 +32,28 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-### [2.1] - 2024-06-26
-#### Added
+## [2.1.1] - 2024-06-26
+### Changed
+- fix the issue that binary replacement may fail in specific cases.
+
+## [2.1] - 2024-06-26
+### Added
 - add `autoinstall.sh` script, auto deploy the latest Frida plugin version with `issh` command
 - add `Makefile`, provide convenient commands for help, clean, build and deploy the project
 
-#### Changed
+### Changed
 - update `build.sh` script to support the integration of new scripts and Makefile
 - enhance error handling and log recording, improve user experience
 
-#### Fixed
+### Fixed
 - fix the issue that binary replacement may fail in specific cases
-### [2.0] - 2024-06-25
+## [2.0] - 2024-06-25
 
-#### Added
+### Added
 - support multiple architectures, add more ARM and ARM64 subtypes
 - add more replacements
 - `macho.File.Section()` returns a pointer to `macho.Section`
 - add more error handling
 
-### 1.0 - Initial Version
+## 1.0 - Initial Version
 - initial release, provide basic functions to modify and customize Frida server
