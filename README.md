@@ -16,6 +16,7 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/csuifei?style=social)](https://twitter.com/csuifei)
 
 Fridare 是一个用于修改和定制 Frida（魔改） 服务器的工具，专为 iOS 越狱设备设计。它允许用户更改 frida-server 的名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
+[CHANGELOG](CHANGELOG.md)
 
 ## 特性
 
@@ -27,6 +28,7 @@ Fridare 是一个用于修改和定制 Frida（魔改） 服务器的工具，�
 - 生成可直接安装的修改版 .deb 包
 
 ### 新增特性
+
 - 引入 `autoinstall.sh` 脚本，实现 Frida 插件的自动部署。
 - 引入 `Makefile`，简化项目的构建和部署流程。
 - 运行之前请确保本机已经安装了 [issh](https://github.com/4ch12dy/issh) 命令。并配置好了 ssh 的免密登录。
