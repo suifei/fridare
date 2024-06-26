@@ -26,6 +26,22 @@ Fridare 是一个用于修改和定制 Frida（魔改） 服务器的工具，�
 - 二进制替换修改 frida-server
 - 生成可直接安装的修改版 .deb 包
 
+### 新增特性
+- 引入 `autoinstall.sh` 脚本，实现 Frida 插件的自动部署。
+- 引入 `Makefile`，简化项目的构建和部署流程。
+- 运行之前请确保本机已经安装了 [issh](https://github.com/4ch12dy/issh) 命令。并配置好了 ssh 的免密登录。
+   > 配置 issh 的 ssh 免密登陆
+   ```shell
+   # 生成 keygen 密钥，如果已生成可以跳过
+   ssh-keygen -t rsa -b 4096 -C "<EMAIL>"
+   # 配置手机IP，如果USB连接可以不配置
+   issh ip set <iPhone-IP>     
+   # 拷贝公钥到手机 /var/root ，需要 root 密码 alpine
+   issh scp ~/.ssh/id_rsa.pub  
+   # 远程服务器添加公钥到 authorized_keys 文件
+   issh run "mkdir -p ~/.ssh && cat /var/root/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && chmod 700 ~/.ssh"
+   ```
+
 ## 前提条件
 
 - macOS 操作系统（用于运行构建脚本）
@@ -40,6 +56,12 @@ Fridare 是一个用于修改和定制 Frida（魔改） 服务器的工具，�
 ```shell
 git clone https://github.com/suifei/fridare.git
 cd fridare
+```
+
+2. 使用 Makefile 构建和部署：
+```shell
+make build       # 构建项目
+make deploy      # 部署项目
 ```
 
 2. 运行构建脚本：

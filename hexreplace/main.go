@@ -20,6 +20,13 @@ import (
 	"os"
 )
 
+type Replacement struct {
+	Old []byte
+	New []byte
+}
+
+type Replacements []*Replacement
+
 type CPUSubtype uint32
 
 // ARM subtypes
@@ -261,26 +268,25 @@ func isStringAlpha(s string) bool {
 	return true
 }
 
-func buildReplacements(fridaNewName string) map[string]string {
-	return map[string]string{
-		"frida_server_":          fridaNewName + "_server_",
-		"frida-server-main-loop": fridaNewName + "-server-main-loop",
-		"frida-main-loop":        fridaNewName + "-main-loop",
-		"frida:rpc":              fridaNewName + ":rpc",
-		"re.frida.server":        "re." + fridaNewName + ".server",
-		"frida_agent_main":       fridaNewName + "_agent_main",
-		"127.0.0.1":              "0.0.0.0",
-		// "Frida":                  fridaNewName,
+func buildReplacements(fridaNewName string) *Replacements {
+	return &Replacements{
+		&Replacement{Old: []byte("frida_server_"), New: []byte(fridaNewName + "_server_")},
+		&Replacement{Old: []byte("frida-server-main-loop"), New: []byte(fridaNewName + "-server-main-loop")},
+		&Replacement{Old: []byte("frida-main-loop"), New: []byte(fridaNewName + "-main-loop")},
+		&Replacement{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
+		// &Replacement{Old: []byte("frida_agent_main"), New: []byte(fridaNewName + "_agent_main")}, //会导致崩溃
+		// &Replacement{Old: []byte("re.frida.server"), New: []byte("re." + fridaNewName + ".server")}, //官方frida-tools 会无法连接
+		// &Replacement{Old: []byte("\x00Frida\x00"), New: []byte("\x00" + fridaNewName + "\x00")}, //官方frida-tools 会无法连接
 	}
 }
 
-func replaceInSection(data []byte, replacements map[string]string) []byte {
+func replaceInSection(data []byte, replacements *Replacements) []byte {
 	modifiedData := make([]byte, len(data))
 	copy(modifiedData, data)
 
-	for old, new := range replacements {
-		oldBytes := []byte(old)
-		newBytes := []byte(new)
+	for _, replacement := range *replacements {
+		oldBytes := replacement.Old
+		newBytes := replacement.New
 
 		for i := 0; i <= len(modifiedData)-len(oldBytes); i++ {
 			if bytesEqual(modifiedData[i:i+len(oldBytes)], oldBytes) {
@@ -297,6 +303,7 @@ func replaceInSection(data []byte, replacements map[string]string) []byte {
 			}
 		}
 	}
+
 	// 比较 modifiedData 和 data 的差异部分，并打印出来
 	// for i := 0; i < len(data); i++ {
 	// 	if modifiedData[i] != data[i] {
