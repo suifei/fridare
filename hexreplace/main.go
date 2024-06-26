@@ -273,7 +273,7 @@ func buildReplacements(fridaNewName string) *Replacements {
 		&Replacement{Old: []byte("frida_server_"), New: []byte(fridaNewName + "_server_")},
 		&Replacement{Old: []byte("frida-server-main-loop"), New: []byte(fridaNewName + "-server-main-loop")},
 		&Replacement{Old: []byte("frida-main-loop"), New: []byte(fridaNewName + "-main-loop")},
-		&Replacement{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
+		// &Replacement{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")}, // 会导致无法启动进程
 		// &Replacement{Old: []byte("frida_agent_main"), New: []byte(fridaNewName + "_agent_main")}, //会导致崩溃
 		// &Replacement{Old: []byte("re.frida.server"), New: []byte("re." + fridaNewName + ".server")}, //官方frida-tools 会无法连接
 		// &Replacement{Old: []byte("\x00Frida\x00"), New: []byte("\x00" + fridaNewName + "\x00")}, //官方frida-tools 会无法连接
