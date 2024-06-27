@@ -1,4 +1,6 @@
 # Fridare
+[![GitHub Streak](https://streak-stats.demolab.com?user=suifei&theme=swift&locale=zh_Hans&date_format=%5BY.%5Dn.j)](https://git.io/streak-stats)
+
 ![Github stars](https://img.shields.io/github/stars/suifei/fridare?style=social)
 ![Github forks](https://img.shields.io/github/forks/suifei/fridare?style=social)
 ![Github watchers](https://img.shields.io/github/watchers/suifei/fridare?style=social)
