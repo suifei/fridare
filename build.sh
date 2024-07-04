@@ -195,12 +195,25 @@ modify_binary() {
     local arch=$2
     local frida_server_path
     local new_path
+    local frida_dylib_file
+    local new_dylib_file
+    local dylib_folder
+    local new_dylib_folder
+
     if [ "$arch" = "arm64" ]; then
         frida_server_path="${build}/var/jb/usr/sbin/frida-server"
         new_path="${build}/var/jb/usr/sbin/${FRIDA_NAME}"
+        frida_dylib_file="${build}/var/jb/usr/lib/frida/frida-agent.dylib"
+        new_dylib_file="${build}/var/jb/usr/lib/frida/${FRIDA_NAME}-agent.dylib"
+        dylib_folder="${build}/var/jb/usr/lib/frida"
+        new_dylib_folder="${build}/var/jb/usr/lib/${FRIDA_NAME}"
     else
         frida_server_path="${build}/usr/sbin/frida-server"
         new_path="${build}/usr/sbin/${FRIDA_NAME}"
+        frida_dylib_file="${build}/usr/lib/frida/frida-agent.dylib"
+        new_dylib_file="${build}/usr/lib/frida/${FRIDA_NAME}-agent.dylib"
+        dylib_folder="${build}/usr/lib/frida"
+        new_dylib_folder="${build}/usr/lib/${FRIDA_NAME}"
     fi
     echo "正在修改二进制文件: $frida_server_path"
     if [ ! -f "$frida_server_path" ]; then
@@ -216,6 +229,17 @@ modify_binary() {
     # 确保新文件有执行权限
     sudo chmod +x $new_path
     sudo chown root:wheel $new_path
+
+    ./hexreplace $frida_dylib_file $FRIDA_NAME $new_dylib_file
+    rm -rf $frida_dylib_file
+    # 确保新文件有执行权限
+    sudo chmod +x $new_dylib_file
+    sudo chown root:wheel $new_dylib_file
+
+    # 修改dylib目录
+    mv $dylib_folder $new_dylib_folder
+    # sudo chown -R root:wheel $new_dylib_folder
+
 }
 
 # 函数：重新打包 deb 文件
@@ -228,6 +252,69 @@ repackage_deb() {
     dpkg-deb -b "$build" "$output_filename" || { echo "打包 $output_filename 失败"; exit 1; }
 
     rm -rf "$build"
+}
+
+# 函数：修订frida-tools
+modify_frida_tools() {
+    PYLIB_PATH=$(python3 -c "import os, frida; print(os.path.dirname(frida.__file__))")
+    PYLIB=$(ls $PYLIB_PATH/*.so)
+
+    if [ -z "$PYLIB" ]; then
+        echo "未找到 frida python 库"
+        return 1
+    fi
+
+    # 判断是否有备份文件，没有则备份
+    if [ ! -f "$PYLIB.fridare" ]; then
+        cp "$PYLIB" "$PYLIB.fridare"
+    fi
+
+    echo "$PYLIB"
+    echo "$FRIDA_NAME"
+    
+    ./hexreplace "$PYLIB" $FRIDA_NAME test.so
+    
+    rm -rf "$PYLIB" "$PYLIB_PATH/__pycache__"
+    mv test.so "$PYLIB"
+    chmod 755 "$PYLIB"
+
+python3 -c "
+import os, frida, shutil, re;
+p = os.path.join(os.path.dirname(frida.__file__), 'core.py');
+b = p + '.fridare';
+frida_name = '$FRIDA_NAME';
+if not os.path.exists(b):
+    print(f'Creating backup: {b}');
+    shutil.copy2(p, b);
+else:
+    print(f'Backup already exists: {b}');
+try:
+    with open(p, 'r') as f:
+        lines = f.readlines();
+    replaced = False;
+    for i, line in enumerate(lines):
+        matches = re.finditer(r'\"([^\"]{5}):rpc\"', line)
+        for match in matches:
+            old = match.group(1)
+            new = frida_name[:5].ljust(5)  # Ensure frida_name is 5 chars
+            line = line.replace(f'\"{old}:rpc\"', f'\"{new}:rpc\"')
+            print(f'Line {i+1}: Replaced \"{old}:rpc\" with \"{new}:rpc\"')
+            replaced = True
+        lines[i] = line
+    if replaced:
+        with open(p, 'w') as f:
+            f.writelines(lines);
+        print(f'Replacement complete');
+    else:
+        print('No matching pattern found, no changes made');
+except Exception as e:
+    print(f'Error: {e}');
+    if os.path.exists(b):
+        print('Restoring from backup');
+        shutil.copy2(b, p);
+    else:
+        print('No backup found to restore from');
+"
 }
 
 # 主函数
@@ -275,6 +362,9 @@ main() {
         yellow_text "frida -H <iPhone-IP>:${FRIDA_SERVER_PORT} -f com.xxx.xxx --no-pause"
         yellow_text "-------------------------------------------------"
     done
+
+    modify_frida_tools
+    echo "frida-tools 修改完成"
     cd ..
 
 }

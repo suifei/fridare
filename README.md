@@ -1,4 +1,7 @@
 # Fridare
+
+[English](#Features) | [中文](#特性)
+
 [![GitHub Streak](https://streak-stats.demolab.com?user=suifei&theme=swift&locale=zh_Hans&date_format=%5BY.%5Dn.j)](https://git.io/streak-stats)
 
 ![Github stars](https://img.shields.io/github/stars/suifei/fridare?style=social)
@@ -26,10 +29,20 @@ Fridare 是一个用于修改和定制 Frida（魔改） 服务器的工具，�
 - 随机生成新的 frida-server 名称
 - 自定义 frida-server 端口
 - 支持 arm 和 arm64 架构
-- 二进制替换修改 frida-server
+- 二进制替换修改
+   - frida-server
+   - frida-agent.dylib
+   - frida-tools
 - 生成可直接安装的修改版 .deb 包
 
-### 新增特性
+### 新增特性 v2.2.0 (仅测试 macOS arm 架构，其它架构未测试)
+- 新增加 frida-tools 补丁，适配 `frida:rpc` 特征魔改
+   - 解决 Android 内存扫描该字符串问题
+   - 自动扫描本地 pip 安装 frida-tools 的位置，对 `core.py` 文件进行魔改，对 `_frida.abi3.so` 文件进行魔改
+- 新增加 frida-agent.dylib 魔改，从文件名称，加载位置进行隐藏
+   - 解决 agent 加载未隐藏问题
+
+### 新增特性 v2.1.1
 
 - 引入 `autoinstall.sh` 脚本，实现 Frida 插件的自动部署。
 - 引入 `Makefile`，简化项目的构建和部署流程。
@@ -180,5 +193,180 @@ build.sh 脚本自动化了整个过程：
 欢迎提交问题和拉取请求。对于重大更改，请先开issue讨论您想要更改的内容。
 
 ## 许可证
+
+[MIT LICENSE](LICENSE)
+
+---
+
+## Features
+
+- Automatically download and modify specified versions of frida-server
+- Randomly generate new frida-server names
+- Customize frida-server ports
+- Support for arm and arm64 architectures
+- Binary replacement modification
+   - frida-server
+   - frida-agent.dylib
+   - frida-tools
+- Generate modified .deb packages ready for direct installation
+
+### New Features v2.2.0 (Only tested on macOS arm architecture, other architectures not tested)
+- Added frida-tools patch, adapting to the `frida:rpc` characteristic modification
+   - Resolves the issue of Android memory scanning for this string
+   - Automatically scans the local pip installation location of frida-tools, modifies the `core.py` file, and modifies the `_frida.abi3.so` file
+- Added frida-agent.dylib modification, hiding from filename and load location
+   - Resolves the issue of unhidden agent loading
+
+### New Features v2.1.1
+
+- Introduced `autoinstall.sh` script for automatic deployment of Frida plugins.
+- Introduced `Makefile` to simplify the project build and deployment process.
+- Before running, please ensure that the [issh](https://github.com/4ch12dy/issh) command is installed on your machine. And configure password-free SSH login.
+   > Configure password-free SSH login for issh
+   ```shell
+   # Generate keygen, skip if already generated
+   ssh-keygen -t rsa -b 4096 -C "<EMAIL>"
+   # Configure iPhone IP, can be skipped if using USB connection
+   issh ip set <iPhone-IP>     
+   # Copy public key to /var/root on the phone, requires root password alpine
+   issh scp ~/.ssh/id_rsa.pub  
+   # Add public key to authorized_keys file on remote server
+   issh run "mkdir -p ~/.ssh && cat /var/root/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && chmod 700 ~/.ssh"
+   ```
+
+## Prerequisites
+
+- macOS operating system (for running build scripts)
+- Homebrew
+- dpkg (will be automatically installed via Homebrew if not already installed)
+- Jailbroken iOS device
+- OpenSSH installed on iOS device
+
+## Usage
+
+1. Clone this repository:
+```shell
+git clone https://github.com/suifei/fridare.git
+cd fridare
+```
+
+2. Use Makefile to build and deploy:
+```shell
+make build       # Build the project
+make deploy      # Deploy the project
+```
+
+2. Run the build script:
+```shell
+./build.sh [FRIDA_VERSION] [FRIDA_SERVER_PORT] [CURL_PROXY]
+```
+
+For example:
+```shell
+./build.sh 16.3.3 8899 http://127.0.0.1:1081
+```
+If no parameters are specified, the script will use default values (Frida version 16.3.3, port 8899).
+CURL_PROXY is the proxy address that can access GitHub. If no proxy is needed, it can be omitted.
+
+3. The script will download the specified version of Frida, modify it, and generate a new .deb package in the `dist` directory.
+
+```shell
+$ ./build.sh 16.3.1 8888 http://127.0.0.1:1081
+```
+![build](screenshots/1.png)
+![setup](screenshots/2.png)
+
+4. Transfer the generated .deb package to your iOS device:
+```shell
+scp ./dist/frida_16.3.3_iphoneos-arm_tcp.deb root@<iPhone-IP>:/var/root/
+```
+
+5. SSH into your iOS device and install the modified package:
+```shell
+ssh root@<iPhone-IP>
+dpkg -i /var/root/frida_16.3.3_iphoneos-arm_tcp.deb
+```
+
+## Install Compatible Version of Frida Tools
+
+To ensure compatibility, install Frida tools that match the modified server version:
+```shell
+pip install frida-tools==12.4.3
+```
+For Node.js users:
+```shell
+npm install frida@16.3.3
+```
+
+## Usage
+
+If not using a USB data cable, you can use the following commands to connect to the remote frida-server:
+```shell
+frida -H <iPhone-IP>:8899 -U
+frida-trace -H <iPhone-IP>:8899 ...
+frida-ps -H <iPhone-IP>:8899
+frida-inject -H <iPhone-IP>:8899 ...
+```
+
+## Principle
+Core principles of the Fridare project:
+
+### 1. frida-server Modification Principle
+
+The core idea of Fridare is to modify frida-server to make it harder to detect. This is mainly achieved through the following aspects:
+
+- Renaming the server file:
+   Rename `frida-server` to a randomly generated name (e.g., `abcde`), which avoids simple name detection.
+
+- Modifying startup configuration:
+   Update the LaunchDaemons plist file to use the new server name and custom port. This changes the way the server starts and the port it listens on.
+
+- Binary file modification:
+   Use binary replacement techniques to replace "frida" related strings in the server binary file with custom strings. This can avoid detection of Frida by scanning the binary file.
+
+### 2. deb Package Modification and Repackaging
+
+The project uses the dpkg-deb tool to unpack and repack deb files. This allows us to modify the contents of the package, including:
+
+- Updating the package name in the DEBIAN/control file
+- Modifying DEBIAN/extrainst_ and DEBIAN/prerm scripts to use the new server name
+- Replacing and renaming the actual server binary file
+
+### 3. Automated Process
+
+The build.sh script automates the entire process:
+
+- Downloading the specified version of frida-server
+- Generating random names
+- Modifying all necessary files
+- Repacking the deb file
+
+### 4. Compatibility Considerations
+
+The script handles packages for both arm and arm64 architectures, ensuring compatibility on different iOS devices.
+
+### 5. Enhanced Security
+
+By changing the server name, port, and internal strings, this project makes it more difficult to detect the presence of Frida through conventional methods. This is particularly useful for using Frida in applications that might actively detect and block Frida.
+
+### 6. Flexibility
+
+By allowing users to specify the Frida version and port, the tool provides great flexibility to adapt to different needs and environments.
+
+### 7. Binary Modification Technique
+
+Using [hexreplace](hexreplace/main.go) to perform binary replacements, modifying binary files without recompiling Frida. While effective, this method has limitations as it can only replace fixed-length strings.
+
+## Notes
+
+- The default root user password is "alpine". For security reasons, it is strongly recommended to change this password.
+- Please ensure your iOS device is jailbroken and has OpenSSH installed.
+- This tool is for educational and research purposes only. Please comply with all applicable laws and terms.
+
+## Contributing
+
+Issues and pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+## License
 
 [MIT LICENSE](LICENSE)

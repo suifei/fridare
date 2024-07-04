@@ -2,6 +2,14 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## [2.2.0] - 2024-07-04
+### Added
+- 新增加 frida-tools 补丁，适配 `frida:rpc` 特征魔改
+   - 解决 Android 内存扫描该字符串问题
+   - 自动扫描本地 pip 安装 frida-tools 的位置，对 `core.py` 文件进行魔改，对 `_frida.abi3.so` 文件进行魔改
+- 新增加 frida-agent.dylib 魔改，从文件名称，加载位置进行隐藏
+   - 解决 agent 加载未隐藏问题
+
 ## [2.1.1] - 2024-06-26
 ### Changed
 - 修正了二进制替换可能失败的问题。
@@ -31,6 +39,14 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.2.0] - 2024-07-04
+### Added
+- add frida-tools patch, adapt to `frida:rpc` feature modification
+   - solve the problem of scanning this string in Android memory
+   - automatically scan the location of the locally installed pip frida-tools, modify the `core.py` file, and modify the `_frida.abi3.so` file
+- add frida-agent.dylib modification, hide from file name and loading location
+    - solve the problem of agent loading not hidden
 
 ## [2.1.1] - 2024-06-26
 ### Changed

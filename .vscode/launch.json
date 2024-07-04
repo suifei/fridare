@@ -12,9 +12,9 @@
             "program": "${workspaceFolder}/hexreplace/main.go",
             "cwd": "${workspaceFolder}/hexreplace",
             "args": [
-                "../frida-server",
+                "/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/frida/_frida.abi3.so",
                 "abcde",
-                "../frida-server2"
+                "_frida.abi3.so.so"
             ]
         }
     ]

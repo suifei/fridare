@@ -8,4 +8,6 @@ build:
 	@go build 
 
 test:
-	@go run main.go ./frida-server abcde
+	@go run main.go /Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/site-packages/frida/_frida.abi3.so \
+	abcde \
+	_frida.abi3.so.so
