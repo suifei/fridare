@@ -7,21 +7,22 @@ Github: https://github.com/suifei/fridare/tree/master/hexreplace
 Version: 2.1
 
 changelog:
-- 2.1: 
+- 2.1:
   - Refactored the Replacements structure to support multiple sections:
-    - Added a new 'SectionName' field to the Replacements struct
-    - Changed 'Replacements' to contain an 'Items' slice of Replacement structs
+  - Added a new 'SectionName' field to the Replacements struct
+  - Changed 'Replacements' to contain an 'Items' slice of Replacement structs
   - Modified the buildReplacements function to return a slice of Replacements, allowing for multiple section definitions
   - Updated handleSignleArchitecture and patchArchitecture functions to process multiple sections:
-    - Now iterates through all defined sections in the Replacements slice
-    - Applies replacements to each specified section individually
+  - Now iterates through all defined sections in the Replacements slice
+  - Applies replacements to each specified section individually
   - Adjusted the replaceInSection function to accept a slice of Replacement structs
   - Improved error handling and logging:
-    - Added more detailed error messages for each section processing step
-    - Included section names in log messages for better traceability
+  - Added more detailed error messages for each section processing step
+  - Included section names in log messages for better traceability
   - Enhanced code flexibility and extensibility:
-    - Made it easier to add new sections for replacement in the future
-    - Improved code organization by grouping replacement rules by section
+  - Made it easier to add new sections for replacement in the future
+  - Improved code organization by grouping replacement rules by section
+
 - 2.0: support multiple architectures, add more ARM and ARM64 subtypes, add more replacements, macho.File.Section() returns a pointer to macho.Section, add more error handling
 - 1.0: initial version
 */
@@ -35,7 +36,6 @@ import (
 	"os"
 )
 
-
 type Replacement struct {
 	Old []byte
 	New []byte
@@ -43,7 +43,7 @@ type Replacement struct {
 
 type Replacements struct {
 	SectionName string
-	Items []*Replacement
+	Items       []*Replacement
 }
 
 type CPUSubtype uint32
@@ -225,47 +225,47 @@ func copyFile(src, dst string) error {
 }
 
 func handleSignleArchitecture(file *macho.File, outputFilePath, fridaNewName string) {
-    replacementsList := buildReplacements(fridaNewName)
-    for _, replacements := range replacementsList {
-        section := file.Section(replacements.SectionName)
-        if section == nil {
-            fmt.Printf("Warning: %s section not found in file\n", replacements.SectionName)
-            continue
-        }
-        data, err := section.Data()
-        if err != nil {
-            fmt.Printf("Error reading section data for %s: %v\n", replacements.SectionName, err)
-            continue
-        }
-        modifiedData := replaceInSection(data, replacements.Items)
-        if err := writeModifiedSection(outputFilePath, int64(section.Offset), modifiedData); err != nil {
-            fmt.Printf("Error writing modified data for %s: %v\n", replacements.SectionName, err)
-            continue
-        }
-        fmt.Printf("Successfully patched %s section in architecture: %s\n", replacements.SectionName, describeArch(file))
-    }
+	replacementsList := buildReplacements(fridaNewName)
+	for _, replacements := range replacementsList {
+		section := file.Section(replacements.SectionName)
+		if section == nil {
+			fmt.Printf("Warning: %s section not found in file\n", replacements.SectionName)
+			continue
+		}
+		data, err := section.Data()
+		if err != nil {
+			fmt.Printf("Error reading section data for %s: %v\n", replacements.SectionName, err)
+			continue
+		}
+		modifiedData := replaceInSection(data, replacements.Items)
+		if err := writeModifiedSection(outputFilePath, int64(section.Offset), modifiedData); err != nil {
+			fmt.Printf("Error writing modified data for %s: %v\n", replacements.SectionName, err)
+			continue
+		}
+		fmt.Printf("Successfully patched %s section in architecture: %s\n", replacements.SectionName, describeArch(file))
+	}
 }
 
 func patchArchitecture(arch macho.FatArch, filePath, fridaNewName string) {
-    replacementsList := buildReplacements(fridaNewName)
-    for _, replacements := range replacementsList {
-        section := arch.Section(replacements.SectionName)
-        if section == nil {
-            fmt.Printf("Warning: %s section not found in architecture %s\n", replacements.SectionName, describeArch(arch.File))
-            continue
-        }
-        data, err := section.Data()
-        if err != nil {
-            fmt.Printf("Error reading section data for %s in architecture %s: %v\n", replacements.SectionName, describeArch(arch.File), err)
-            continue
-        }
-        modifiedData := replaceInSection(data, replacements.Items)
-        if err := writeModifiedSection(filePath, int64(arch.Offset+section.Offset), modifiedData); err != nil {
-            fmt.Printf("Error writing modified data for %s in architecture %s: %v\n", replacements.SectionName, describeArch(arch.File), err)
-            continue
-        }
-        fmt.Printf("Successfully patched %s section in architecture: %s\n", replacements.SectionName, describeArch(arch.File))
-    }
+	replacementsList := buildReplacements(fridaNewName)
+	for _, replacements := range replacementsList {
+		section := arch.Section(replacements.SectionName)
+		if section == nil {
+			fmt.Printf("Warning: %s section not found in architecture %s\n", replacements.SectionName, describeArch(arch.File))
+			continue
+		}
+		data, err := section.Data()
+		if err != nil {
+			fmt.Printf("Error reading section data for %s in architecture %s: %v\n", replacements.SectionName, describeArch(arch.File), err)
+			continue
+		}
+		modifiedData := replaceInSection(data, replacements.Items)
+		if err := writeModifiedSection(filePath, int64(arch.Offset+section.Offset), modifiedData); err != nil {
+			fmt.Printf("Error writing modified data for %s in architecture %s: %v\n", replacements.SectionName, describeArch(arch.File), err)
+			continue
+		}
+		fmt.Printf("Successfully patched %s section in architecture: %s\n", replacements.SectionName, describeArch(arch.File))
+	}
 }
 
 func handleMultipleArchitectures(fatFile *macho.FatFile, filePath, fridaNewName string) {
@@ -283,50 +283,49 @@ func isStringAlpha(s string) bool {
 	return true
 }
 
-
 func buildReplacements(fridaNewName string) []Replacements {
-    return []Replacements{
-        {
-            SectionName: "__cstring",
-            Items: []*Replacement{
-                {Old: []byte("frida_server_"), New: []byte(fridaNewName + "_server_")},
-                {Old: []byte("frida-server-main-loop"), New: []byte(fridaNewName + "-server-main-loop")},
-                {Old: []byte("frida-main-loop"), New: []byte(fridaNewName + "-main-loop")},
-                {Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
+	return []Replacements{
+		{
+			SectionName: "__cstring",
+			Items: []*Replacement{
+				{Old: []byte("frida_server_"), New: []byte(fridaNewName + "_server_")},
+				{Old: []byte("frida-server-main-loop"), New: []byte(fridaNewName + "-server-main-loop")},
+				{Old: []byte("frida-main-loop"), New: []byte(fridaNewName + "-main-loop")},
+				{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
 				{Old: []byte("frida-agent.dylib"), New: []byte(fridaNewName + "-agent.dylib")},
-				{Old: []byte("/usr/lib/frida/"), New: []byte("/usr/lib/" +fridaNewName + "/")},
-            },
-        },
+				{Old: []byte("/usr/lib/frida/"), New: []byte("/usr/lib/" + fridaNewName + "/")},
+			},
+		},
 		{
 			SectionName: "__const",
 			Items: []*Replacement{
-                {Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
+				{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
 			},
 		},
-    }
+	}
 }
 
 func replaceInSection(data []byte, replacements []*Replacement) []byte {
-    modifiedData := make([]byte, len(data))
-    copy(modifiedData, data)
+	modifiedData := make([]byte, len(data))
+	copy(modifiedData, data)
 
-    for _, replacement := range replacements {
-        oldBytes := replacement.Old
-        newBytes := replacement.New
+	for _, replacement := range replacements {
+		oldBytes := replacement.Old
+		newBytes := replacement.New
 
-        for i := 0; i <= len(modifiedData)-len(oldBytes); i++ {
-            if bytesEqual(modifiedData[i:i+len(oldBytes)], oldBytes) {
-                replacement := make([]byte, len(oldBytes))
-                copy(replacement, newBytes)
-                for j := len(newBytes); j < len(oldBytes); j++ {
-                    replacement[j] = 0
-                }
-                copy(modifiedData[i:i+len(oldBytes)], replacement)
-            }
-        }
-    }
+		for i := 0; i <= len(modifiedData)-len(oldBytes); i++ {
+			if bytesEqual(modifiedData[i:i+len(oldBytes)], oldBytes) {
+				replacement := make([]byte, len(oldBytes))
+				copy(replacement, newBytes)
+				for j := len(newBytes); j < len(oldBytes); j++ {
+					replacement[j] = 0
+				}
+				copy(modifiedData[i:i+len(oldBytes)], replacement)
+			}
+		}
+	}
 
-    return modifiedData
+	return modifiedData
 }
 
 func bytesEqual(a, b []byte) bool {
