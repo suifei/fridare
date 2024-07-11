@@ -2,6 +2,27 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## [3.0.1] - 2024-07-11
+### Added
+- 新增 `is_conda_env()` 函数用于检测 Conda 环境
+- 新增 `get_python_cmd()` 函数用于选择正确的 Python 解释器
+- 新增 `log_environment_info()` 函数，详细输出运行环境信息
+
+### Changed
+- 重构 `modify_frida_tools()` 函数，以支持 Conda 环境
+- 优化 Golang 环境检查，利用现有的 `check_and_install_tool` 函数
+- 更新 `build_frida` 函数，简化 Golang 环境检查
+- 改进环境检测逻辑，优先使用 Conda 环境中的 Python
+
+### Fixed
+- 修复在 Conda 环境中无法正确识别和修改 Frida 工具的问题
+- 解决多个 Python 环境共存时的兼容性问题
+
+### Improved
+- 提升脚本对不同 Python 环境的适应性
+- 增强环境信息输出，便于调试和问题排查
+- 简化用户使用流程，无需手动指定 Frida 工具路径
+
 ## [3.0.0] - 2024-07-11
 ### Added
 - 新增 `fridare.sh` 脚本，整合所有功能，提供更完整的命令行界面
@@ -58,6 +79,27 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [3.0.1] - 2024-07-11
+### Added
+- Added the `is_conda_env()` function for detecting Conda environments
+- Added the `get_python_cmd()` function for selecting the correct Python interpreter
+- Added the `log_environment_info()` function to output detailed information about the running environment
+
+### Changed
+- Refactored the `modify_frida_tools()` function to support Conda environments
+- Optimized the Golang environment check by utilizing the existing `check_and_install_tool` function
+- Updated the `build_frida` function to simplify the Golang environment check
+- Improved the environment detection logic to prioritize the use of Python in the Conda environment
+
+### Fixed
+- Fixed the issue where Frida tools could not be correctly identified and modified in Conda environments
+- Resolved compatibility issues when multiple Python environments coexist
+
+### Improved
+- Enhanced the script's adaptability to different Python environments
+- Enhanced the output of environment information for easier debugging and troubleshooting
+- Simplified the user process, eliminating the need to manually specify the path to Frida tools
 
 ## [3.0.0] - 2024-07-11
 ### Added

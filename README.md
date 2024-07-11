@@ -23,38 +23,6 @@
 Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS 越狱设备设计。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
 [CHANGELOG](CHANGELOG)
 
-### 新增特性 v3.0.0
-- 新增 `fridare.sh` 脚本，整合所有功能，提供更完整的命令行界面
-- 新增 `build`, `ls`, `download`, `lm`, `setup`, `config`, 和 `help` 命令
-- 新增配置文件支持，可以保存和加载用户设置
-- 新增颜色输出，提升用户体验
-- 新增自动检查和安装依赖功能
-- 新增下载特定 Frida 模块的功能
-- 新增列出可用 Frida 版本和模块的功能
-
-### 新增特性 v2.2.0 (仅测试 macOS arm 架构，其它架构未测试)
-- 新增加 frida-tools 补丁，适配 `frida:rpc` 特征魔改
-   - 解决 Android 内存扫描该字符串问题
-   - 自动扫描本地 pip 安装 frida-tools 的位置，对 `core.py` 文件进行魔改，对 `_frida.abi3.so` 文件进行魔改
-- 新增加 frida-agent.dylib 魔改，从文件名称，加载位置进行隐藏
-   - 解决 agent 加载未隐藏问题
-
-### 新增特性 v2.1.1
-
-- 引入 `autoinstall.sh` 脚本，实现 Frida 插件的自动部署。
-- 引入 `Makefile`，简化项目的构建和部署流程。
-- 运行之前请确保本机已经安装了 [issh](https://github.com/4ch12dy/issh) 命令。并配置好了 ssh 的免密登录。
-   > 配置 issh 的 ssh 免密登陆
-   ```shell
-   # 生成 keygen 密钥，如果已生成可以跳过
-   ssh-keygen -t rsa -b 4096 -C "<EMAIL>"
-   # 配置手机IP，如果USB连接可以不配置
-   issh ip set <iPhone-IP>     
-   # 拷贝公钥到手机 /var/root ，需要 root 密码 alpine
-   issh scp ~/.ssh/id_rsa.pub  
-   # 远程服务器添加公钥到 authorized_keys 文件
-   issh run "mkdir -p ~/.ssh && cat /var/root/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && chmod 700 ~/.ssh"
-   ```
 
 ## 特性
 
@@ -72,6 +40,44 @@ Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS
 - 自动检查和安装依赖
 - 下载特定 Frida 模块
 - 列出可用 Frida 版本和模块
+- 支持 Conda 环境
+
+### 3.0.1 Fixed
+- 修复在 Conda 环境中无法正确识别和修改 Frida 工具的问题
+- 解决多个 Python 环境共存时的兼容性问题
+
+### 新增特性 v3.0.0
+- 新增 `fridare.sh` 脚本，整合所有功能，提供更完整的命令行界面
+- 新增 `build`, `ls`, `download`, `lm`, `setup`, `config`, 和 `help` 命令
+- 新增配置文件支持，可以保存和加载用户设置
+- 新增颜色输出，提升用户体验
+- 新增自动检查和安装依赖功能
+- 新增下载特定 Frida 模块的功能
+- 新增列出可用 Frida 版本和模块的功能
+
+### v2.2.0 (仅测试 macOS arm 架构，其它架构未测试)
+- 新增加 frida-tools 补丁，适配 `frida:rpc` 特征魔改
+   - 解决 Android 内存扫描该字符串问题
+   - 自动扫描本地 pip 安装 frida-tools 的位置，对 `core.py` 文件进行魔改，对 `_frida.abi3.so` 文件进行魔改
+- 新增加 frida-agent.dylib 魔改，从文件名称，加载位置进行隐藏
+   - 解决 agent 加载未隐藏问题
+
+### v2.1.1
+
+- 引入 `autoinstall.sh` 脚本，实现 Frida 插件的自动部署。
+- 引入 `Makefile`，简化项目的构建和部署流程。
+- 运行之前请确保本机已经安装了 [issh](https://github.com/4ch12dy/issh) 命令。并配置好了 ssh 的免密登录。
+   > 配置 issh 的 ssh 免密登陆
+   ```shell
+   # 生成 keygen 密钥，如果已生成可以跳过
+   ssh-keygen -t rsa -b 4096 -C "<EMAIL>"
+   # 配置手机IP，如果USB连接可以不配置
+   issh ip set <iPhone-IP>     
+   # 拷贝公钥到手机 /var/root ，需要 root 密码 alpine
+   issh scp ~/.ssh/id_rsa.pub  
+   # 远程服务器添加公钥到 authorized_keys 文件
+   issh run "mkdir -p ~/.ssh && cat /var/root/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && chmod 700 ~/.ssh"
+   ```
 
 ## Frida 魔改脚本的结构和功能
 ```shell

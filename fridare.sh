@@ -95,6 +95,9 @@ log_color() {
     echo -e "$1$2${COLOR_RESET}"
 }
 
+log_skyblue(){
+    echo -e "${COLOR_SKYBLUE}$1${COLOR_RESET}"
+}
 show_main_usage() {
     echo -e "${COLOR_SKYBLUE}Frida 重打包工具 v${VERSION}${COLOR_RESET}"
     echo
@@ -994,7 +997,7 @@ check_frida_tool() {
 install_frida_tools() {
     log_info "正在安装 frida-tools..."
 
-    local pip_commands=("pip3" "pip")
+    local pip_commands=("pip" "pip3")
     for pip_cmd in "${pip_commands[@]}"; do
         if command -v "$pip_cmd" >/dev/null 2>&1; then
             if $pip_cmd install --user frida-tools --force-reinstall; then
@@ -1213,7 +1216,7 @@ modify_binary() {
         log_error "错误: frida-server 文件不存在于路径: $frida_server_path"
         return 1
     fi
-
+    
     cd ../hexreplace
     (go build -o ../build/hexreplace) || {
         log_error "编译 hexreplace 工具失败"
@@ -1309,14 +1312,7 @@ find_frida_path() {
 
 # 函数：修订frida-tools
 modify_frida_tools() {
-    local python_cmd=""
-    for cmd in python3 python; do
-        if command -v $cmd >/dev/null 2>&1; then
-            python_cmd=$cmd
-            break
-        fi
-    done
-
+    local python_cmd=$(get_python_cmd)
     if [ -z "$python_cmd" ]; then
         log_error "未找到 Python 解释器"
         return 1
@@ -1496,7 +1492,22 @@ initialize_config() {
         echo "FRIDA_NAME=" >>"$CONFIG_FILE"
     fi
 }
-
+is_conda_env() {
+    # 检查 CONDA_PREFIX 环境变量是否存在
+    [ -n "$CONDA_PREFIX" ]
+}
+get_python_cmd() {
+    if is_conda_env; then
+        echo "$CONDA_PREFIX/bin/python"
+    else
+        for cmd in python3 python; do
+            if command -v $cmd >/dev/null 2>&1; then
+                echo $cmd
+                return
+            fi
+        done
+    fi
+}
 #创建了一个后台进程，其目的是保持 sudo 权限活跃
 sudo_keep_alive() {
     while true; do
@@ -1513,9 +1524,57 @@ cleanup() {
         kill $SUDO_KEEP_ALIVE_PID
     fi
 }
+get_golang_info() {
+    if command -v go >/dev/null 2>&1; then
+        local go_version=$(go version 2>&1)
+        local go_path=$(go env GOPATH 2>/dev/null)
+        echo "$go_version:$go_path"
+    else
+        echo "Not installed"
+    fi
+}
+log_environment_info() {
+    log_skyblue "环境信息:"
+
+    # Python 环境信息
+    if is_conda_env; then
+        log_skyblue "  Conda 环境: $CONDA_PREFIX"
+    else
+        log_skyblue "  使用系统 Python 环境"
+    fi
+    local python_cmd=$(get_python_cmd)
+    log_skyblue "  Python 路径: $python_cmd"
+    log_skyblue "  Python 版本: $($python_cmd --version 2>&1)"
+    
+    # Frida 信息
+    local frida_version=$($python_cmd -c 'import frida; print(frida.__version__)' 2>/dev/null)
+    if [ -n "$frida_version" ]; then
+        log_skyblue "  Frida 版本: $frida_version"
+        log_skyblue "  Frida 路径: $($python_cmd -c 'import os; import frida; print(os.path.dirname(frida.__file__))' 2>/dev/null)"
+    else
+        log_warning "  Frida 未安装或无法检测"
+    fi
+
+    # Golang 环境信息
+    local golang_info=$(get_golang_info)
+    if [ "$golang_info" != "Not installed" ]; then
+        IFS=':' read -r go_version go_path <<< "$golang_info"
+        log_skyblue "  Golang 版本: $go_version"
+        log_skyblue "  GOPATH: $go_path"
+    else
+        log_warning "  Golang 未安装或无法检测"
+    fi
+
+    # 操作系统信息
+    log_skyblue "  操作系统: $(uname -s)"
+    log_skyblue "  系统版本: $(uname -r)"
+
+    echo  # 空行，为了更好的可读性
+}
 # 主函数
 main() {
     initialize_config
+    log_environment_info
     # 检查是否有 -y 参数
     if [[ "$*" == *"-y"* || "$*" == *"--yes"* ]]; then
         sudo -v || { log_error "无法获取 sudo 权限"; exit 1; }
