@@ -3,6 +3,7 @@
 [English](#Features) | [中文](#特性)
 
 [![GitHub Streak](https://streak-stats.demolab.com?user=suifei&theme=swift&locale=zh_Hans&date_format=%5BY.%5Dn.j)](https://git.io/streak-stats)
+<img src="screenshots/555354813.jpg" width="156" alt="QQ群二维码"> 
 
 ![Github stars](https://img.shields.io/github/stars/suifei/fridare?style=social)
 ![Github forks](https://img.shields.io/github/forks/suifei/fridare?style=social)
@@ -23,8 +24,7 @@
 Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS 越狱设备设计。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
 [CHANGELOG](CHANGELOG)
 
-<img src="screenshots/555354813.jpg" width="200" alt="QQ群二维码"> 
-加入 QQ 555354813 群讨论
+加入 [QQ 555354813](screenshots/555354813.jpg) 群讨论
 
 ## 特性
 
