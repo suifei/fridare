@@ -221,9 +221,9 @@ Fridare 提供了多个命令来满足不同的需求：
 ```
 
 9. 获取特定命令的帮助信息
-```
-./fridare.sh help build
 ```shell
+./fridare.sh help build
+```
 这个命令会显示 build 命令的详细用法。
 
 10. 使用最新版本构建 Frida
