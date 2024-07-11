@@ -131,6 +131,7 @@ show_config_usage() {
     echo "  set <选项> <值>    设置配置"
     echo "  unset <选项>       取消设置"
     echo "  ls, list          列出所有配置"
+    echo "  frida-tools       安装 frida-tools"
     echo
     echo "选项:"
     echo "  proxy              HTTP 代理"
@@ -302,6 +303,9 @@ parse_config_args() {
     ls | list)
         list_config
         ;;
+    frida-tools)
+        install_frida_tools
+        ;;
     *)
         log_error "未知的配置操作: $action"
         show_config_usage
@@ -375,36 +379,36 @@ update_config_file() {
     local current_config=$(cat "$CONFIG_FILE")
 
     # 更新配置
-    echo "# Fridare Configuration File" > "$CONFIG_FILE"
+    echo "# Fridare Configuration File" >"$CONFIG_FILE"
     echo "$current_config" | while IFS='=' read -r key value; do
         case "$key" in
-            FRIDA_SERVER_PORT)
-                echo "FRIDA_SERVER_PORT=${FRIDA_SERVER_PORT:-$value}"
-                ;;
-            CURL_PROXY)
-                echo "CURL_PROXY=${CURL_PROXY:-$value}"
-                ;;
-            AUTO_CONFIRM)
-                echo "AUTO_CONFIRM=${AUTO_CONFIRM:-$value}"
-                ;;
-            FRIDA_NAME)
-                echo "FRIDA_NAME=${FRIDA_NAME:-$value}"
-                ;;
-            *)
-                echo "$key=$value"
-                ;;
+        FRIDA_SERVER_PORT)
+            echo "FRIDA_SERVER_PORT=${FRIDA_SERVER_PORT:-$value}"
+            ;;
+        CURL_PROXY)
+            echo "CURL_PROXY=${CURL_PROXY:-$value}"
+            ;;
+        AUTO_CONFIRM)
+            echo "AUTO_CONFIRM=${AUTO_CONFIRM:-$value}"
+            ;;
+        FRIDA_NAME)
+            echo "FRIDA_NAME=${FRIDA_NAME:-$value}"
+            ;;
+        *)
+            echo "$key=$value"
+            ;;
         esac
-    done >> "$CONFIG_FILE"
+    done >>"$CONFIG_FILE"
 
     log_success "配置已更新: $CONFIG_FILE"
 }
 
 list_frida_versions() {
     log_info "获取 Frida 最新版本列表..."
-    
+
     # 使用 GitHub API 获取最新的 10 个发布版本
     releases=$(curl -s "https://api.github.com/repos/frida/frida/releases?per_page=10")
-    
+
     if [ $? -ne 0 ]; then
         log_error "无法从 GitHub 获取 Frida 版本信息"
         exit 1
@@ -414,18 +418,18 @@ list_frida_versions() {
     log_color ${COLOR_BG_WHITE}${COLOR_BLUE} "序号\t版本\t\t发布日期\t\t下载次数"
     echo "----------------------------------------------------------------"
 
-    echo "$releases" | jq -r '.[] | "\(.tag_name)\t\(.published_at)\t\(.assets[0].download_count)"' | 
-    while IFS=$'\t' read -r version date downloads; do
-        # 格式化日期 (适用于 macOS)
-        formatted_date=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$date" "+%Y-%m-%d" 2>/dev/null || echo "$date")
-        
-        # 获取版本说明的前100个字符
-        description=$(echo "$releases" | jq -r ".[] | select(.tag_name == \"$version\") | .body" | sed 's/\r//' | head -n 1 | cut -c 1-100)
+    echo "$releases" | jq -r '.[] | "\(.tag_name)\t\(.published_at)\t\(.assets[0].download_count)"' |
+        while IFS=$'\t' read -r version date downloads; do
+            # 格式化日期 (适用于 macOS)
+            formatted_date=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$date" "+%Y-%m-%d" 2>/dev/null || echo "$date")
 
-        # 输出格式化的版本信息
-        printf "${COLOR_GREEN}%2d${COLOR_RESET}\t${COLOR_YELLOW}%-10s${COLOR_RESET}\t%s\t%'d\n" "$((++i))" "$version" "$formatted_date" "$downloads"
-        echo -e "${COLOR_PURPLE}   说明: ${COLOR_RESET}${description}...\n"
-    done
+            # 获取版本说明的前100个字符
+            description=$(echo "$releases" | jq -r ".[] | select(.tag_name == \"$version\") | .body" | sed 's/\r//' | head -n 1 | cut -c 1-100)
+
+            # 输出格式化的版本信息
+            printf "${COLOR_GREEN}%2d${COLOR_RESET}\t${COLOR_YELLOW}%-10s${COLOR_RESET}\t%s\t%'d\n" "$((++i))" "$version" "$formatted_date" "$downloads"
+            echo -e "${COLOR_PURPLE}   说明: ${COLOR_RESET}${description}...\n"
+        done
 
     echo -e "\n${COLOR_SKYBLUE}提示: 使用 'fridare.sh build -v <版本号>' 来构建特定版本${COLOR_RESET}"
 }
@@ -895,6 +899,23 @@ confirm_execution() {
         ;;
     esac
 }
+confirm_modify_frida_tools(){
+    if [ "$AUTO_CONFIRM" = "true" ]; then
+        log_warning "自动确认模式：用户已同意自动修改本地 frida-tools。"
+        return 0
+    fi
+    log_color $COLOR_PURPLE "本脚本将自动修改本地 frida-tools，以适配魔改版本的 Frida。（跳过 frida-tools 魔改。某些功能可能无法使用，建议修改）"
+    read -p "您是否同意？(y/N) " response
+    case "$response" in
+    [yY][eE][sS] | [yY])
+        return 0
+        ;;
+    *)
+        log_info "用户不同意，操作已取消"
+        return 1
+        ;;
+    esac
+}
 check_dependencies() {
     local missing_tools=()
     local tools=("xcode-select" "brew" "git" "jq" "dpkg-deb" "go" "python3" "7z" "curl" "xz" "gzip")
@@ -908,6 +929,14 @@ check_dependencies() {
         fi
     done
 
+    # 检查 Frida 工具
+    if ! check_frida_tool; then
+        missing_tools+=("frida-tools")
+        log_warning "${COLOR_YELLOW}frida-tools${COLOR_RESET} ${COLOR_PURPLE}未找到"
+    else
+        log_success "${COLOR_YELLOW}frida-tools$COLOR_RESET ${COLOR_SKYBLUE}已安装"
+    fi
+
     if [ ${#missing_tools[@]} -eq 0 ]; then
         log_success "所有依赖已安装"
         return 0
@@ -915,6 +944,7 @@ check_dependencies() {
         log_warning "以下工具未安装: ${missing_tools[*]}"
         return 1
     fi
+
 }
 
 install_dependencies() {
@@ -932,6 +962,8 @@ install_dependencies() {
     check_and_install_tool "curl" "brew install curl"
     check_and_install_tool "xz" "brew install xz"
     check_and_install_tool "gzip" "brew install gzip"
+
+    install_frida_tools
 
     log_success "依赖安装完成"
 }
@@ -952,7 +984,31 @@ setup_environment() {
 
     log_success "环境设置完成"
 }
+check_frida_tool() {
+    if command -v frida-ps >/dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+install_frida_tools() {
+    log_info "正在安装 frida-tools..."
 
+    local pip_commands=("pip3" "pip")
+    for pip_cmd in "${pip_commands[@]}"; do
+        if command -v "$pip_cmd" >/dev/null 2>&1; then
+            if $pip_cmd install --user frida-tools --force-reinstall; then
+                log_success "frida-tools 安装成功"
+                return 0
+            else
+                log_error "使用 $pip_cmd 安装 frida-tools 失败"
+            fi
+        fi
+    done
+
+    log_error "无法安装 frida-tools。请确保 pip 已正确安装并且网络连接正常。"
+    return 1
+}
 check_and_install_tool() {
     local tool=$1
     local install_cmd=$2
@@ -1157,26 +1213,39 @@ modify_binary() {
         log_error "错误: frida-server 文件不存在于路径: $frida_server_path"
         return 1
     fi
+
     cd ../hexreplace
-    go build -o ../build/hexreplace
+    (go build -o ../build/hexreplace) || {
+        log_error "编译 hexreplace 工具失败"
+        return 1
+    }
     cd ../build
     chmod +x hexreplace
-    ./hexreplace $frida_server_path $FRIDA_NAME $new_path
+    (./hexreplace "$frida_server_path" "$FRIDA_NAME" "$new_path") || {
+        log_error "修改 frida-server 二进制失败"
+        return 1
+    }
     rm -rf $frida_server_path
     # 确保新文件有执行权限
     sudo chmod +x $new_path
     sudo chown root:wheel $new_path
 
-    ./hexreplace $frida_dylib_file $FRIDA_NAME $new_dylib_file
+    (./hexreplace $frida_dylib_file $FRIDA_NAME $new_dylib_file) || {
+        log_error "修改 frida-agent.dylib 失败"
+        return 1
+    }
     rm -rf $frida_dylib_file
     # 确保新文件有执行权限
     sudo chmod +x $new_dylib_file
     sudo chown root:wheel $new_dylib_file
 
     # 修改dylib目录
-    mv $dylib_folder $new_dylib_folder
-
+    if ! mv "$dylib_folder" "$new_dylib_folder"; then
+        log_error "重命名 dylib 目录失败"
+        return 1
+    fi
     log_success "二进制文件修改完成"
+    return 0
 }
 
 # 函数：重新打包 deb 文件
@@ -1196,67 +1265,141 @@ repackage_deb() {
     log_success "重新打包 $output_filename 完成"
 }
 
+find_frida_path() {
+    local pip_commands=("pip3" "pip")
+    local frida_path=""
+
+    for pip_cmd in "${pip_commands[@]}"; do
+        if command -v "$pip_cmd" >/dev/null 2>&1; then
+            frida_path=$("$pip_cmd" show frida 2>/dev/null | grep "Location:" | cut -d " " -f 2-)
+            if [ -n "$frida_path" ]; then
+                frida_path="${frida_path}/frida"
+                if [ -d "$frida_path" ]; then
+                    echo "$frida_path"
+                    return 0
+                fi
+            fi
+        fi
+    done
+
+    # 如果通过 pip 无法找到，尝试常见路径
+    local frida_paths=(
+        "/usr/local/lib/python*/site-packages/frida"
+        "/usr/lib/python*/site-packages/frida"
+        "$HOME/.local/lib/python*/site-packages/frida"
+        "$HOME/Library/Python/*/lib/python/site-packages/frida"
+        "$HOME/anaconda*/lib/python*/site-packages/frida"
+        "/opt/homebrew/lib/python*/site-packages/frida"
+        "/Library/Frameworks/Python.framework/Versions/*/lib/python*/site-packages/frida"
+        "/Applications/Frida.app/Contents/Resources/lib/python*/site-packages/frida"
+    )
+
+    for path_pattern in "${frida_paths[@]}"; do
+        for path in $path_pattern; do
+            if [ -d "$path" ]; then
+                echo "$path"
+                return 0
+            fi
+        done
+    done
+
+    log_error "无法找到 frida-tools 路径。请确保 frida-tools 已正确安装。"
+    return 1
+}
+
 # 函数：修订frida-tools
 modify_frida_tools() {
-    PYLIB_PATH=$(python3 -c "import os, frida; print(os.path.dirname(frida.__file__))")
-    PYLIB=$(ls $PYLIB_PATH/*.so)
+    local python_cmd=""
+    for cmd in python3 python; do
+        if command -v $cmd >/dev/null 2>&1; then
+            python_cmd=$cmd
+            break
+        fi
+    done
 
-    if [ -z "$PYLIB" ]; then
-        log_error "未找到 frida python 库"
+    if [ -z "$python_cmd" ]; then
+        log_error "未找到 Python 解释器"
         return 1
     fi
 
-    # 判断是否有备份文件，没有则备份
-    if [ ! -f "$PYLIB.fridare" ]; then
-        cp "$PYLIB" "$PYLIB.fridare"
+    local pylib_path=$($python_cmd -c "import os, frida; print(os.path.dirname(frida.__file__))" 2>/dev/null)
+    if [ $? -ne 0 ]; then
+        log_error "执行 Python 命令失败，请确保 frida 已正确安装"
+        return 1
+    fi
+    local pylib=$(ls $pylib_path/*.so 2>/dev/null)
+    if [ -z "$pylib" ]; then
+        log_error "未找到 frida Python 库"
+        return 1
     fi
 
-    log_info "python libfile: $PYLIB $FRIDA_NAME"
+    if [ ! -f "$pylib.fridare" ]; then
+        cp "$pylib" "$pylib.fridare"
+        log_info "创建备份: $pylib.fridare"
+    else
+        log_info "备份已存在: $pylib.fridare"
+    fi
 
-    ./hexreplace "$PYLIB" $FRIDA_NAME test.so
+    log_info "Python 库文件: $pylib"
+    log_info "Frida 名称: $FRIDA_NAME"
 
-    rm -rf "$PYLIB" "$PYLIB_PATH/__pycache__"
-    mv test.so "$PYLIB"
-    chmod 755 "$PYLIB"
+    ./hexreplace "$pylib" "$FRIDA_NAME" "test.so" || {
+        log_error "修改 frida Python 库失败"
+        return 1
+    }
 
-    python3 -c "
-import os, frida, shutil, re;
-p = os.path.join(os.path.dirname(frida.__file__), 'core.py');
-b = p + '.fridare';
-frida_name = '$FRIDA_NAME';
-if not os.path.exists(b):
-    print(f'Creating backup: {b}');
-    shutil.copy2(p, b);
-else:
-    print(f'Backup already exists: {b}');
-try:
-    with open(p, 'r') as f:
-        lines = f.readlines();
-    replaced = False;
-    for i, line in enumerate(lines):
-        matches = re.finditer(r'\"([^\"]{5}):rpc\"', line)
-        for match in matches:
-            old = match.group(1)
-            new = frida_name[:5].ljust(5)  # Ensure frida_name is 5 chars
-            line = line.replace(f'\"{old}:rpc\"', f'\"{new}:rpc\"')
-            print(f'Line {i+1}: Replaced \"{old}:rpc\" with \"{new}:rpc\"')
-            replaced = True
-        lines[i] = line
-    if replaced:
-        with open(p, 'w') as f:
-            f.writelines(lines);
-        print(f'Replacement complete');
+    rm -f "$pylib"
+    rm -rf "$pylib_path/__pycache__"
+    mv test.so "$pylib"
+    chmod 755 "$pylib"
+
+    $python_cmd -c "
+import os, frida, shutil, re, sys
+
+def modify_core_py(frida_name):
+    p = os.path.join(os.path.dirname(frida.__file__), 'core.py')
+    b = p + '.fridare'
+    if not os.path.exists(b):
+        print(f'Creating backup: {b}')
+        shutil.copy2(p, b)
     else:
-        print('No matching pattern found, no changes made');
-except Exception as e:
-    print(f'Error: {e}');
-    if os.path.exists(b):
-        print('Restoring from backup');
-        shutil.copy2(b, p);
-    else:
-        print('No backup found to restore from');
-"
+        print(f'Backup already exists: {b}')
+    try:
+        with open(p, 'r') as f:
+            lines = f.readlines()
+        replaced = False
+        for i, line in enumerate(lines):
+            matches = re.finditer(r'\"([^\"]{5}):rpc\"', line)
+            for match in matches:
+                old = match.group(1)
+                new = frida_name[:5].ljust(5)
+                line = line.replace(f'\"{old}:rpc\"', f'\"{new}:rpc\"')
+                print(f'Line {i+1}: Replaced \"{old}:rpc\" with \"{new}:rpc\"')
+                replaced = True
+            lines[i] = line
+        if replaced:
+            with open(p, 'w') as f:
+                f.writelines(lines)
+            print('Replacement complete')
+        else:
+            print('No matching pattern found, no changes made')
+    except Exception as e:
+        print(f'Error: {e}')
+        if os.path.exists(b):
+            print('Restoring from backup')
+            shutil.copy2(b, p)
+        else:
+            print('No backup found to restore from')
+        sys.exit(1)
+
+modify_core_py('$FRIDA_NAME')
+" || {
+        log_error "修改 core.py 失败"
+        return 1
+    }
+
     log_success "frida-tools 修改完成"
+    return 0
 }
 
 build_frida() {
@@ -1280,7 +1423,7 @@ build_frida() {
 
     log_info "开始构建 Frida..."
     # 检查并安装 dpkg
-    
+
     if ! check_dependencies; then
         log_error "依赖检查失败"
         log_success "请使用 './$0 setup' 命令安装依赖"
@@ -1329,8 +1472,15 @@ build_frida() {
         log_info "-------------------------------------------------"
     done
 
+    # 确认执行
+    if [ "$AUTO_CONFIRM" != "true" ]; then
+        # 不同意返回0
+        if ! confirm_modify_frida_tools; then
+            log_success "frida-tools 未修改。"
+            exit 0
+        fi
+    fi
     modify_frida_tools
-    log_success "frida-tools 修改完成"
     cd ..
 
 }
@@ -1339,16 +1489,39 @@ initialize_config() {
     mkdir -p "$(dirname "$CONFIG_FILE")"
 
     if [ ! -f "$CONFIG_FILE" ]; then
-        echo "# Fridare Configuration File" > "$CONFIG_FILE"
-        echo "FRIDA_SERVER_PORT=$DEF_FRIDA_SERVER_PORT" >> "$CONFIG_FILE"
-        echo "CURL_PROXY=" >> "$CONFIG_FILE"
-        echo "AUTO_CONFIRM=$DEF_AUTO_CONFIRM" >> "$CONFIG_FILE"
-        echo "FRIDA_NAME=" >> "$CONFIG_FILE"
+        echo "# Fridare Configuration File" >"$CONFIG_FILE"
+        echo "FRIDA_SERVER_PORT=$DEF_FRIDA_SERVER_PORT" >>"$CONFIG_FILE"
+        echo "CURL_PROXY=" >>"$CONFIG_FILE"
+        echo "AUTO_CONFIRM=$DEF_AUTO_CONFIRM" >>"$CONFIG_FILE"
+        echo "FRIDA_NAME=" >>"$CONFIG_FILE"
+    fi
+}
+
+#创建了一个后台进程，其目的是保持 sudo 权限活跃
+sudo_keep_alive() {
+    while true; do
+        sudo -n true
+        sleep 60
+        kill -0 "$$" || exit
+    done 2>/dev/null &
+    SUDO_KEEP_ALIVE_PID=$!
+}
+
+# 在脚本结束时清理
+cleanup() {
+    if [ -n "$SUDO_KEEP_ALIVE_PID" ]; then
+        kill $SUDO_KEEP_ALIVE_PID
     fi
 }
 # 主函数
 main() {
     initialize_config
+    # 检查是否有 -y 参数
+    if [[ "$*" == *"-y"* || "$*" == *"--yes"* ]]; then
+        sudo -v || { log_error "无法获取 sudo 权限"; exit 1; }
+        sudo_keep_alive
+        trap cleanup EXIT
+    fi
     # 读取配置文件（如果存在）
     if [ -f "$CONFIG_FILE" ]; then
         source "$CONFIG_FILE"

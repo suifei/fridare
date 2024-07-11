@@ -23,17 +23,14 @@
 Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS 越狱设备设计。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
 [CHANGELOG](CHANGELOG)
 
-## 特性
-
-- 自动下载并修改指定版本的 frida-server 
-- 随机生成新的 frida-server 名称
-- 自定义 frida-server 端口
-- 支持 arm 和 arm64 架构
-- 二进制替换修改
-   - frida-server
-   - frida-agent.dylib
-   - frida-tools
-- 生成可直接安装的修改版 .deb 包
+### 新增特性 v3.0.0
+- 新增 `fridare.sh` 脚本，整合所有功能，提供更完整的命令行界面
+- 新增 `build`, `ls`, `download`, `lm`, `setup`, `config`, 和 `help` 命令
+- 新增配置文件支持，可以保存和加载用户设置
+- 新增颜色输出，提升用户体验
+- 新增自动检查和安装依赖功能
+- 新增下载特定 Frida 模块的功能
+- 新增列出可用 Frida 版本和模块的功能
 
 ### 新增特性 v2.2.0 (仅测试 macOS arm 架构，其它架构未测试)
 - 新增加 frida-tools 补丁，适配 `frida:rpc` 特征魔改
@@ -59,15 +56,88 @@ Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS
    issh run "mkdir -p ~/.ssh && cat /var/root/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && chmod 700 ~/.ssh"
    ```
 
+## 特性
+
+- 自动下载并修改指定版本的 frida-server 
+- 随机生成新的 frida-server 名称
+- 自定义 frida-server 端口
+- 支持 arm 和 arm64 架构
+- 二进制替换修改
+   - frida-server
+   - frida-agent.dylib
+   - frida-tools
+- 生成可直接安装的修改版 .deb 包
+- 一体化命令行界面，提供多种功能
+- 配置文件支持，可保存用户设置
+- 自动检查和安装依赖
+- 下载特定 Frida 模块
+- 列出可用 Frida 版本和模块
+
+## Frida 魔改脚本的结构和功能
+```shell
+fridare.sh - Frida 魔改脚本
+│
+├── 主要功能
+│   ├── 构建魔改版 Frida (build)
+│   ├── 列出可用 Frida 版本 (ls, list)
+│   ├── 下载特定版本 Frida (download)
+│   ├── 列出可用 Frida 模块 (lm, list-modules)
+│   ├── 检查并安装系统依赖 (setup)
+│   └── 配置选项设置 (config)
+│
+├── 脚本结构
+│   ├── 初始化配置 (initialize_config)
+│   ├── 参数解析 (parse_arguments)
+│   ├── 命令处理
+│   │   ├── build
+│   │   ├── setup
+│   │   ├── config
+│   │   ├── list
+│   │   ├── download
+│   │   └── list-modules
+│   └── 主函数 (main)
+│
+├── 构建过程 (build_frida)
+│   ├── 版本检查
+│   ├── 环境准备
+│   ├── 下载 Frida (download_frida)
+│   ├── 解包 deb 文件
+│   ├── 修改文件
+│   │   ├── 修改启动守护程序 (modify_launch_daemon)
+│   │   ├── 修改 Debian 文件 (modify_debian_files)
+│   │   └── 修改二进制文件 (modify_binary)
+│   ├── 重新打包 deb 文件 (repackage_deb)
+│   └── 修改 frida-tools (modify_frida_tools)
+│
+├── 辅助功能
+│   ├── 日志输出 (log_info, log_success, log_warning, log_error)
+│   ├── 用户确认 (confirm_execution)
+│   ├── 依赖检查 (check_dependencies)
+│   ├── 依赖安装 (install_dependencies)
+│   ├── 配置管理 (set_config, unset_config, list_config)
+│   └── Frida 版本和模块列表 (list_frida_versions, list_frida_modules)
+│
+├── 下载功能 (download_frida_module)
+│   ├── 版本选择 (最新版或指定版本)
+│   ├── 模块选择 (单个模块或全部模块)
+│   ├── 下载过程
+│   └── 解压处理
+│
+└── 安全和权限
+    ├── sudo 权限保持 (sudo_keep_alive)
+    └── 清理过程 (cleanup)
+```
+
 ## 前提条件
 
 - macOS 操作系统（用于运行构建脚本）
 - Homebrew
-- dpkg（将通过 Homebrew 自动安装，如果尚未安装）
+- Python 3
+- Go (用于编译 hexreplace 工具)
 - 越狱的 iOS 设备
 - 在 iOS 设备上安装 OpenSSH
 
-## 使用方法
+## 安装
 
 1. 克隆此仓库：
 ```shell
@@ -75,42 +145,117 @@ git clone https://github.com/suifei/fridare.git
 cd fridare
 ```
 
-2. 使用 Makefile 构建和部署：
+2. 运行设置命令
 ```shell
-make build       # 构建项目
-make deploy      # 部署项目
+./fridare.sh setup
 ```
+此命令将检查并安装所需的依赖项。
+
 
 2. 运行构建脚本：
 ```shell
 ./build.sh [FRIDA_VERSION] [FRIDA_SERVER_PORT] [CURL_PROXY]
 ```
 
-例如：
+## 使用方法
+Fridare 提供了多个命令来满足不同的需求：
+
+当然，我可以为您提供一个详细的命令清单和使用范例。这将有助于用户更好地理解和使用您的 Fridare 脚本。
+
+### 命令清单
+
+1. `build`: 重新打包 Frida
+2. `ls` 或 `list`: 列出可用的 Frida 版本
+3. `download`: 下载特定版本的 Frida
+4. `lm` 或 `list-modules`: 列出可用的 Frida 模块
+5. `setup`: 检查并安装系统依赖
+6. `config`: 设置配置选项
+7. `help`: 显示帮助信息
+
+### 使用范例
+
+1. 构建魔改版 Frida
 ```shell
-./build.sh 16.3.3 8899 http://127.0.0.1:1081
+./fridare.sh build -v 16.0.19 -p 8899 -y
 ```
-如果不指定参数，脚本将使用默认值（Frida 版本 16.3.3，端口 8899）。
-CURL_PROXY 为可以访问github的代理地址，如果不需要代理，可以不传递。
+这个命令会构建版本 16.0.19 的 Frida，设置端口为 8899，并自动确认所有提示。
 
-3. 脚本将下载指定版本的 Frida，修改它，并在 `dist` 目录中生成新的 .deb 包。
-
+2. 列出可用的 Frida 版本
 ```shell
-$ ./build.sh 16.3.1 8888 http://127.0.0.1:1081
+./fridare.sh ls
 ```
-![build](screenshots/1.png)
-![setup](screenshots/2.png)
 
-4. 将生成的 .deb 包传输到您的 iOS 设备：
+3. 下载特定版本的 Frida
+```shell
+./fridare.sh download -v 16.0.19 -m frida-server ./output
+```
+这个命令会下载版本 16.0.19 的 frida-server 模块到 ./output 目录。
+
+4. 下载最新版本的所有 Frida 模块
+```shell
+./fridare.sh download -latest -all ./output
+```
+
+5. 列出可用的 Frida 模块
+```shell
+./fridare.sh lm
+```
+
+6. 设置环境
+```shell
+./fridare.sh setup
+```
+这个命令会检查并安装所需的系统依赖。
+
+7. 配置设置
+```shell
+./fridare.sh config set proxy http://127.0.0.1:7890
+./fridare.sh config set port 9999
+./fridare.sh config set frida-name abcde
+```
+这些命令分别设置代理、端口和 Frida 魔改名。
+
+8. 列出当前配置
+```shell
+./fridare.sh config ls
+```
+
+9. 获取特定命令的帮助信息
+```
+./fridare.sh help build
+```shell
+这个命令会显示 build 命令的详细用法。
+
+10. 使用最新版本构建 Frida
+```shell
+./fridare.sh build -latest -p 9999 -y
+```
+这个命令会使用最新版本的 Frida 进行构建，设置端口为 9999，并自动确认所有提示。
+
+11. 下载但不解压 Frida 模块
+```shell
+./fridare.sh download -latest -m frida-gadget --no-extract ./output
+```
+这个命令会下载最新版本的 frida-gadget 模块到 ./output 目录，但不会自动解压。
+
+12. 安装 frida-tools
+```shell
+./fridare.sh config frida-tools
+```
+这个命令会安装或更新 frida-tools。
+
+13. 将生成的 .deb 包传输到您的 iOS 设备：
 ```shell
 scp ./dist/frida_16.3.3_iphoneos-arm_tcp.deb root@<iPhone-IP>:/var/root/
 ```
 
-5. SSH 进入您的 iOS 设备并安装修改后的包：
+14. SSH 进入您的 iOS 设备并安装修改后的包：
 ```shell
 ssh root@<iPhone-IP>
 dpkg -i /var/root/frida_16.3.3_iphoneos-arm_tcp.deb
 ```
+
+这些示例涵盖了脚本的主要功能和常见使用场景。可帮助您快速上手使用。
 
 ## 安装兼容版本的 Frida 工具
 
@@ -123,8 +268,12 @@ pip install frida-tools==12.4.3
 npm install frida@16.3.3
 ```
 
-## 使用
-
+## 访问 frida-server
+如果您的设备通过 USB 访问，您可以使用以下命令连接到本地 frida-server：
+```shell
+frida -U -f <target-process>
+```
+## 使用远程 frida-server
 如果不使用usb数据线时，可以使用以下命令连接到远程 frida-server ：
 ```shell
 frida -H <iPhone-IP>:8899 -U
@@ -198,20 +347,24 @@ build.sh 脚本自动化了整个过程：
 
 ---
 
+# Fridare
+
+Fridare is a modification tool designed for customizing Frida-server, specifically for jailbroken iOS devices. It allows users to change names and ports, enhancing security and flexibility. It eliminates many jailbreak detection scenarios for Frida.
+[CHANGELOG](CHANGELOG)
+
 ## Features
 
-- Automatically download and modify specified versions of frida-server
-- Randomly generate new frida-server names
-- Customize frida-server ports
-- Support for arm and arm64 architectures
-- Binary replacement modification
-   - frida-server
-   - frida-agent.dylib
-   - frida-tools
-- Generate modified .deb packages ready for direct installation
+### New Features v3.0.0
+- Added `fridare.sh` script, integrating all functionalities and providing a more complete command-line interface
+- Added `build`, `ls`, `download`, `lm`, `setup`, `config`, and `help` commands
+- Added configuration file support for saving and loading user settings
+- Added color output to enhance user experience
+- Added automatic dependency checking and installation
+- Added functionality to download specific Frida modules
+- Added listing of available Frida versions and modules
 
-### New Features v2.2.0 (Only tested on macOS arm architecture, other architectures not tested)
-- Added frida-tools patch, adapting to the `frida:rpc` characteristic modification
+### New Features v2.2.0 (Tested only on macOS arm architecture, other architectures not tested)
+- Added frida-tools patch, adapting to `frida:rpc` feature modification
    - Resolves the issue of Android memory scanning for this string
    - Automatically scans the local pip installation location of frida-tools, modifies the `core.py` file, and modifies the `_frida.abi3.so` file
 - Added frida-agent.dylib modification, hiding from filename and load location
@@ -234,15 +387,88 @@ build.sh 脚本自动化了整个过程：
    issh run "mkdir -p ~/.ssh && cat /var/root/id_rsa.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && chmod 700 ~/.ssh"
    ```
 
+## Features
+
+- Automatically download and modify specified versions of frida-server
+- Randomly generate new frida-server names
+- Customize frida-server ports
+- Support for arm and arm64 architectures
+- Binary replacement modification
+   - frida-server
+   - frida-agent.dylib
+   - frida-tools
+- Generate modified .deb packages ready for direct installation
+- Integrated command-line interface providing multiple functionalities
+- Configuration file support for saving user settings
+- Automatic dependency checking and installation
+- Download specific Frida modules
+- List available Frida versions and modules
+
+## Structure and Functionality of the Frida Modification Script
+```shell
+fridare.sh - Frida Modification Script
+│
+├── Main Functions
+│   ├── Build modified Frida (build)
+│   ├── List available Frida versions (ls, list)
+│   ├── Download specific Frida version (download)
+│   ├── List available Frida modules (lm, list-modules)
+│   ├── Check and install system dependencies (setup)
+│   └── Configure options (config)
+│
+├── Script Structure
+│   ├── Initialize configuration (initialize_config)
+│   ├── Parse arguments (parse_arguments)
+│   ├── Command processing
+│   │   ├── build
+│   │   ├── setup
+│   │   ├── config
+│   │   ├── list
+│   │   ├── download
+│   │   └── list-modules
+│   └── Main function (main)
+│
+├── Build Process (build_frida)
+│   ├── Version check
+│   ├── Environment preparation
+│   ├── Download Frida (download_frida)
+│   ├── Unpack deb file
+│   ├── Modify files
+│   │   ├── Modify launch daemon (modify_launch_daemon)
+│   │   ├── Modify Debian files (modify_debian_files)
+│   │   └── Modify binary files (modify_binary)
+│   ├── Repackage deb file (repackage_deb)
+│   └── Modify frida-tools (modify_frida_tools)
+│
+├── Auxiliary Functions
+│   ├── Log output (log_info, log_success, log_warning, log_error)
+│   ├── User confirmation (confirm_execution)
+│   ├── Dependency check (check_dependencies)
+│   ├── Dependency installation (install_dependencies)
+│   ├── Configuration management (set_config, unset_config, list_config)
+│   └── Frida version and module listing (list_frida_versions, list_frida_modules)
+│
+├── Download Functionality (download_frida_module)
+│   ├── Version selection (latest or specified version)
+│   ├── Module selection (single module or all modules)
+│   ├── Download process
+│   └── Extraction process
+│
+└── Security and Permissions
+    ├── Maintain sudo privileges (sudo_keep_alive)
+    └── Cleanup process (cleanup)
+```
+
 ## Prerequisites
 
 - macOS operating system (for running build scripts)
 - Homebrew
-- dpkg (will be automatically installed via Homebrew if not already installed)
+- Python 3
+- Go (for compiling the hexreplace tool)
 - Jailbroken iOS device
 - OpenSSH installed on iOS device
 
-## Usage
+## Installation
 
 1. Clone this repository:
 ```shell
@@ -250,46 +476,113 @@ git clone https://github.com/suifei/fridare.git
 cd fridare
 ```
 
-2. Use Makefile to build and deploy:
+2. Run the setup command:
 ```shell
-make build       # Build the project
-make deploy      # Deploy the project
+./fridare.sh setup
+```
+This command will check and install the required dependencies.
+
+## Usage
+Fridare provides multiple commands to meet different needs:
+
+### Command List
+
+1. `build`: Repackage Frida
+2. `ls` or `list`: List available Frida versions
+3. `download`: Download a specific version of Frida
+4. `lm` or `list-modules`: List available Frida modules
+5. `setup`: Check and install system dependencies
+6. `config`: Set configuration options
+7. `help`: Display help information
+
+### Usage Examples
+
+1. Build a modified version of Frida
+```shell
+./fridare.sh build -v 16.0.19 -p 8899 -y
+```
+This command will build Frida version 16.0.19, set the port to 8899, and automatically confirm all prompts.
+
+2. List available Frida versions
+```shell
+./fridare.sh ls
 ```
 
-2. Run the build script:
+3. Download a specific version of Frida
 ```shell
-./build.sh [FRIDA_VERSION] [FRIDA_SERVER_PORT] [CURL_PROXY]
+./fridare.sh download -v 16.0.19 -m frida-server ./output
+```
+This command will download the frida-server module of version 16.0.19 to the ./output directory.
+
+4. Download all Frida modules of the latest version
+```shell
+./fridare.sh download -latest -all ./output
 ```
 
-For example:
+5. List available Frida modules
 ```shell
-./build.sh 16.3.3 8899 http://127.0.0.1:1081
+./fridare.sh lm
 ```
-If no parameters are specified, the script will use default values (Frida version 16.3.3, port 8899).
-CURL_PROXY is the proxy address that can access GitHub. If no proxy is needed, it can be omitted.
 
-3. The script will download the specified version of Frida, modify it, and generate a new .deb package in the `dist` directory.
-
+6. Set up the environment
 ```shell
-$ ./build.sh 16.3.1 8888 http://127.0.0.1:1081
+./fridare.sh setup
 ```
-![build](screenshots/1.png)
-![setup](screenshots/2.png)
+This command will check and install the required system dependencies.
 
-4. Transfer the generated .deb package to your iOS device:
+7. Configure settings
+```shell
+./fridare.sh config set proxy http://127.0.0.1:7890
+./fridare.sh config set port 9999
+./fridare.sh config set frida-name abcde
+```
+These commands set the proxy, port, and Frida modification name respectively.
+
+8. List current configuration
+```shell
+./fridare.sh config ls
+```
+
+9. Get help information for a specific command
+```shell
+./fridare.sh help build
+```
+This command will display detailed usage for the build command.
+
+10. Build Frida using the latest version
+```shell
+./fridare.sh build -latest -p 9999 -y
+```
+This command will build using the latest version of Frida, set the port to 9999, and automatically confirm all prompts.
+
+11. Download but don't extract Frida module
+```shell
+./fridare.sh download -latest -m frida-gadget --no-extract ./output
+```
+This command will download the latest version of the frida-gadget module to the ./output directory but won't automatically extract it.
+
+12. Install frida-tools
+```shell
+./fridare.sh config frida-tools
+```
+This command will install or update frida-tools.
+
+13. Transfer the generated .deb package to your iOS device:
 ```shell
 scp ./dist/frida_16.3.3_iphoneos-arm_tcp.deb root@<iPhone-IP>:/var/root/
 ```
 
-5. SSH into your iOS device and install the modified package:
+14. SSH into your iOS device and install the modified package:
 ```shell
 ssh root@<iPhone-IP>
 dpkg -i /var/root/frida_16.3.3_iphoneos-arm_tcp.deb
 ```
 
-## Install Compatible Version of Frida Tools
+These examples cover the main functionalities and common usage scenarios of the script. They can help you quickly get started with using it.
 
-To ensure compatibility, install Frida tools that match the modified server version:
+## Installing Compatible Frida Tools
+
+To ensure compatibility, please install Frida tools that match the modified server version:
 ```shell
 pip install frida-tools==12.4.3
 ```
@@ -298,8 +591,12 @@ For Node.js users:
 npm install frida@16.3.3
 ```
 
-## Usage
-
+## Accessing frida-server
+If your device is accessed via USB, you can use the following command to connect to the local frida-server:
+```shell
+frida -U -f <target-process>
+```
+## Using Remote frida-server
 If not using a USB data cable, you can use the following commands to connect to the remote frida-server:
 ```shell
 frida -H <iPhone-IP>:8899 -U
@@ -308,7 +605,7 @@ frida-ps -H <iPhone-IP>:8899
 frida-inject -H <iPhone-IP>:8899 ...
 ```
 
-## Principle
+## Principles
 Core principles of the Fridare project:
 
 ### 1. frida-server Modification Principle

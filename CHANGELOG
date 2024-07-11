@@ -2,6 +2,25 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## [3.0.0] - 2024-07-11
+### Added
+- 新增 `fridare.sh` 脚本，整合所有功能，提供更完整的命令行界面
+- 新增 `build`, `ls`, `download`, `lm`, `setup`, `config`, 和 `help` 命令
+- 新增配置文件支持，可以保存和加载用户设置
+- 新增颜色输出，提升用户体验
+- 新增自动检查和安装依赖功能
+- 新增下载特定 Frida 模块的功能
+- 新增列出可用 Frida 版本和模块的功能
+
+### Changed
+- 重构了整个项目结构，提高代码可维护性
+- 改进了错误处理和日志输出
+- 优化了 Frida 构建过程，提高效率
+- 更新了二进制修改逻辑，提高兼容性
+
+### Removed
+- 移除了旧的 `build.sh` 脚本
+
 ## [2.2.0] - 2024-07-04
 ### Added
 - 新增加 frida-tools 补丁，适配 `frida:rpc` 特征魔改
@@ -39,6 +58,27 @@
 # Change Log
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [3.0.0] - 2024-07-11
+### Added
+- add `fridare.sh` script, integrate all functions, provide a more complete command line interface
+- add `build`, `ls`, `download`, `lm`, `setup`, `config`, and `help` commands
+- add configuration file support, can save and load user settings
+- add color output, improve user experience
+- add automatic dependency check and installation
+- add download specific Frida module
+- add list available Frida versions and modules
+
+### Changed
+- refactor the entire project structure, improve code maintainability
+- improve error handling and log output
+- optimize Frida build process, improve efficiency
+- update binary modification logic, improve compatibility
+
+### Removed
+- remove old `build.sh` script
+
+### Changed
 
 ## [2.2.0] - 2024-07-04
 ### Added

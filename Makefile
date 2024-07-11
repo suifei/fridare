@@ -10,7 +10,7 @@ clean:
 	@rm -rf dist
 
 build:
-	@./build.sh 16.3.3 8899 http://127.0.0.1:1081
+	@./fridare.sh build -latest -y
 
 deploy:
 	./autoinstall.sh
