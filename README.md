@@ -85,39 +85,68 @@ fridare.sh - Frida 魔改脚本
 │
 ├── 主要功能
 │   ├── 构建魔改版 Frida (build)
+│   │   ├── 支持指定版本或最新版本
+│   │   ├── 自动生成随机5字符名称
+│   │   ├── 自定义端口设置
+│   │   └── 支持 arm 和 arm64 架构
 │   ├── 列出可用 Frida 版本 (ls, list)
+│   │   └── 从 GitHub API 获取版本信息
 │   ├── 下载特定版本 Frida (download)
+│   │   ├── 支持下载单个或所有模块
+│   │   └── 可选的自动解压功能
 │   ├── 列出可用 Frida 模块 (lm, list-modules)
 │   ├── 检查并安装系统依赖 (setup)
+│   │   ├── 自动检测缺失依赖
+│   │   └── 使用包管理器安装依赖
 │   └── 配置选项设置 (config)
+│       ├── 设置 HTTP 代理
+│       ├── 设置 Frida 服务器端口
+│       └── 设置 Frida 魔改名称
 │
 ├── 脚本结构
 │   ├── 初始化配置 (initialize_config)
+│   │   └── 读取和创建配置文件
 │   ├── 参数解析 (parse_arguments)
+│   │   └── 支持多种命令行选项
 │   ├── 命令处理
-│   │   ├── build
-│   │   ├── setup
-│   │   ├── config
-│   │   ├── list
-│   │   ├── download
-│   │   └── list-modules
+│   │   ├── build: 构建魔改版 Frida
+│   │   ├── setup: 设置环境
+│   │   ├── config: 管理配置
+│   │   ├── list: 列出版本
+│   │   ├── download: 下载模块
+│   │   └── list-modules: 列出模块
 │   └── 主函数 (main)
+│       └── 整合所有功能的入口点
 │
 ├── 构建过程 (build_frida)
 │   ├── 版本检查
+│   │   └── 支持最新版本自动检测
 │   ├── 环境准备
+│   │   ├── 检查 Python 环境 (包括 Conda)
+│   │   └── 检查 Golang 环境
 │   ├── 下载 Frida (download_frida)
 │   ├── 解包 deb 文件
 │   ├── 修改文件
 │   │   ├── 修改启动守护程序 (modify_launch_daemon)
+│   │   │   └── 更新 plist 文件
 │   │   ├── 修改 Debian 文件 (modify_debian_files)
+│   │   │   ├── 更新 control 文件
+│   │   │   ├── 更新 extrainst_ 文件
+│   │   │   └── 更新 prerm 文件
 │   │   └── 修改二进制文件 (modify_binary)
+│   │       ├── 修改 frida-server
+│   │       ├── 修改 frida-agent.dylib
+│   │       └── 使用 hexreplace 工具
 │   ├── 重新打包 deb 文件 (repackage_deb)
 │   └── 修改 frida-tools (modify_frida_tools)
+│       ├── 修改 Python 库文件
+│       └── 更新 core.py 中的字符串
 │
 ├── 辅助功能
 │   ├── 日志输出 (log_info, log_success, log_warning, log_error)
+│   │   └── 支持彩色输出
 │   ├── 用户确认 (confirm_execution)
+│   │   └── 可选的自动确认模式
 │   ├── 依赖检查 (check_dependencies)
 │   ├── 依赖安装 (install_dependencies)
 │   ├── 配置管理 (set_config, unset_config, list_config)
@@ -127,7 +156,9 @@ fridare.sh - Frida 魔改脚本
 │   ├── 版本选择 (最新版或指定版本)
 │   ├── 模块选择 (单个模块或全部模块)
 │   ├── 下载过程
+│   │   └── 支持 HTTP 代理
 │   └── 解压处理
+│       └── 可选的自动解压功能
 │
 └── 安全和权限
     ├── sudo 权限保持 (sudo_keep_alive)
@@ -413,54 +444,85 @@ Fridare is a modification tool designed for customizing Frida-server, specifical
 fridare.sh - Frida Modification Script
 │
 ├── Main Functions
-│   ├── Build modified Frida (build)
-│   ├── List available Frida versions (ls, list)
-│   ├── Download specific Frida version (download)
-│   ├── List available Frida modules (lm, list-modules)
-│   ├── Check and install system dependencies (setup)
-│   └── Configure options (config)
+│   ├── Build Modified Frida (build)
+│   │   ├── Support for specified version or latest version
+│   │   ├── Auto-generate random 5-character name
+│   │   ├── Custom port setting
+│   │   └── Support for arm and arm64 architectures
+│   ├── List Available Frida Versions (ls, list)
+│   │   └── Fetch version info from GitHub API
+│   ├── Download Specific Frida Version (download)
+│   │   ├── Support for downloading single or all modules
+│   │   └── Optional auto-extraction feature
+│   ├── List Available Frida Modules (lm, list-modules)
+│   ├── Check and Install System Dependencies (setup)
+│   │   ├── Auto-detect missing dependencies
+│   │   └── Install dependencies using package manager
+│   └── Configure Options (config)
+│       ├── Set HTTP proxy
+│       ├── Set Frida server port
+│       └── Set Frida modification name
 │
 ├── Script Structure
-│   ├── Initialize configuration (initialize_config)
-│   ├── Parse arguments (parse_arguments)
-│   ├── Command processing
-│   │   ├── build
-│   │   ├── setup
-│   │   ├── config
-│   │   ├── list
-│   │   ├── download
-│   │   └── list-modules
-│   └── Main function (main)
+│   ├── Initialize Configuration (initialize_config)
+│   │   └── Read and create configuration file
+│   ├── Parse Arguments (parse_arguments)
+│   │   └── Support various command-line options
+│   ├── Command Processing
+│   │   ├── build: Build modified Frida
+│   │   ├── setup: Set up environment
+│   │   ├── config: Manage configuration
+│   │   ├── list: List versions
+│   │   ├── download: Download modules
+│   │   └── list-modules: List modules
+│   └── Main Function (main)
+│       └── Entry point integrating all functionalities
 │
 ├── Build Process (build_frida)
-│   ├── Version check
-│   ├── Environment preparation
+│   ├── Version Check
+│   │   └── Support for latest version auto-detection
+│   ├── Environment Preparation
+│   │   ├── Check Python environment (including Conda)
+│   │   └── Check Golang environment
 │   ├── Download Frida (download_frida)
-│   ├── Unpack deb file
-│   ├── Modify files
-│   │   ├── Modify launch daemon (modify_launch_daemon)
-│   │   ├── Modify Debian files (modify_debian_files)
-│   │   └── Modify binary files (modify_binary)
-│   ├── Repackage deb file (repackage_deb)
+│   ├── Unpack deb File
+│   ├── Modify Files
+│   │   ├── Modify Launch Daemon (modify_launch_daemon)
+│   │   │   └── Update plist file
+│   │   ├── Modify Debian Files (modify_debian_files)
+│   │   │   ├── Update control file
+│   │   │   ├── Update extrainst_ file
+│   │   │   └── Update prerm file
+│   │   └── Modify Binary Files (modify_binary)
+│   │       ├── Modify frida-server
+│   │       ├── Modify frida-agent.dylib
+│   │       └── Use hexreplace tool
+│   ├── Repackage deb File (repackage_deb)
 │   └── Modify frida-tools (modify_frida_tools)
+│       ├── Modify Python library files
+│       └── Update strings in core.py
 │
 ├── Auxiliary Functions
-│   ├── Log output (log_info, log_success, log_warning, log_error)
-│   ├── User confirmation (confirm_execution)
-│   ├── Dependency check (check_dependencies)
-│   ├── Dependency installation (install_dependencies)
-│   ├── Configuration management (set_config, unset_config, list_config)
-│   └── Frida version and module listing (list_frida_versions, list_frida_modules)
+│   ├── Log Output (log_info, log_success, log_warning, log_error)
+│   │   └── Support for colored output
+│   ├── User Confirmation (confirm_execution)
+│   │   └── Optional auto-confirm mode
+│   ├── Dependency Check (check_dependencies)
+│   ├── Dependency Installation (install_dependencies)
+│   ├── Configuration Management (set_config, unset_config, list_config)
+│   └── Frida Version and Module Lists (list_frida_versions, list_frida_modules)
 │
 ├── Download Functionality (download_frida_module)
-│   ├── Version selection (latest or specified version)
-│   ├── Module selection (single module or all modules)
-│   ├── Download process
-│   └── Extraction process
+│   ├── Version Selection (latest or specified version)
+│   ├── Module Selection (single module or all modules)
+│   ├── Download Process
+│   │   └── Support for HTTP proxy
+│   └── Extraction Processing
+│       └── Optional auto-extraction feature
 │
 └── Security and Permissions
-    ├── Maintain sudo privileges (sudo_keep_alive)
-    └── Cleanup process (cleanup)
+    ├── Maintain sudo Privileges (sudo_keep_alive)
+    └── Cleanup Process (cleanup)
 ```
 
 ## Prerequisites
