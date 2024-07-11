@@ -23,6 +23,11 @@
 Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS 越狱设备设计。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
 [CHANGELOG](CHANGELOG)
 
+<details>
+  <summary>加入 QQ 555354813 群讨论</summary>
+  
+  ![QQ群 555354813 ](screenshots/555354813.jpg) 
+</details>
 
 ## 特性
 
