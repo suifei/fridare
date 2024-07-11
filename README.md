@@ -2,7 +2,7 @@
 
 [English](#Features) | [中文](#特性)
 
-[![GitHub Streak](https://streak-stats.demolab.com?user=suifei&theme=swift&locale=zh_Hans&date_format=%5BY.%5Dn.j)](https://git.io/streak-stats)
+[![GitHub Streak](https://streak-stats.demolab.com?user=suifei&theme=dark&locale=zh_Hans&date_format=%5BY.%5Dn.j)](https://git.io/streak-stats)
 <img src="screenshots/555354813.jpg" width="156" alt="QQ群二维码"> 
 
 ![Github stars](https://img.shields.io/github/stars/suifei/fridare?style=social)
