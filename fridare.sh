@@ -5,7 +5,7 @@
 
 set -e # 遇到错误立即退出
 
-VERSION="3.1.0"
+VERSION="3.1.1"
 # 默认值设置
 DEF_FRIDA_SERVER_PORT=8899
 DEF_AUTO_CONFIRM="false"
@@ -46,7 +46,7 @@ FRIDA_VERSION=""
 FRIDA_SERVER_PORT=""
 CURL_PROXY=""
 AUTO_CONFIRM=""
-CONFIG_FILE="${HOME}/.fridare_config"
+CONFIG_FILE="${HOME}/.fridare.conf"
 
 # 免责声明
 DISCLAIMER="${COLOR_BG_WHITE}${COLOR_BLACK}${COLOR_BLINK} 本脚本仅供${COLOR_BLUE}学习使用，${COLOR_RED}请勿用于非法用途。${COLOR_RESET}
@@ -102,14 +102,15 @@ show_main_usage() {
     echo "用法: $0 <命令> [选项]"
     echo
     echo "命令:"
-    echo "  build                 重新打包 Frida"
-    echo "  patch                 修补指定的 Frida 模块"
-    echo "  ls, list              列出可用的 Frida 版本" # 完成, complete
-    echo "  download              下载特定版本的 Frida"  # 完成, complete
-    echo "  lm, list-modules      列出可用的 Frida 模块" # 完成, complete
-    echo "  setup                 检查并安装系统依赖"      # 完成, complete
-    echo "  config                设置配置选项"         # 完成, complete
-    echo "  help                  显示帮助信息"         # 完成, complete
+    echo "  build,         b       重新打包 Frida"        # 完成, complete
+    echo "  patch,         p       修补指定的 Frida 模块"  # 完成, complete
+    echo "  list,         ls       列出可用的 Frida 版本"  # 完成, complete
+    echo "  download,     dl       下载特定版本的 Frida"   # 完成, complete
+    echo "  list-modules  lm       列出可用的 Frida 模块"  # 完成, complete
+    echo "  setup,         s       检查并安装系统依赖"      # 完成, complete
+    echo "  config,     conf       设置配置选项"          # 完成, complete
+    echo "  upgrade,       u       更新配置，检查新版本"    # 完成, complete
+    echo "  help,          h       显示帮助信息"          # 完成, complete
     echo
     echo "运行 '$0 help <命令>' 以获取特定命令的更多信息。"
     echo "    suifei@gmail.com"
@@ -208,6 +209,10 @@ parse_arguments() {
         ;;
     lm | list-modules)
         list_frida_modules
+        ;;
+    u | upgrade)
+        update_frida_modules
+        check_version
         ;;
     h | help)
         if [ $# -eq 0 ]; then
@@ -460,250 +465,132 @@ list_frida_versions() {
 
     echo -e "\n${COLOR_SKYBLUE}提示: 使用 'fridare.sh build -v <版本号>' 来构建特定版本${COLOR_RESET}"
 }
-FRIDA_MODULES=(
-    "frida-python-cp37-abi3:freebsd:amd64:frida-{VERSION}-cp37-abi3-freebsd_14_0_release_amd64.whl"
-    "frida-clr:windows:x86:frida-clr-{VERSION}-windows-x86.dll.xz"
-    "frida-clr:windows:x86_64:frida-clr-{VERSION}-windows-x86_64.dll.xz"
-    "frida-core-devkit:android:arm:frida-core-devkit-{VERSION}-android-arm.tar.xz"
-    "frida-core-devkit:android:arm64:frida-core-devkit-{VERSION}-android-arm64.tar.xz"
-    "frida-core-devkit:android:x86:frida-core-devkit-{VERSION}-android-x86.tar.xz"
-    "frida-core-devkit:android:x86_64:frida-core-devkit-{VERSION}-android-x86_64.tar.xz"
-    "frida-core-devkit:freebsd:arm64:frida-core-devkit-{VERSION}-freebsd-arm64.tar.xz"
-    "frida-core-devkit:freebsd:x86_64:frida-core-devkit-{VERSION}-freebsd-x86_64.tar.xz"
-    "frida-core-devkit:ios:simulator:frida-core-devkit-{VERSION}-ios-arm64-simulator.tar.xz"
-    "frida-core-devkit:ios:arm64:frida-core-devkit-{VERSION}-ios-arm64.tar.xz"
-    "frida-core-devkit:ios:arm64e:frida-core-devkit-{VERSION}-ios-arm64e.tar.xz"
-    "frida-core-devkit:ios:x86_64:frida-core-devkit-{VERSION}-ios-x86_64-simulator.tar.xz"
-    "frida-core-devkit:linux:musl:frida-core-devkit-{VERSION}-linux-arm64-musl.tar.xz"
-    "frida-core-devkit:linux:arm64:frida-core-devkit-{VERSION}-linux-arm64.tar.xz"
-    "frida-core-devkit:linux:armhf:frida-core-devkit-{VERSION}-linux-armhf.tar.xz"
-    "frida-core-devkit:linux:mips:frida-core-devkit-{VERSION}-linux-mips.tar.xz"
-    "frida-core-devkit:linux:mips64:frida-core-devkit-{VERSION}-linux-mips64.tar.xz"
-    "frida-core-devkit:linux:mips64el:frida-core-devkit-{VERSION}-linux-mips64el.tar.xz"
-    "frida-core-devkit:linux:mipsel:frida-core-devkit-{VERSION}-linux-mipsel.tar.xz"
-    "frida-core-devkit:linux:x86:frida-core-devkit-{VERSION}-linux-x86.tar.xz"
-    "frida-core-devkit:linux:x86_64:frida-core-devkit-{VERSION}-linux-x86_64-musl.tar.xz"
-    "frida-core-devkit:linux:x86_64:frida-core-devkit-{VERSION}-linux-x86_64.tar.xz"
-    "frida-core-devkit:macos:arm64:frida-core-devkit-{VERSION}-macos-arm64.tar.xz"
-    "frida-core-devkit:macos:arm64e:frida-core-devkit-{VERSION}-macos-arm64e.tar.xz"
-    "frida-core-devkit:macos:x86_64:frida-core-devkit-{VERSION}-macos-x86_64.tar.xz"
-    "frida-core-devkit:qnx:armeabi:frida-core-devkit-{VERSION}-qnx-armeabi.tar.xz"
-    "frida-core-devkit:tvos:simulator:frida-core-devkit-{VERSION}-tvos-arm64-simulator.tar.xz"
-    "frida-core-devkit:tvos:arm64:frida-core-devkit-{VERSION}-tvos-arm64.tar.xz"
-    "frida-core-devkit:watchos:simulator:frida-core-devkit-{VERSION}-watchos-arm64-simulator.tar.xz"
-    "frida-core-devkit:watchos:arm64:frida-core-devkit-{VERSION}-watchos-arm64.tar.xz"
-    "frida-core-devkit:windows:x86:frida-core-devkit-{VERSION}-windows-x86.exe"
-    "frida-core-devkit:windows:x86:frida-core-devkit-{VERSION}-windows-x86.tar.xz"
-    "frida-core-devkit:windows:x86_64:frida-core-devkit-{VERSION}-windows-x86_64.exe"
-    "frida-core-devkit:windows:x86_64:frida-core-devkit-{VERSION}-windows-x86_64.tar.xz"
-    "frida-gadget:android:arm:frida-gadget-{VERSION}-android-arm.so.xz"
-    "frida-gadget:android:arm64:frida-gadget-{VERSION}-android-arm64.so.xz"
-    "frida-gadget:android:x86:frida-gadget-{VERSION}-android-x86.so.xz"
-    "frida-gadget:android:x86_64:frida-gadget-{VERSION}-android-x86_64.so.xz"
-    "frida-gadget:freebsd:arm64:frida-gadget-{VERSION}-freebsd-arm64.so.xz"
-    "frida-gadget:freebsd:x86_64:frida-gadget-{VERSION}-freebsd-x86_64.so.xz"
-    "frida-gadget:ios:universal:frida-gadget-{VERSION}-ios-simulator-universal.dylib.xz"
-    "frida-gadget:ios:universal:frida-gadget-{VERSION}-ios-universal.dylib.gz"
-    "frida-gadget:ios:universal:frida-gadget-{VERSION}-ios-universal.dylib.xz"
-    "frida-gadget:linux:musl:frida-gadget-{VERSION}-linux-arm64-musl.so.xz"
-    "frida-gadget:linux:arm64:frida-gadget-{VERSION}-linux-arm64.so.xz"
-    "frida-gadget:linux:armhf:frida-gadget-{VERSION}-linux-armhf.so.xz"
-    "frida-gadget:linux:mips:frida-gadget-{VERSION}-linux-mips.so.xz"
-    "frida-gadget:linux:mips64:frida-gadget-{VERSION}-linux-mips64.so.xz"
-    "frida-gadget:linux:mips64el:frida-gadget-{VERSION}-linux-mips64el.so.xz"
-    "frida-gadget:linux:mipsel:frida-gadget-{VERSION}-linux-mipsel.so.xz"
-    "frida-gadget:linux:x86:frida-gadget-{VERSION}-linux-x86.so.xz"
-    "frida-gadget:linux:x86_64:frida-gadget-{VERSION}-linux-x86_64-musl.so.xz"
-    "frida-gadget:linux:x86_64:frida-gadget-{VERSION}-linux-x86_64.so.xz"
-    "frida-gadget:macos:universal:frida-gadget-{VERSION}-macos-universal.dylib.xz"
-    "frida-gadget:qnx:armeabi:frida-gadget-{VERSION}-qnx-armeabi.so.xz"
-    "frida-gadget:tvos:simulator:frida-gadget-{VERSION}-tvos-arm64-simulator.dylib.xz"
-    "frida-gadget:tvos:arm64:frida-gadget-{VERSION}-tvos-arm64.dylib.xz"
-    "frida-gadget:watchos:simulator:frida-gadget-{VERSION}-watchos-arm64-simulator.dylib.xz"
-    "frida-gadget:watchos:arm64:frida-gadget-{VERSION}-watchos-arm64.dylib.xz"
-    "frida-gadget:windows:x86:frida-gadget-{VERSION}-windows-x86.dll.xz"
-    "frida-gadget:windows:x86_64:frida-gadget-{VERSION}-windows-x86_64.dll.xz"
-    "frida-gum-devkit:android:arm:frida-gum-devkit-{VERSION}-android-arm.tar.xz"
-    "frida-gum-devkit:android:arm64:frida-gum-devkit-{VERSION}-android-arm64.tar.xz"
-    "frida-gum-devkit:android:x86:frida-gum-devkit-{VERSION}-android-x86.tar.xz"
-    "frida-gum-devkit:android:x86_64:frida-gum-devkit-{VERSION}-android-x86_64.tar.xz"
-    "frida-gum-devkit:freebsd:arm64:frida-gum-devkit-{VERSION}-freebsd-arm64.tar.xz"
-    "frida-gum-devkit:freebsd:x86_64:frida-gum-devkit-{VERSION}-freebsd-x86_64.tar.xz"
-    "frida-gum-devkit:ios:simulator:frida-gum-devkit-{VERSION}-ios-arm64-simulator.tar.xz"
-    "frida-gum-devkit:ios:arm64:frida-gum-devkit-{VERSION}-ios-arm64.tar.xz"
-    "frida-gum-devkit:ios:arm64e:frida-gum-devkit-{VERSION}-ios-arm64e.tar.xz"
-    "frida-gum-devkit:ios:x86_64:frida-gum-devkit-{VERSION}-ios-x86_64-simulator.tar.xz"
-    "frida-gum-devkit:linux:musl:frida-gum-devkit-{VERSION}-linux-arm64-musl.tar.xz"
-    "frida-gum-devkit:linux:arm64:frida-gum-devkit-{VERSION}-linux-arm64.tar.xz"
-    "frida-gum-devkit:linux:armhf:frida-gum-devkit-{VERSION}-linux-armhf.tar.xz"
-    "frida-gum-devkit:linux:mips:frida-gum-devkit-{VERSION}-linux-mips.tar.xz"
-    "frida-gum-devkit:linux:mips64:frida-gum-devkit-{VERSION}-linux-mips64.tar.xz"
-    "frida-gum-devkit:linux:mips64el:frida-gum-devkit-{VERSION}-linux-mips64el.tar.xz"
-    "frida-gum-devkit:linux:mipsel:frida-gum-devkit-{VERSION}-linux-mipsel.tar.xz"
-    "frida-gum-devkit:linux:x86:frida-gum-devkit-{VERSION}-linux-x86.tar.xz"
-    "frida-gum-devkit:linux:x86_64:frida-gum-devkit-{VERSION}-linux-x86_64-musl.tar.xz"
-    "frida-gum-devkit:linux:x86_64:frida-gum-devkit-{VERSION}-linux-x86_64.tar.xz"
-    "frida-gum-devkit:macos:arm64:frida-gum-devkit-{VERSION}-macos-arm64.tar.xz"
-    "frida-gum-devkit:macos:arm64e:frida-gum-devkit-{VERSION}-macos-arm64e.tar.xz"
-    "frida-gum-devkit:macos:x86_64:frida-gum-devkit-{VERSION}-macos-x86_64.tar.xz"
-    "frida-gum-devkit:qnx:armeabi:frida-gum-devkit-{VERSION}-qnx-armeabi.tar.xz"
-    "frida-gum-devkit:tvos:simulator:frida-gum-devkit-{VERSION}-tvos-arm64-simulator.tar.xz"
-    "frida-gum-devkit:tvos:arm64:frida-gum-devkit-{VERSION}-tvos-arm64.tar.xz"
-    "frida-gum-devkit:watchos:simulator:frida-gum-devkit-{VERSION}-watchos-arm64-simulator.tar.xz"
-    "frida-gum-devkit:watchos:arm64:frida-gum-devkit-{VERSION}-watchos-arm64.tar.xz"
-    "frida-gum-devkit:windows:x86:frida-gum-devkit-{VERSION}-windows-x86.exe"
-    "frida-gum-devkit:windows:x86:frida-gum-devkit-{VERSION}-windows-x86.tar.xz"
-    "frida-gum-devkit:windows:x86_64:frida-gum-devkit-{VERSION}-windows-x86_64.exe"
-    "frida-gum-devkit:windows:x86_64:frida-gum-devkit-{VERSION}-windows-x86_64.tar.xz"
-    "frida-gumjs-devkit:android:arm:frida-gumjs-devkit-{VERSION}-android-arm.tar.xz"
-    "frida-gumjs-devkit:android:arm64:frida-gumjs-devkit-{VERSION}-android-arm64.tar.xz"
-    "frida-gumjs-devkit:android:x86:frida-gumjs-devkit-{VERSION}-android-x86.tar.xz"
-    "frida-gumjs-devkit:android:x86_64:frida-gumjs-devkit-{VERSION}-android-x86_64.tar.xz"
-    "frida-gumjs-devkit:freebsd:arm64:frida-gumjs-devkit-{VERSION}-freebsd-arm64.tar.xz"
-    "frida-gumjs-devkit:freebsd:x86_64:frida-gumjs-devkit-{VERSION}-freebsd-x86_64.tar.xz"
-    "frida-gumjs-devkit:ios:simulator:frida-gumjs-devkit-{VERSION}-ios-arm64-simulator.tar.xz"
-    "frida-gumjs-devkit:ios:arm64:frida-gumjs-devkit-{VERSION}-ios-arm64.tar.xz"
-    "frida-gumjs-devkit:ios:arm64e:frida-gumjs-devkit-{VERSION}-ios-arm64e.tar.xz"
-    "frida-gumjs-devkit:ios:x86_64:frida-gumjs-devkit-{VERSION}-ios-x86_64-simulator.tar.xz"
-    "frida-gumjs-devkit:linux:musl:frida-gumjs-devkit-{VERSION}-linux-arm64-musl.tar.xz"
-    "frida-gumjs-devkit:linux:arm64:frida-gumjs-devkit-{VERSION}-linux-arm64.tar.xz"
-    "frida-gumjs-devkit:linux:armhf:frida-gumjs-devkit-{VERSION}-linux-armhf.tar.xz"
-    "frida-gumjs-devkit:linux:mips:frida-gumjs-devkit-{VERSION}-linux-mips.tar.xz"
-    "frida-gumjs-devkit:linux:mips64:frida-gumjs-devkit-{VERSION}-linux-mips64.tar.xz"
-    "frida-gumjs-devkit:linux:mips64el:frida-gumjs-devkit-{VERSION}-linux-mips64el.tar.xz"
-    "frida-gumjs-devkit:linux:mipsel:frida-gumjs-devkit-{VERSION}-linux-mipsel.tar.xz"
-    "frida-gumjs-devkit:linux:x86:frida-gumjs-devkit-{VERSION}-linux-x86.tar.xz"
-    "frida-gumjs-devkit:linux:x86_64:frida-gumjs-devkit-{VERSION}-linux-x86_64-musl.tar.xz"
-    "frida-gumjs-devkit:linux:x86_64:frida-gumjs-devkit-{VERSION}-linux-x86_64.tar.xz"
-    "frida-gumjs-devkit:macos:arm64:frida-gumjs-devkit-{VERSION}-macos-arm64.tar.xz"
-    "frida-gumjs-devkit:macos:arm64e:frida-gumjs-devkit-{VERSION}-macos-arm64e.tar.xz"
-    "frida-gumjs-devkit:macos:x86_64:frida-gumjs-devkit-{VERSION}-macos-x86_64.tar.xz"
-    "frida-gumjs-devkit:qnx:armeabi:frida-gumjs-devkit-{VERSION}-qnx-armeabi.tar.xz"
-    "frida-gumjs-devkit:tvos:simulator:frida-gumjs-devkit-{VERSION}-tvos-arm64-simulator.tar.xz"
-    "frida-gumjs-devkit:tvos:arm64:frida-gumjs-devkit-{VERSION}-tvos-arm64.tar.xz"
-    "frida-gumjs-devkit:watchos:simulator:frida-gumjs-devkit-{VERSION}-watchos-arm64-simulator.tar.xz"
-    "frida-gumjs-devkit:watchos:arm64:frida-gumjs-devkit-{VERSION}-watchos-arm64.tar.xz"
-    "frida-gumjs-devkit:windows:x86:frida-gumjs-devkit-{VERSION}-windows-x86.exe"
-    "frida-gumjs-devkit:windows:x86:frida-gumjs-devkit-{VERSION}-windows-x86.tar.xz"
-    "frida-gumjs-devkit:windows:x86_64:frida-gumjs-devkit-{VERSION}-windows-x86_64.exe"
-    "frida-gumjs-devkit:windows:x86_64:frida-gumjs-devkit-{VERSION}-windows-x86_64.tar.xz"
-    "frida-inject:android:arm:frida-inject-{VERSION}-android-arm.xz"
-    "frida-inject:android:arm64:frida-inject-{VERSION}-android-arm64.xz"
-    "frida-inject:android:x86:frida-inject-{VERSION}-android-x86.xz"
-    "frida-inject:android:x86_64:frida-inject-{VERSION}-android-x86_64.xz"
-    "frida-inject:freebsd:arm64:frida-inject-{VERSION}-freebsd-arm64.xz"
-    "frida-inject:freebsd:x86_64:frida-inject-{VERSION}-freebsd-x86_64.xz"
-    "frida-inject:linux:musl:frida-inject-{VERSION}-linux-arm64-musl.xz"
-    "frida-inject:linux:arm64:frida-inject-{VERSION}-linux-arm64.xz"
-    "frida-inject:linux:armhf:frida-inject-{VERSION}-linux-armhf.xz"
-    "frida-inject:linux:mips:frida-inject-{VERSION}-linux-mips.xz"
-    "frida-inject:linux:mips64:frida-inject-{VERSION}-linux-mips64.xz"
-    "frida-inject:linux:mips64el:frida-inject-{VERSION}-linux-mips64el.xz"
-    "frida-inject:linux:mipsel:frida-inject-{VERSION}-linux-mipsel.xz"
-    "frida-inject:linux:x86:frida-inject-{VERSION}-linux-x86.xz"
-    "frida-inject:linux:x86_64:frida-inject-{VERSION}-linux-x86_64-musl.xz"
-    "frida-inject:linux:x86_64:frida-inject-{VERSION}-linux-x86_64.xz"
-    "frida-inject:macos:arm64:frida-inject-{VERSION}-macos-arm64.xz"
-    "frida-inject:macos:arm64e:frida-inject-{VERSION}-macos-arm64e.xz"
-    "frida-inject:macos:x86_64:frida-inject-{VERSION}-macos-x86_64.xz"
-    "frida-inject:qnx:armeabi:frida-inject-{VERSION}-qnx-armeabi.xz"
-    "frida-inject:windows:x86:frida-inject-{VERSION}-windows-x86.exe.xz"
-    "frida-inject:windows:x86_64:frida-inject-{VERSION}-windows-x86_64.exe.xz"
-    "frida-portal:android:arm:frida-portal-{VERSION}-android-arm.xz"
-    "frida-portal:android:arm64:frida-portal-{VERSION}-android-arm64.xz"
-    "frida-portal:android:x86:frida-portal-{VERSION}-android-x86.xz"
-    "frida-portal:android:x86_64:frida-portal-{VERSION}-android-x86_64.xz"
-    "frida-portal:freebsd:arm64:frida-portal-{VERSION}-freebsd-arm64.xz"
-    "frida-portal:freebsd:x86_64:frida-portal-{VERSION}-freebsd-x86_64.xz"
-    "frida-portal:ios:arm64:frida-portal-{VERSION}-ios-arm64.xz"
-    "frida-portal:ios:arm64e:frida-portal-{VERSION}-ios-arm64e.xz"
-    "frida-portal:linux:musl:frida-portal-{VERSION}-linux-arm64-musl.xz"
-    "frida-portal:linux:arm64:frida-portal-{VERSION}-linux-arm64.xz"
-    "frida-portal:linux:armhf:frida-portal-{VERSION}-linux-armhf.xz"
-    "frida-portal:linux:mips:frida-portal-{VERSION}-linux-mips.xz"
-    "frida-portal:linux:mips64:frida-portal-{VERSION}-linux-mips64.xz"
-    "frida-portal:linux:mips64el:frida-portal-{VERSION}-linux-mips64el.xz"
-    "frida-portal:linux:mipsel:frida-portal-{VERSION}-linux-mipsel.xz"
-    "frida-portal:linux:x86:frida-portal-{VERSION}-linux-x86.xz"
-    "frida-portal:linux:x86_64:frida-portal-{VERSION}-linux-x86_64-musl.xz"
-    "frida-portal:linux:x86_64:frida-portal-{VERSION}-linux-x86_64.xz"
-    "frida-portal:macos:arm64:frida-portal-{VERSION}-macos-arm64.xz"
-    "frida-portal:macos:arm64e:frida-portal-{VERSION}-macos-arm64e.xz"
-    "frida-portal:macos:x86_64:frida-portal-{VERSION}-macos-x86_64.xz"
-    "frida-portal:qnx:armeabi:frida-portal-{VERSION}-qnx-armeabi.xz"
-    "frida-portal:windows:x86:frida-portal-{VERSION}-windows-x86.exe.xz"
-    "frida-portal:windows:x86_64:frida-portal-{VERSION}-windows-x86_64.exe.xz"
-    "frida-qml:linux:x86_64:frida-qml-{VERSION}-linux-x86_64.tar.xz"
-    "frida-qml:macos:x86_64:frida-qml-{VERSION}-macos-x86_64.tar.xz"
-    "frida-qml:windows:x86_64:frida-qml-{VERSION}-windows-x86_64.tar.xz"
-    "frida-server:android:arm:frida-server-{VERSION}-android-arm.xz"
-    "frida-server:android:arm64:frida-server-{VERSION}-android-arm64.xz"
-    "frida-server:android:x86:frida-server-{VERSION}-android-x86.xz"
-    "frida-server:android:x86_64:frida-server-{VERSION}-android-x86_64.xz"
-    "frida-server:freebsd:arm64:frida-server-{VERSION}-freebsd-arm64.xz"
-    "frida-server:freebsd:x86_64:frida-server-{VERSION}-freebsd-x86_64.xz"
-    "frida-server:linux:musl:frida-server-{VERSION}-linux-arm64-musl.xz"
-    "frida-server:linux:arm64:frida-server-{VERSION}-linux-arm64.xz"
-    "frida-server:linux:armhf:frida-server-{VERSION}-linux-armhf.xz"
-    "frida-server:linux:mips:frida-server-{VERSION}-linux-mips.xz"
-    "frida-server:linux:mips64:frida-server-{VERSION}-linux-mips64.xz"
-    "frida-server:linux:mips64el:frida-server-{VERSION}-linux-mips64el.xz"
-    "frida-server:linux:mipsel:frida-server-{VERSION}-linux-mipsel.xz"
-    "frida-server:linux:x86:frida-server-{VERSION}-linux-x86.xz"
-    "frida-server:linux:x86_64:frida-server-{VERSION}-linux-x86_64-musl.xz"
-    "frida-server:linux:x86_64:frida-server-{VERSION}-linux-x86_64.xz"
-    "frida-server:macos:arm64:frida-server-{VERSION}-macos-arm64.xz"
-    "frida-server:macos:arm64e:frida-server-{VERSION}-macos-arm64e.xz"
-    "frida-server:macos:x86_64:frida-server-{VERSION}-macos-x86_64.xz"
-    "frida-server:qnx:armeabi:frida-server-{VERSION}-qnx-armeabi.xz"
-    "frida-server:windows:x86:frida-server-{VERSION}-windows-x86.exe.xz"
-    "frida-server:windows:x86_64:frida-server-{VERSION}-windows-x86_64.exe.xz"
-    "frida-electron-v123:freebsd:arm64:frida-v{VERSION}-electron-v123-freebsd-arm64.tar.gz"
-    "frida-electron-v123:freebsd:x64:frida-v{VERSION}-electron-v123-freebsd-x64.tar.gz"
-    "frida-electron-v125:darwin:arm64:frida-v{VERSION}-electron-v125-darwin-arm64.tar.gz"
-    "frida-electron-v125:darwin:x64:frida-v{VERSION}-electron-v125-darwin-x64.tar.gz"
-    "frida-electron-v125:linux:arm64:frida-v{VERSION}-electron-v125-linux-arm64.tar.gz"
-    "frida-electron-v125:linux:x64:frida-v{VERSION}-electron-v125-linux-x64.tar.gz"
-    "frida-electron-v125:win32:x64:frida-v{VERSION}-electron-v125-win32-x64.tar.gz"
-    "frida-node-v108:darwin:arm64:frida-v{VERSION}-node-v108-darwin-arm64.tar.gz"
-    "frida-node-v108:darwin:x64:frida-v{VERSION}-node-v108-darwin-x64.tar.gz"
-    "frida-node-v108:linux:arm64:frida-v{VERSION}-node-v108-linux-arm64.tar.gz"
-    "frida-node-v108:linux:armv7l:frida-v{VERSION}-node-v108-linux-armv7l.tar.gz"
-    "frida-node-v108:linux:ia32:frida-v{VERSION}-node-v108-linux-ia32.tar.gz"
-    "frida-node-v108:linux:x64:frida-v{VERSION}-node-v108-linux-x64.tar.gz"
-    "frida-node-v108:win32:x64:frida-v{VERSION}-node-v108-win32-x64.tar.gz"
-    "frida-node-v115:darwin:arm64:frida-v{VERSION}-node-v115-darwin-arm64.tar.gz"
-    "frida-node-v115:darwin:x64:frida-v{VERSION}-node-v115-darwin-x64.tar.gz"
-    "frida-node-v115:freebsd:arm64:frida-v{VERSION}-node-v115-freebsd-arm64.tar.gz"
-    "frida-node-v115:freebsd:x64:frida-v{VERSION}-node-v115-freebsd-x64.tar.gz"
-    "frida-node-v115:linux:arm64:frida-v{VERSION}-node-v115-linux-arm64.tar.gz"
-    "frida-node-v115:linux:armv7l:frida-v{VERSION}-node-v115-linux-armv7l.tar.gz"
-    "frida-node-v115:linux:ia32:frida-v{VERSION}-node-v115-linux-ia32.tar.gz"
-    "frida-node-v115:linux:x64:frida-v{VERSION}-node-v115-linux-x64.tar.gz"
-    "frida-node-v115:win32:x64:frida-v{VERSION}-node-v115-win32-x64.tar.gz"
-    "frida-node-v127:darwin:arm64:frida-v{VERSION}-node-v127-darwin-arm64.tar.gz"
-    "frida-node-v127:darwin:x64:frida-v{VERSION}-node-v127-darwin-x64.tar.gz"
-    "frida-node-v127:linux:arm64:frida-v{VERSION}-node-v127-linux-arm64.tar.gz"
-    "frida-node-v127:linux:armv7l:frida-v{VERSION}-node-v127-linux-armv7l.tar.gz"
-    "frida-node-v127:linux:ia32:frida-v{VERSION}-node-v127-linux-ia32.tar.gz"
-    "frida-node-v127:linux:x64:frida-v{VERSION}-node-v127-linux-x64.tar.gz"
-    "frida-node-v127:win32:x64:frida-v{VERSION}-node-v127-win32-x64.tar.gz"
-    "frida-node-v93:darwin:arm64:frida-v{VERSION}-node-v93-darwin-arm64.tar.gz"
-    "frida-node-v93:darwin:x64:frida-v{VERSION}-node-v93-darwin-x64.tar.gz"
-    "frida-node-v93:linux:arm64:frida-v{VERSION}-node-v93-linux-arm64.tar.gz"
-    "frida-node-v93:linux:armv7l:frida-v{VERSION}-node-v93-linux-armv7l.tar.gz"
-    "frida-node-v93:linux:ia32:frida-v{VERSION}-node-v93-linux-ia32.tar.gz"
-    "frida-node-v93:linux:x64:frida-v{VERSION}-node-v93-linux-x64.tar.gz"
-    "frida-node-v93:win32:ia32:frida-v{VERSION}-node-v93-win32-ia32.tar.gz"
-    "frida-node-v93:win32:x64:frida-v{VERSION}-node-v93-win32-x64.tar.gz"
-    "frida-appletvos-deb:appletvos:arm64:frida_{VERSION}_appletvos-arm64.deb"
-    "frida-iphoneos-deb:iphoneos:arm:frida_{VERSION}_iphoneos-arm.deb"
-    "frida-iphoneos-deb:iphoneos:arm64:frida_{VERSION}_iphoneos-arm64.deb"
-    "gum-graft:macos:arm64:gum-graft-{VERSION}-macos-arm64.xz"
-    "gum-graft:macos:x86_64:gum-graft-{VERSION}-macos-x86_64.xz"
-)
+FRIDA_MODULES=()
+update_frida_modules() {
+    log_info "正在更新 FRIDA_MODULES..."
+    local python_cmd=$(get_python_cmd)
+    if [ -z "$python_cmd" ]; then
+        log_error "未找到 Python 解释器"
+        return 1
+    fi
 
+    # 确保 CURL_PROXY 环境变量可用于 Python 脚本
+    export CURL_PROXY
+
+    local new_modules=$($python_cmd -c "$(cat <<EOF
+import os
+import re
+import requests
+
+def get_proxy_settings():
+    curl_proxy = os.environ.get('CURL_PROXY', '')
+    if curl_proxy:
+        return {"http": curl_proxy, "https": curl_proxy}
+    return None
+
+def get_latest_release():
+    url = "https://api.github.com/repos/frida/frida/releases/latest"
+    proxies = get_proxy_settings()
+    try:
+        response = requests.get(url, proxies=proxies)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching latest release: {str(e)}")
+        return None
+
+def parse_filename(filename):
+    pattern = re.compile(r'(?P<module_type>frida[-_]?[a-zA-Z0-9\-]+)?[-_](?P<version>v?\d+\.\d+\.\d+)[-_](?P<os>[a-zA-Z0-9\-]+)[-_](?P<arch>[a-zA-Z0-9_]+)')
+    match = pattern.search(filename)
+    if match:
+        module_type = match.group('module_type') or 'N/A'
+        version = match.group('version')
+        os = match.group('os')
+        arch = match.group('arch')
+        if '.' in filename:
+            ext = filename.split('.')[-1]
+        else:
+            ext = 'N/A'
+        if '64' == arch:
+            arch = 'x86_64'
+        elif '_' in arch:
+            arch = arch.split('_')[-1]
+        if os.startswith('cp') and '-' in os:
+            os_info = os.split('-')
+            os = os_info[-1]
+            module_type = 'frida-python-' + os_info[0] + '-' + os_info[1]
+        elif 'node-' in os:
+            os_info = os.split('-')
+            os = os_info[-1]
+            module_type = 'frida-' + os_info[0] + '-' + os_info[1]
+        elif 'electron-' in os:
+            os_info = os.split('-')
+            os = os_info[-1]
+            module_type = 'frida-' + os_info[0] + '-' + os_info[1]
+        elif '-' in os:
+            os = os.split('-')[0]
+
+        if 'N/A' == module_type and 'deb' in filename:
+            module_type = 'frida-' + os + '-deb'
+        elif 'N/A' == module_type and 'gum-graft' in filename:
+            module_type = 'gum-graft'
+            os = filename.split('-')[-2]
+            arch = filename.split('-')[-1].split('.')[0]
+        return (module_type, version, os, arch, ext)
+    return None
+
+def generate_frida_modules():
+    release = get_latest_release()
+    if not release:
+        return []
+
+    assets = release['assets']
+    frida_modules = []
+
+    for asset in assets:
+        parsed = parse_filename(asset['name'])
+        if parsed:
+            module_type, version, os, arch, ext = parsed
+            if 'v' == version[0]:
+                version = version[1:]
+            asset_name = asset['name'].replace(version, '{VERSION}')
+            frida_modules.append(f'"{module_type}:{os}:{arch}:{asset_name}"')
+
+    return frida_modules
+
+def main():
+    frida_modules = generate_frida_modules()
+    print("FRIDA_MODULES=(")
+    for module in frida_modules:
+        print(f"    {module}")
+    print(")")
+
+if __name__ == "__main__":
+    main()
+EOF
+)")
+
+    if [ $? -ne 0 ]; then
+        log_error "更新 FRIDA_MODULES 失败"
+        return 1
+    fi
+
+    # 更新配置文件中的 FRIDA_MODULES
+    sed -i '' '/^FRIDA_MODULES=/,/^)/d' "$CONFIG_FILE"
+    echo "$new_modules" >> "$CONFIG_FILE"
+
+    log_success "FRIDA_MODULES 更新完成"
+    return 0
+}
 list_frida_modules() {
+    # 检查 FRIDA_MODULES 是否为空
+    if [ ${#FRIDA_MODULES[@]} -eq 0 ]; then
+        log_info "FRIDA_MODULES 为空，正在更新..."
+        update_frida_modules
+        # 重新加载配置文件以获取更新后的 FRIDA_MODULES
+        source "$CONFIG_FILE"
+    fi
+
     log_info "可用的 Frida 模块："
     # 使用临时文件来存储和排序唯一的模块
     temp_file=$(mktemp)
@@ -1753,6 +1640,8 @@ initialize_config() {
         echo "CURL_PROXY=" >>"$CONFIG_FILE"
         echo "AUTO_CONFIRM=$DEF_AUTO_CONFIRM" >>"$CONFIG_FILE"
         echo "FRIDA_NAME=" >>"$CONFIG_FILE"
+        echo "FRIDA_MODULES=(" >> "$CONFIG_FILE"
+        echo ")" >> "$CONFIG_FILE"
     fi
 }
 is_conda_env() {
@@ -1842,6 +1731,101 @@ log_config_info() {
     log_skyblue "  AUTO_CONFIRM: $AUTO_CONFIRM"
     log_skyblue "  FRIDA_NAME: $FRIDA_NAME"
     echo # 空行，为了更好的可读性
+}
+check_version() {
+    local current_version="$VERSION"
+    local repo_owner="suifei"  # 替换为您的 GitHub 用户名
+    local repo_name="fridare"  # 替换为您的仓库名
+
+    log_info "检查版本更新..."
+    local latest_info=$(curl -s "https://api.github.com/repos/$repo_owner/$repo_name/releases/latest")
+    local latest_version=$(echo "$latest_info" | jq -r '.tag_name')
+    local download_url=$(echo "$latest_info" | jq -r '.zipball_url')
+    
+    if [ -z "$latest_version" ] || [ -z "$download_url" ]; then
+        log_error "无法获取最新版本信息"
+        return 1
+    fi
+
+    if version_compare "$current_version" "$latest_version"; then
+        log_success "当前版本 ($current_version) 已是最新"
+        return 0
+    fi
+
+    log_warning "发现新版本：$latest_version（当前版本：$current_version）"
+    echo "更新说明："
+    echo "$latest_info" | jq -r '.body' | sed 's/^/  /'
+
+    read -p "是否更新到最新版本？(y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_info "取消更新"
+        return 0
+    fi
+
+    log_info "开始下载最新版本..."
+    local temp_dir=$(mktemp -d)
+    local zip_file="$temp_dir/fridare-$latest_version.zip"
+
+    if ! curl -L "$download_url" -o "$zip_file"; then
+        log_error "下载失败"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+
+    log_info "解压文件..."
+    if ! unzip -q "$zip_file" -d "$temp_dir"; then
+        log_error "解压失败"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+
+    log_info "更新本地文件..."
+    local extract_dir=$(find "$temp_dir" -maxdepth 1 -type d | grep -v "^$temp_dir$" | head -n 1)
+    local script_dir=$(dirname "$0")
+    
+    # 使用 cp 替代 rsync
+    if ! (cd "$extract_dir" && cp -R . "$script_dir/"); then
+        log_error "更新本地文件失败"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+
+    # 删除可能存在的旧文件
+    find "$script_dir" -type f | while read file; do
+        if [ ! -e "$extract_dir/${file#$script_dir/}" ]; then
+            rm "$file"
+        fi
+    done
+
+    chmod -R 755 "$script_dir"  # 根据需要调整权限
+    rm -rf "$temp_dir"
+    log_success "更新完成，新版本：$latest_version"
+    log_info "请重新运行脚本以使用新版本"
+    exit 0
+}
+
+version_compare() {
+    if [[ $1 == $2 ]]; then
+        return 1
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do
+        ver1[i]=0
+    done
+    for ((i=0; i<${#ver1[@]}; i++)); do
+        if [[ -z ${ver2[i]} ]]; then
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]})); then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]})); then
+            return 0
+        fi
+    done
+    return 1
 }
 # 主函数
 main() {

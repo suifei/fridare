@@ -1,0 +1,7 @@
+hexreplace/main.go
+hexreplace/Makefile
+hexreplace/go.mod
+autoinstall.sh
+CHANGELOG
+fridare.sh
+README.md
