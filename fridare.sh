@@ -700,27 +700,26 @@ FRIDA_MODULES=(
     "gum-graft:macos:arm64:gum-graft-{VERSION}-macos-arm64.xz"
     "gum-graft:macos:x86_64:gum-graft-{VERSION}-macos-x86_64.xz"
 )
+
 list_frida_modules() {
     log_info "可用的 Frida 模块："
-    echo -e "${COLOR_GREEN}模块名称\t\t操作系统\t架构${COLOR_RESET}"
-    echo "----------------------------------------"
-
     # 使用临时文件来存储和排序唯一的模块
     temp_file=$(mktemp)
 
+    # 添加表头
+    echo -e "模块名称\t操作系统\t架构" >"$temp_file"
+    echo -e "-------\t-------\t----" >>"$temp_file"
+
     for item in "${FRIDA_MODULES[@]}"; do
         IFS=':' read -r mod os arch filename <<<"$item"
-        echo "$mod	$os	$arch" >>"$temp_file"
+        echo -e "$mod\t$os\t$arch" >>"$temp_file"
     done
 
-    # 排序并移除重复项
-    sort -u "$temp_file" | while read -r line; do
-        echo -e "$line"
-    done
-
-    # 删除临时文件
+    # 使用 column 命令对齐输出，并删除临时文件
+    column -t -s $'\t' < "$temp_file"
     rm -f "$temp_file"
 }
+
 parse_download_args() {
     local version=""
     local module=""
