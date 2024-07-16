@@ -5,11 +5,9 @@
 
 set -e # 遇到错误立即退出
 
-VERSION="3.0.0"
+VERSION="3.1.0"
 # 默认值设置
-# DEF_FRIDA_VERSION=
 DEF_FRIDA_SERVER_PORT=8899
-# DEF_HTTP_PROXY=""
 DEF_AUTO_CONFIRM="false"
 
 readonly COLOR_YELLOW='\033[33m'
@@ -95,7 +93,7 @@ log_color() {
     echo -e "$1$2${COLOR_RESET}"
 }
 
-log_skyblue(){
+log_skyblue() {
     echo -e "${COLOR_SKYBLUE}$1${COLOR_RESET}"
 }
 show_main_usage() {
@@ -105,6 +103,7 @@ show_main_usage() {
     echo
     echo "命令:"
     echo "  build                 重新打包 Frida"
+    echo "  patch                 修补指定的 Frida 模块"
     echo "  ls, list              列出可用的 Frida 版本" # 完成, complete
     echo "  download              下载特定版本的 Frida"  # 完成, complete
     echo "  lm, list-modules      列出可用的 Frida 模块" # 完成, complete
@@ -117,7 +116,7 @@ show_main_usage() {
     echo "    https://github.com/suifei/fridare"
 }
 show_build_usage() {
-    echo "用法: $0 build [选项]"
+    echo "用法: $0 b|build [选项]"
     echo
     echo "选项:"
     echo "  -v VERSION               指定 Frida 版本"
@@ -126,6 +125,24 @@ show_build_usage() {
     echo "  -y, --yes                自动回答是以确认提示"
     echo
     echo "注意: -v 和 -latest 不能同时使用"
+}
+show_patch_usage() {
+    echo "用法: $0 patch [选项]"
+    echo
+    echo "选项:"
+    echo "  -m, --module NAME        指定要修补的 Frida 模块名称"
+    echo "  -v, --version VERSION    指定 Frida 版本"
+    echo "  -latest                  使用最新的 Frida 版本"
+    echo "  -os OS                   指定操作系统 (可选)"
+    echo "  -arch ARCH               指定处理器架构 (可选)"
+    echo "  -o, --output DIR         指定输出目录 (默认: ./patched_output)"
+    echo "  -n, --no-backup          不保留源文件 (默认保留)"
+    echo "  -a, --auto-package       自动打包修补后的模块 (默认不打包)"
+    echo "  -f, --force              覆盖已存在的文件 (默认跳过)"
+    echo
+    echo "示例:"
+    echo "  $0 patch -m frida-server -v 14.2.18 -os android -arch arm64 -o ./patched -a"
+    echo "  $0 patch -m frida-gadget -latest -os ios -arch arm64 -k -a -f"
 }
 show_config_usage() {
     echo "用法: $0 config <操作> <选项> [<值>]"
@@ -142,7 +159,7 @@ show_config_usage() {
     echo "  frida-name         Frida 魔改名"
 }
 show_download_usage() {
-    echo "用法: $0 download [选项] <输出目录>"
+    echo "用法: $0 dl|download [选项] <输出目录>"
     echo
     echo "选项:"
     echo "  -v, --version VERSION    指定要下载的 Frida 版本"
@@ -150,12 +167,13 @@ show_download_usage() {
     echo "  -m, --module MODULE      指定要下载的模块名称"
     echo "  -all                     下载所有模块"
     echo "  --no-extract             不自动解压文件"
+    echo "  -f, --force              覆盖已存在的文件 (默认跳过)"
     echo "  lm, list-modules         列出所有可用的模块"
     echo
     echo "示例:"
     echo "  $0 download -v 16.4.2 -m frida-server ./output"
     echo "  $0 download -latest -m frida-gadget ./output"
-    echo "  $0 download -latest -all ./output"
+    echo "  $0 download -latest -all ./output -f"
     echo "  $0 download -latest -all --no-extract ./output"
 }
 
@@ -170,32 +188,36 @@ parse_arguments() {
     shift
 
     case "$command" in
-    build)
+    b | build)
         parse_build_args "$@"
         ;;
-    setup)
+    p | patch)
+        parse_patch_args "$@"
+        ;;
+    s | setup)
         setup_environment
         ;;
-    config)
+    conf | config)
         parse_config_args "$@"
         ;;
     ls | list)
         list_frida_versions
         ;;
-    download)
+    dl | download)
         parse_download_args "$@"
         ;;
     lm | list-modules)
         list_frida_modules
         ;;
-    help)
+    h | help)
         if [ $# -eq 0 ]; then
             show_main_usage
         else
             case "$1" in
-            build) show_build_usage ;;
-            config) show_config_usage ;;
-            download) show_download_usage ;;
+            b | build) show_build_usage ;;
+            p | patch) show_patch_usage ;;
+            conf | config) show_config_usage ;;
+            dl | download) show_download_usage ;;
             *)
                 log_error "未知命令: $1"
                 show_main_usage
@@ -706,6 +728,9 @@ parse_download_args() {
     local use_latest=false
     local download_all=false
     local no_extract=false
+    local os=""
+    local arch=""
+    local force=false
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -731,6 +756,18 @@ parse_download_args() {
             ;;
         --no-extract)
             no_extract=true
+            shift
+            ;;
+        -os)
+            os="$2"
+            shift 2
+            ;;
+        -arch)
+            arch="$2"
+            shift 2
+            ;;
+        -f | --force)
+            force=true
             shift
             ;;
         *)
@@ -765,7 +802,7 @@ parse_download_args() {
     fi
 
     # 执行下载逻辑
-    download_frida_module "$version" "$use_latest" "$module" "$download_all" "$output_dir" "$no_extract"
+    download_frida_module "$version" "$use_latest" "$module" "$download_all" "$output_dir" "$no_extract" "$os" "$arch" "$force"
 }
 download_frida_module() {
     local version="$1"
@@ -774,6 +811,9 @@ download_frida_module() {
     local download_all="$4"
     local output_dir="$5"
     local no_extract="$6"
+    local os="$7"
+    local arch="$8"
+    local force="$9"
 
     # 如果使用最新版本，获取最新版本号
     if [[ "$use_latest" == true ]]; then
@@ -784,8 +824,8 @@ download_frida_module() {
     if [[ -n "$module" ]]; then
         local module_found=false
         for item in "${FRIDA_MODULES[@]}"; do
-            IFS=':' read -r mod os arch filename <<<"$item"
-            if [[ "$mod" == "$module" ]]; then
+            IFS=':' read -r item_mod item_os item_arch filename <<<"$item"
+            if [[ "$item_mod" == "$module" ]]; then
                 module_found=true
                 break
             fi
@@ -803,14 +843,21 @@ download_frida_module() {
     # 创建基础输出目录
     mkdir -p "$output_dir"
 
+    local found_match=false
     # 遍历模块列表
     for item in "${FRIDA_MODULES[@]}"; do
-        IFS=':' read -r mod os arch filename <<<"$item"
-
-        # 如果指定了模块且不匹配，或者不是下载全部，则跳过
-        if [[ -n "$module" && "$mod" != "$module" ]] || [[ "$download_all" != true && -n "$module" && "$mod" != "$module" ]]; then
+        IFS=':' read -r item_mod item_os item_arch filename <<<"$item"
+        # 如果指定了模块且不匹配，则跳过
+        if [[ -n "$module" && "$item_mod" != "$module" ]]; then
             continue
         fi
+
+        # 如果指定了操作系统和架构，只下载匹配的文件
+        if [[ (-n "$os" && "$item_os" != "$os") || (-n "$arch" && "$item_arch" != "$arch") ]]; then
+            continue
+        fi
+
+        found_match=true
 
         # 替换文件名中的版本占位符
         filename="${filename/\{VERSION\}/$version}"
@@ -821,6 +868,11 @@ download_frida_module() {
 
         local url="https://github.com/frida/frida/releases/download/${version}/${filename}"
         local output_file="${dir}/${filename}"
+
+        if [[ -f "$output_file" && "$force" != true ]]; then
+            log_info "文件 $filename 已存在，跳过下载"
+            continue
+        fi
 
         log_info "正在下载 $filename 到 $dir"
         if [ -n "$CURL_PROXY" ]; then
@@ -877,9 +929,215 @@ download_frida_module() {
                 log_info "跳过解压 $filename (deb 或 whl 文件)"
             fi
         fi
+        # 如果不是下载全部，找到匹配项后就退出循环
+        if [[ "$download_all" != true ]]; then
+            break
+        fi
+    done
+    if [[ "$found_match" == false ]]; then
+        log_error "没有找到匹配的模块: $module (OS: $os, Arch: $arch)"
+        return 1
+    fi
+    log_success "所有下载和解压操作完成"
+}
+parse_patch_args() {
+    local module=""
+    local version=""
+    local use_latest=false
+    local os=""
+    local arch=""
+    local output_dir="./patched"
+    local no_backup=false
+    local auto_package=false
+    local force=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+        -m | --module)
+            module="$2"
+            shift 2
+            ;;
+        -v | --version)
+            version="$2"
+            shift 2
+            ;;
+        -latest)
+            use_latest=true
+            shift
+            ;;
+        -os)
+            os="$2"
+            shift 2
+            ;;
+        -arch)
+            arch="$2"
+            shift 2
+            ;;
+        -o | --output)
+            output_dir="$2"
+            shift 2
+            ;;
+        -n | --no-backup)
+            no_backup=true
+            shift
+            ;;
+        -a | --auto-package)
+            auto_package=true
+            shift
+            ;;
+        -f | --force)
+            force=true
+            shift
+            ;;
+        *)
+            log_error "无效的参数: $1"
+            show_patch_usage
+            exit 1
+            ;;
+        esac
     done
 
-    log_success "所有下载和解压操作完成"
+    if [ -z "$module" ]; then
+        log_error "必须指定模块名称"
+        show_patch_usage
+        exit 1
+    fi
+
+    if [ "$use_latest" = true ] && [ -n "$version" ]; then
+        log_error "不能同时指定版本和使用最新版本"
+        show_patch_usage
+        exit 1
+    fi
+
+    if [ "$use_latest" = false ] && [ -z "$version" ]; then
+        log_error "必须指定版本或使用 -latest 选项"
+        show_patch_usage
+        exit 1
+    fi
+
+    # 如果使用最新版本,获取最新版本号
+    if [ "$use_latest" = true ]; then
+        version=$(get_latest_frida_version)
+        log_info "使用最新版本: $version"
+    fi
+
+    # 执行修补逻辑
+    patch_frida_module "$module" "$version" "$os" "$arch" "$output_dir" "$keep_source" "$auto_package" "$force"
+}
+
+patch_frida_module() {
+    local module="$1"
+    local version="$2"
+    local os="$3"
+    local arch="$4"
+    local output_dir="$5"
+    local keep_source="$6"
+    local auto_package="$7"
+    local force="$8"
+
+    log_info "准备下载模块: $module, 版本: $version, OS: $os, 架构: $arch, 输出目录: $output_dir, 保留源码: $keep_source, 自动打包: $auto_package, 强制下载: $force"
+
+    # 首先下载模块
+    download_frida_module "$version" false "$module" false "$output_dir" false "$os" "$arch" "$force"
+
+    # 获取下载的文件路径
+    local downloaded_file=$(find "$output_dir" -name "${module}*" -type f | head -n 1)
+    if [ -z "$downloaded_file" ]; then
+        log_error "无法找到下载的模块文件"
+        return 1
+    fi
+
+    log_info "正在修补文件: $downloaded_file"
+
+    # 编译hexreplace工具
+    cd hexreplace
+    (go build -o ../build/hexreplace) || {
+        log_error "编译 hexreplace 工具失败"
+        return 1
+    }
+    cd ../build
+    chmod +x hexreplace
+    cd ..
+
+    # 生成新的Frida名称（如果未指定）
+    if [ -z "$FRIDA_NAME" ]; then
+        FRIDA_NAME=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 5 | grep -E '^[a-z]+$' | head -n 1)
+        if [[ ! "$FRIDA_NAME" =~ ^[a-z]{5}$ ]]; then
+            log_error "无法生成有效的 Frida 魔改名"
+            return 1
+        fi
+        log_info "生成 Frida 魔改名: $FRIDA_NAME"
+    else
+        log_info "使用指定的 Frida 魔改名: $FRIDA_NAME"
+    fi
+
+    # 修补二进制文件
+    local patched_file="${output_dir}/${module}_${FRIDA_NAME}"
+    (./build/hexreplace "$downloaded_file" "$FRIDA_NAME" "$patched_file") || {
+        log_error "修改 ${module} 二进制失败"
+        return 1
+    }
+
+    # 设置权限
+    sudo chmod +x "$patched_file"
+    sudo chown root:wheel "$patched_file"
+
+    log_success "模块修补完成: $patched_file"
+
+    # 处理源文件
+    if [ "$no_backup" = true ]; then
+        rm -f "$downloaded_file"
+        log_info "已删除源文件"
+    fi
+
+    # 自动打包
+    if [ "$auto_package" = true ]; then
+        log_info "正在自动打包修补后的模块..."
+
+        # 获取原始文件的扩展名
+        local original_extension="${downloaded_file##*.}"
+        local packed_file="${patched_file}.${original_extension}"
+
+        # 使用7z进行压缩
+        if command -v 7z &>/dev/null; then
+            case "$original_extension" in
+            xz | gz | zip | tar | bz2 | 7z)
+                7z a -t"$original_extension" "$packed_file" "$patched_file" >/dev/null || {
+                    log_error "使用 7z 压缩失败"
+                    return 1
+                }
+                ;;
+            *)
+                # 对于未知格式,使用gzip压缩
+                gzip -c "$patched_file" >"${patched_file}.gz" || {
+                    log_error "使用 gzip 压缩失败"
+                    return 1
+                }
+                packed_file="${patched_file}.gz"
+                log_warning "未知的压缩格式: ${original_extension}, 使用 gzip 压缩"
+                ;;
+            esac
+        else
+            # 如果7z不可用,退回到使用gzip
+            gzip -c "$patched_file" >"${patched_file}.gz" || {
+                log_error "使用 gzip 压缩失败"
+                return 1
+            }
+            packed_file="${patched_file}.gz"
+            log_warning "7z 不可用,使用 gzip 压缩"
+        fi
+
+        if [ "$packed_file" != "$patched_file" ]; then
+            log_success "模块已打包: $packed_file"
+            # 如果不保留源文件，删除未压缩的修补文件
+            if [ "$no_backup" = true ]; then
+                rm -f "$patched_file"
+                log_info "已删除未压缩的修补文件"
+            fi
+        fi
+    fi
+
+    return 0
 }
 # 用户确认函数
 confirm_execution() {
@@ -902,7 +1160,7 @@ confirm_execution() {
         ;;
     esac
 }
-confirm_modify_frida_tools(){
+confirm_modify_frida_tools() {
     if [ "$AUTO_CONFIRM" = "true" ]; then
         log_warning "自动确认模式：用户已同意自动修改本地 frida-tools。"
         return 0
@@ -1216,7 +1474,7 @@ modify_binary() {
         log_error "错误: frida-server 文件不存在于路径: $frida_server_path"
         return 1
     fi
-    
+
     cd ../hexreplace
     (go build -o ../build/hexreplace) || {
         log_error "编译 hexreplace 工具失败"
@@ -1545,7 +1803,7 @@ log_environment_info() {
     local python_cmd=$(get_python_cmd)
     log_skyblue "  Python 路径: $python_cmd"
     log_skyblue "  Python 版本: $($python_cmd --version 2>&1)"
-    
+
     # Frida 信息
     local frida_version=$($python_cmd -c 'import frida; print(frida.__version__)' 2>/dev/null)
     if [ -n "$frida_version" ]; then
@@ -1558,7 +1816,7 @@ log_environment_info() {
     # Golang 环境信息
     local golang_info=$(get_golang_info)
     if [ "$golang_info" != "Not installed" ]; then
-        IFS=':' read -r go_version go_path <<< "$golang_info"
+        IFS=':' read -r go_version go_path <<<"$golang_info"
         log_skyblue "  Golang 版本: $go_version"
         log_skyblue "  GOPATH: $go_path"
     else
@@ -1569,7 +1827,7 @@ log_environment_info() {
     log_skyblue "  操作系统: $(uname -s)"
     log_skyblue "  系统版本: $(uname -r)"
 
-    echo  # 空行，为了更好的可读性
+    echo # 空行，为了更好的可读性
 }
 # 主函数
 main() {
@@ -1577,7 +1835,10 @@ main() {
     log_environment_info
     # 检查是否有 -y 参数
     if [[ "$*" == *"-y"* || "$*" == *"--yes"* ]]; then
-        sudo -v || { log_error "无法获取 sudo 权限"; exit 1; }
+        sudo -v || {
+            log_error "无法获取 sudo 权限"
+            exit 1
+        }
         sudo_keep_alive
         trap cleanup EXIT
     fi

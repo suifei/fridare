@@ -41,6 +41,21 @@ Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS
 - 下载特定 Frida 模块
 - 列出可用 Frida 版本和模块
 - 支持 Conda 环境
+- 支持 macho, elf, pe 文件格式
+- 支持 Windows,Linux,MacOS,Android,IOS
+
+### 3.1.0
+### Added
+- 增加了 `patch` 命令，用于修补指定的 Frida 模块
+   - 魔改安卓版 server `./fridare.sh patch -m frida-server -v 14.2.18 -os android -arch arm64 -o ./patched -a`
+- 增加了对 `patch` 命令的帮助信息
+- 增加对 ELF 和 PE 文件格式的支持(支持 Windows,Linux,MacOS,Android,IOS)
+
+### Changed
+- 更新了 `build`、`download` 等命令的用法说明
+
+### Fixed
+- 修复了一些小的 Bug 并改进了脚本的稳定性
 
 ### 3.0.1 Fixed
 - 修复在 Conda 环境中无法正确识别和修改 Frida 工具的问题
@@ -188,10 +203,9 @@ cd fridare
 ```
 此命令将检查并安装所需的依赖项。
 
-
-2. 运行构建脚本：
+3. 查看帮助
 ```shell
-./build.sh [FRIDA_VERSION] [FRIDA_SERVER_PORT] [CURL_PROXY]
+./fridare.sh help
 ```
 
 ## 使用方法
@@ -343,7 +357,7 @@ Fridare 的核心思想是修改 frida-server ，使其更难被检测。这主�
 
 ### 3. 自动化流程
 
-build.sh 脚本自动化了整个过程：
+fridare.sh 脚本自动化了整个过程：
 
 - 下载指定版本的 frida-server 
 - 生成随机名称
@@ -548,6 +562,11 @@ cd fridare
 ```
 This command will check and install the required dependencies.
 
+3. View the help information:
+```shell
+./fridare.sh help
+```
+
 ## Usage
 Fridare provides multiple commands to meet different needs:
 
@@ -697,7 +716,7 @@ The project uses the dpkg-deb tool to unpack and repack deb files. This allows u
 
 ### 3. Automated Process
 
-The build.sh script automates the entire process:
+The fridare.sh script automates the entire process:
 
 - Downloading the specified version of frida-server
 - Generating random names

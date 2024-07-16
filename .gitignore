@@ -14,6 +14,8 @@ frida-server
 
 [Bb]uild/
 [Dd]ist/
+[Pp]atched/
+[Tt]oolkit/
 
 # Thumbnails
 ._*
