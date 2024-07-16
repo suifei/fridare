@@ -315,6 +315,7 @@ parse_config_args() {
         option="$1"
         value="$2"
         set_config "$option" "$value"
+        list_config
         ;;
     unset)
         if [ $# -lt 1 ]; then
@@ -324,6 +325,7 @@ parse_config_args() {
         fi
         option="$1"
         unset_config "$option"
+        list_config
         ;;
     ls | list)
         list_config
