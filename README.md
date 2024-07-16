@@ -46,20 +46,17 @@ Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS
 - 支持 macho, elf, pe 文件格式
 - 支持 Windows,Linux,MacOS,Android,IOS
 
-### 3.1.0
-### Added
+### v3.1.0
 - 增加了 `patch` 命令，用于修补指定的 Frida 模块
-   - 魔改安卓版 server `./fridare.sh patch -m frida-server -v 14.2.18 -os android -arch arm64 -o ./patched -a`
+   - 例如：`安卓 frida-server` `./fridare.sh p -m frida-server -latest -os android -arch arm64 -o ./patched`
 - 增加了对 `patch` 命令的帮助信息
 - 增加对 ELF 和 PE 文件格式的支持(支持 Windows,Linux,MacOS,Android,IOS)
-
-### Changed
 - 更新了 `build`、`download` 等命令的用法说明
-
-### Fixed
 - 修复了一些小的 Bug 并改进了脚本的稳定性
 
-### 3.0.1 Fixed
+![v3.1.0](screenshots/3.png)
+
+### v3.0.1 Fixed
 - 修复在 Conda 环境中无法正确识别和修改 Frida 工具的问题
 - 解决多个 Python 环境共存时的兼容性问题
 
@@ -127,6 +124,7 @@ fridare.sh - Frida 魔改脚本
 │   │   └── 支持多种命令行选项
 │   ├── 命令处理
 │   │   ├── build: 构建魔改版 Frida
+│   │   ├── patch: 修补指定的 Frida 模块
 │   │   ├── setup: 设置环境
 │   │   ├── config: 管理配置
 │   │   ├── list: 列出版本

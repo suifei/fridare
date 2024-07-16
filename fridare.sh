@@ -1059,14 +1059,18 @@ patch_frida_module() {
     chmod +x hexreplace
     cd ..
 
-    # 生成新的Frida名称（如果未指定）
+    # 生成新的Frida名称（如果未指定则提示进行配置： config set frida-name ）
     if [ -z "$FRIDA_NAME" ]; then
-        FRIDA_NAME=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 5 | grep -E '^[a-z]+$' | head -n 1)
-        if [[ ! "$FRIDA_NAME" =~ ^[a-z]{5}$ ]]; then
-            log_error "无法生成有效的 Frida 魔改名"
+        log_error "未指定 Frida 魔改名，请使用 config set frida-name 命令指定"
+        read -p "请输入本次所采用的 Frida 魔改名: " value
+        if [[ "$value" =~ ^[a-zA-Z]{5}$ ]]; then
+            FRIDA_NAME="$value"
+            log_success "Frida 魔改名已设置为: $FRIDA_NAME"
+        else
+            log_error "无效的 Frida 魔改名: $value"
+            log_info "Frida 魔改名必须是恰好 5 个字母（a-z 或 A-Z）"
             return 1
         fi
-        log_info "生成 Frida 魔改名: $FRIDA_NAME"
     else
         log_info "使用指定的 Frida 魔改名: $FRIDA_NAME"
     fi
@@ -1829,6 +1833,15 @@ log_environment_info() {
 
     echo # 空行，为了更好的可读性
 }
+
+log_config_info() {
+    log_skyblue "配置信息:"
+    log_skyblue "  FRIDA_SERVER_PORT: $FRIDA_SERVER_PORT"
+    log_skyblue "  CURL_PROXY: $CURL_PROXY"
+    log_skyblue "  AUTO_CONFIRM: $AUTO_CONFIRM"
+    log_skyblue "  FRIDA_NAME: $FRIDA_NAME"
+    echo # 空行，为了更好的可读性
+}
 # 主函数
 main() {
     initialize_config
@@ -1852,6 +1865,8 @@ main() {
     CURL_PROXY=${CURL_PROXY:-""}
     AUTO_CONFIRM=${AUTO_CONFIRM:-$DEF_AUTO_CONFIRM}
     FRIDA_NAME=${FRIDA_NAME:-""}
+
+    log_config_info
 
     # 解析参数
     parse_arguments "$@"
