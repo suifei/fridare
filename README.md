@@ -21,7 +21,7 @@
 [![GitHub followers](https://img.shields.io/github/followers/suifei.svg?style=social&label=Follow&maxAge=2592000)](https://github.com/suifei?tab=followers)
 [![Twitter Follow](https://img.shields.io/twitter/follow/csuifei?style=social)](https://twitter.com/csuifei)
 
-Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS 越狱设备设计。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
+Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida-server 的自动化魔改工具。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
 [CHANGELOG](CHANGELOG)
 
 欢迎大家入QQ群讨论：[QQ 555354813](screenshots/555354813.jpg) ，如本项目对你有所帮助，记得给作者加星鼓励哦！

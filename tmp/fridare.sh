@@ -2046,8 +2046,8 @@ log_config_info() {
 }
 check_version() {
     local current_version="$VERSION"
-    local repo_owner="suifei" # Replace with your GitHub username
-    local repo_name="fridare" # Replace with your repository name
+    local repo_owner="suifei" # 替换为您的 GitHub 用户名
+    local repo_name="fridare" # 替换为您的仓库名
 
     log_info "检查版本更新..."
     local latest_info=$(curl -s "https://api.github.com/repos/$repo_owner/$repo_name/releases/latest")
@@ -2059,7 +2059,6 @@ check_version() {
         return 1
     fi
 
-    # Remove 'v' if present in version strings
     current_version="${current_version#v}"
     latest_version="${latest_version#v}"
 
@@ -2096,28 +2095,21 @@ check_version() {
     local extract_dir=$(find "$temp_dir" -maxdepth 1 -type d | grep -v "^$temp_dir$" | head -n 1)
     local script_dir=$(dirname "$0")
 
-    # Use cp instead of rsync
-    if ! (cd "$extract_dir" && cp -R . "$temp_dir/extracted_files"); then
+    # 使用 cp 替代 rsync
+    if ! (cd "$extract_dir" && cp -R . "$script_dir/"); then
         log_error "更新本地文件失败"
         rm -rf "$temp_dir"
         return 1
     fi
 
-    # Copy extracted files to script directory
-    if ! cp -R "$temp_dir/extracted_files/." "$script_dir/"; then
-        log_error "更新本地文件失败"
-        rm -rf "$temp_dir"
-        return 1
-    fi
-
-    # Delete old files if present
+    # 删除可能存在的旧文件
     find "$script_dir" -type f | while read file; do
         if [ ! -e "$extract_dir/${file#$script_dir/}" ]; then
             rm "$file"
         fi
     done
 
-    chmod -R 755 "$script_dir" # Adjust permissions as needed
+    chmod -R 755 "$script_dir" # 根据需要调整权限
     rm -rf "$temp_dir"
     log_success "更新完成，新版本：$latest_version"
     log_info "请重新运行脚本以使用新版本"
