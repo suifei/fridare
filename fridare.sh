@@ -96,88 +96,242 @@ log_color() {
 log_skyblue() {
     echo -e "${COLOR_SKYBLUE}$1${COLOR_RESET}"
 }
+download_with_progress() {
+    local url="$1"
+    local output_file="$2"
+    local description="$3"
+    local retry_count=3
+    local temp_file="${output_file}.tmp"
+
+    local curl_cmd="curl -L --progress-bar --fail --show-error"
+    if [ -n "$CURL_PROXY" ]; then
+        case "$CURL_PROXY" in
+            socks4://*)
+                local proxy=${CURL_PROXY#socks4://}
+                curl_cmd+=" --socks4 $proxy"
+                ;;
+            socks4a://*)
+                local proxy=${CURL_PROXY#socks4a://}
+                curl_cmd+=" --socks4a $proxy"
+                ;;
+            socks5://*)
+                local proxy=${CURL_PROXY#socks5://}
+                curl_cmd+=" --socks5 $proxy"
+                ;;
+            socks5h://*)
+                local proxy=${CURL_PROXY#socks5h://}
+                curl_cmd+=" --socks5-hostname $proxy"
+                ;;
+            http://*)
+                curl_cmd+=" --proxy $CURL_PROXY"
+                ;;
+            https://*)
+                curl_cmd+=" --proxy $CURL_PROXY"
+                ;;
+            *)
+                log_warning "未知的代理协议，将作为 HTTP 代理使用: $CURL_PROXY"
+                curl_cmd+=" --proxy $CURL_PROXY"
+                ;;
+        esac
+    fi
+
+    while [ $retry_count -gt 0 ]; do
+        echo -e "${COLOR_SKYBLUE}正在下载 $description...${COLOR_RESET}"
+        
+        if $curl_cmd "$url" -o "$temp_file" 2>&1 | tee /dev/stderr | \
+            sed -u 's/^[# ]*\([0-9]*\.[0-9]%\).*\([ 0-9.]*\(KiB\|MiB\|GiB\)\/s\).*$/\1\n速度: \2/' | \
+            while IFS= read -r line; do
+                if [[ $line =~ ^[0-9]+\.[0-9]% ]]; then
+                    percent=${line%\%*}
+                    completed=$(printf "%.0f" $percent)
+                    printf "\r进度: [%-50s] %d%%" $(printf "=%.0s" $(seq 1 $((completed/2)))) "$completed"
+                elif [[ $line =~ ^速度: ]]; then
+                    printf " %s" "$line"
+                fi
+            done
+        then
+            echo # 换行
+            mv "$temp_file" "$output_file"
+            local file_size=$(wc -c < "$output_file")
+            echo -e "${COLOR_GREEN}下载完成: $output_file (大小: $file_size 字节)${COLOR_RESET}"
+            return 0
+        else
+            echo # 换行
+            local curl_exit_code=$?
+            log_error "下载失败: $output_file (curl exit code: $curl_exit_code)"
+            if [ -f "$temp_file" ]; then
+                log_error "临时文件大小: $(wc -c < "$temp_file") 字节"
+                rm -f "$temp_file"
+            fi
+            retry_count=$((retry_count - 1))
+            if [ $retry_count -gt 0 ]; then
+                log_warning "检查网络连接..."
+                if ! ping -c 1 github.com &>/dev/null; then
+                    log_error "无法连接到 github.com，请检查网络连接"
+                    return 1
+                fi
+                log_warning "网络连接正常，5秒后重试..."
+                sleep 5
+            fi
+        fi
+    done
+
+    if [ $retry_count -eq 0 ]; then
+        log_error "达到最大重试次数，下载失败"
+        return 1
+    fi
+}
 show_main_usage() {
     echo -e "${COLOR_SKYBLUE}Frida 重打包工具 v${VERSION}${COLOR_RESET}"
     echo
-    echo "用法: $0 <命令> [选项]"
+    echo -e "${COLOR_WHITE}用法: $0 <命令> [选项]${COLOR_RESET}"
     echo
-    echo "命令:"
-    echo "  build,         b       重新打包 Frida"        # 完成, complete
-    echo "  patch,         p       修补指定的 Frida 模块"  # 完成, complete
-    echo "  list,         ls       列出可用的 Frida 版本"  # 完成, complete
-    echo "  download,     dl       下载特定版本的 Frida"   # 完成, complete
-    echo "  list-modules  lm       列出可用的 Frida 模块"  # 完成, complete
-    echo "  setup,         s       检查并安装系统依赖"      # 完成, complete
-    echo "  config,     conf       设置配置选项"          # 完成, complete
-    echo "  upgrade,       u       更新配置，检查新版本"    # 完成, complete
-    echo "  help,          h       显示帮助信息"          # 完成, complete
+    echo -e "${COLOR_YELLOW}命令:${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}quickstart,    q${COLOR_RESET}       显示快速开始指南"
+    echo -e "  ${COLOR_GREEN}build,         b${COLOR_RESET}       重新打包 Frida"
+    echo -e "  ${COLOR_GREEN}patch,         p${COLOR_RESET}       修补指定的 Frida 模块"
+    echo -e "  ${COLOR_GREEN}list,         ls${COLOR_RESET}       列出可用的 Frida 版本"
+    echo -e "  ${COLOR_GREEN}download,     dl${COLOR_RESET}       下载特定版本的 Frida"
+    echo -e "  ${COLOR_GREEN}list-modules, lm${COLOR_RESET}       列出可用的 Frida 模块"
+    echo -e "  ${COLOR_GREEN}setup,         s${COLOR_RESET}       检查并安装系统依赖"
+    echo -e "  ${COLOR_GREEN}config,      conf${COLOR_RESET}      设置配置选项"
+    echo -e "  ${COLOR_GREEN}upgrade,       u${COLOR_RESET}       更新配置，检查新版本"
+    echo -e "  ${COLOR_GREEN}help,          h${COLOR_RESET}       显示帮助信息"
     echo
-    echo "运行 '$0 help <命令>' 以获取特定命令的更多信息。"
-    echo "    suifei@gmail.com"
-    echo "    https://github.com/suifei/fridare"
-}
-show_build_usage() {
-    echo "用法: $0 b|build [选项]"
-    echo
-    echo "选项:"
-    echo "  -v VERSION               指定 Frida 版本"
-    echo "  -latest                  使用最新的 Frida 版本"
-    echo "  -p, --port PORT          指定 Frida 服务器端口 (默认: $DEF_FRIDA_SERVER_PORT)"
-    echo "  -y, --yes                自动回答是以确认提示"
-    echo
-    echo "注意: -v 和 -latest 不能同时使用"
-}
-show_patch_usage() {
-    echo "用法: $0 patch [选项]"
-    echo
-    echo "选项:"
-    echo "  -m, --module NAME        指定要修补的 Frida 模块名称"
-    echo "  -v, --version VERSION    指定 Frida 版本"
-    echo "  -latest                  使用最新的 Frida 版本"
-    echo "  -os OS                   指定操作系统 (可选)"
-    echo "  -arch ARCH               指定处理器架构 (可选)"
-    echo "  -o, --output DIR         指定输出目录 (默认: ./patched_output)"
-    echo "  -n, --no-backup          不保留源文件 (默认保留)"
-    echo "  -a, --auto-package       自动打包修补后的模块 (默认不打包)"
-    echo "  -f, --force              覆盖已存在的文件 (默认跳过)"
-    echo
-    echo "示例:"
-    echo "  $0 patch -m frida-server -v 14.2.18 -os android -arch arm64 -o ./patched -a"
-    echo "  $0 patch -m frida-gadget -latest -os ios -arch arm64 -k -a -f"
-}
-show_config_usage() {
-    echo "用法: $0 config <操作> <选项> [<值>]"
-    echo
-    echo "操作:"
-    echo "  set <选项> <值>    设置配置"
-    echo "  unset <选项>       取消设置"
-    echo "  ls, list          列出所有配置"
-    echo "  frida-tools       安装 frida-tools"
-    echo
-    echo "选项:"
-    echo "  proxy              HTTP 代理"
-    echo "  port               Frida 服务器端口"
-    echo "  frida-name         Frida 魔改名"
-}
-show_download_usage() {
-    echo "用法: $0 dl|download [选项] <输出目录>"
-    echo
-    echo "选项:"
-    echo "  -v, --version VERSION    指定要下载的 Frida 版本"
-    echo "  -latest                  下载最新的 Frida 版本"
-    echo "  -m, --module MODULE      指定要下载的模块名称"
-    echo "  -all                     下载所有模块"
-    echo "  --no-extract             不自动解压文件"
-    echo "  -f, --force              覆盖已存在的文件 (默认跳过)"
-    echo "  lm, list-modules         列出所有可用的模块"
-    echo
-    echo "示例:"
-    echo "  $0 download -v 16.4.2 -m frida-server ./output"
-    echo "  $0 download -latest -m frida-gadget ./output"
-    echo "  $0 download -latest -all ./output -f"
-    echo "  $0 download -latest -all --no-extract ./output"
+    echo -e "${COLOR_WHITE}运行 '$0 help <命令>' 以获取特定命令的更多信息。${COLOR_RESET}"
+    echo -e "${COLOR_WHITE}新用户？ 运行 '$0 quickstart' 获取快速入门指南。${COLOR_RESET}"
+    echo -e "${COLOR_GRAY}    suifei@gmail.com${COLOR_RESET}"
+    echo -e "${COLOR_GRAY}    https://github.com/suifei/fridare${COLOR_RESET}"
 }
 
+show_build_usage() {
+    echo -e "${COLOR_SKYBLUE}用法: $0 b|build [选项]${COLOR_RESET}"
+    echo
+    echo -e "${COLOR_YELLOW}选项:${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}-c clean${COLOR_RESET}                                     清理构建目录"
+    echo -e "  ${COLOR_GREEN}-v VERSION${COLOR_RESET}                                   指定 Frida 版本"
+    echo -e "  ${COLOR_GREEN}-latest${COLOR_RESET}                                      使用最新的 Frida 版本"
+    echo -e "  ${COLOR_GREEN}-p, --port PORT${COLOR_RESET}                              指定 Frida 服务器端口 (默认: $DEF_FRIDA_SERVER_PORT)"
+    echo -e "  ${COLOR_GREEN}-y, --yes${COLOR_RESET}                                    自动回答是以确认提示"
+    echo -e "  ${COLOR_GREEN}-l, --local archs[arm,arm64,arm64e] FILENAME${COLOR_RESET} 使用本地 deb 文件，指定构建架构"
+    echo
+    echo -e "${COLOR_BG_WHITE}${COLOR_RED}注意: -v, -latest 和 -l 不能同时使用${COLOR_RESET}"
+    echo -e "${COLOR_WHITE}示例:${COLOR_RESET}"
+    echo -e "  $0 build -v 16.4.2"
+    echo -e "  $0 build -latest"
+    echo -e "  $0 build -l arm64 frida-server_16.4.2_amd64.deb"
+    echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb "
+    echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb" -p 8000"
+    echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb" -p 8000 -y"
+}
+
+show_patch_usage() {
+    echo -e "${COLOR_SKYBLUE}用法: $0 patch [选项]${COLOR_RESET}"
+    echo
+    echo -e "${COLOR_YELLOW}选项:${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}-m, --module NAME${COLOR_RESET}        指定要修补的 Frida 模块名称"
+    echo -e "  ${COLOR_GREEN}-v, --version VERSION${COLOR_RESET}    指定 Frida 版本"
+    echo -e "  ${COLOR_GREEN}-latest${COLOR_RESET}                  使用最新的 Frida 版本"
+    echo -e "  ${COLOR_GREEN}-os OS${COLOR_RESET}                   指定操作系统 (可选)"
+    echo -e "  ${COLOR_GREEN}-arch ARCH${COLOR_RESET}               指定处理器架构 (可选)"
+    echo -e "  ${COLOR_GREEN}-o, --output DIR${COLOR_RESET}         指定输出目录 (默认: ./patched_output)"
+    echo -e "  ${COLOR_GREEN}-n, --no-backup${COLOR_RESET}          不保留源文件 (默认保留)"
+    echo -e "  ${COLOR_GREEN}-a, --auto-package${COLOR_RESET}       自动打包修补后的模块 (默认不打包)"
+    echo -e "  ${COLOR_GREEN}-f, --force${COLOR_RESET}              覆盖已存在的文件 (默认跳过)"
+    echo
+    echo -e "${COLOR_WHITE}示例:${COLOR_RESET}"
+    echo -e "  $0 patch -m frida-server -v 14.2.18 -os android -arch arm64 -o ./patched -a"
+    echo -e "  $0 patch -m frida-gadget -latest -os ios -arch arm64 -k -a -f"
+}
+
+show_config_usage() {
+    echo -e "${COLOR_SKYBLUE}用法: $0 config <操作> <选项> [<值>]${COLOR_RESET}"
+    echo
+    echo -e "${COLOR_YELLOW}操作:${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}set <选项> <值>${COLOR_RESET}    设置配置"
+    echo -e "  ${COLOR_GREEN}unset <选项>${COLOR_RESET}       取消设置"
+    echo -e "  ${COLOR_GREEN}ls, list${COLOR_RESET}          列出所有配置"
+    echo -e "  ${COLOR_GREEN}edit${COLOR_RESET}              启动交互式配置编辑器"
+    echo -e "  ${COLOR_GREEN}frida-tools${COLOR_RESET}       安装 frida-tools"
+    echo
+    echo -e "${COLOR_YELLOW}选项:${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}proxy${COLOR_RESET}              HTTP 代理"
+    echo -e "  ${COLOR_GREEN}port${COLOR_RESET}               Frida 服务器端口"
+    echo -e "  ${COLOR_GREEN}frida-name${COLOR_RESET}         Frida 魔改名"
+}
+
+show_download_usage() {
+    echo -e "${COLOR_SKYBLUE}用法: $0 dl|download [选项] <输出目录>${COLOR_RESET}"
+    echo
+    echo -e "${COLOR_YELLOW}选项:${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}-v, --version VERSION${COLOR_RESET}    指定要下载的 Frida 版本"
+    echo -e "  ${COLOR_GREEN}-latest${COLOR_RESET}                  下载最新的 Frida 版本"
+    echo -e "  ${COLOR_GREEN}-m, --module MODULE${COLOR_RESET}      指定要下载的模块名称"
+    echo -e "  ${COLOR_GREEN}-all${COLOR_RESET}                     下载所有模块"
+    echo -e "  ${COLOR_GREEN}--no-extract${COLOR_RESET}             不自动解压文件"
+    echo -e "  ${COLOR_GREEN}-f, --force${COLOR_RESET}              覆盖已存在的文件 (默认跳过)"
+    echo -e "  ${COLOR_GREEN}lm, list-modules${COLOR_RESET}         列出所有可用的模块"
+    echo
+    echo -e "${COLOR_WHITE}示例:${COLOR_RESET}"
+    echo -e "  $0 download -v 16.4.2 -m frida-server ./output"
+    echo -e "  $0 download -latest -m frida-gadget ./output"
+    echo -e "  $0 download -latest -all ./output -f"
+    echo -e "  $0 download -latest -all --no-extract ./output"
+}
+
+show_setup_usage() {
+    echo -e "${COLOR_SKYBLUE}用法: $0 s|setup${COLOR_RESET}"
+    echo
+    echo -e "${COLOR_WHITE}检查并安装系统依赖。这个命令将：${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 检查所有必要的依赖是否已安装"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 如果缺少任何依赖，尝试安装它们"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 创建必要的目录结构（如 build 和 dist 目录）"
+    echo
+    echo -e "${COLOR_YELLOW}此命令不需要任何额外的参数。${COLOR_RESET}"
+}
+
+show_upgrade_usage() {
+    echo -e "${COLOR_SKYBLUE}用法: $0 u|upgrade${COLOR_RESET}"
+    echo
+    echo -e "${COLOR_WHITE}更新配置并检查新版本。这个命令将：${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 更新 FRIDA_MODULES 配置"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 检查 fridare.sh 脚本的新版本"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 如果有新版本可用，提示用户是否要更新"
+    echo
+    echo -e "${COLOR_YELLOW}此命令不需要任何额外的参数。${COLOR_RESET}"
+}
+
+show_list_usage() {
+    echo -e "${COLOR_SKYBLUE}用法: $0 ls|list${COLOR_RESET}"
+    echo
+    echo -e "${COLOR_WHITE}列出可用的 Frida 版本。这个命令将：${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 从 GitHub 获取最新的 Frida 发布版本信息"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 显示最近的 10 个版本，包括版本号、发布日期和下载次数"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 为每个版本显示简短的更新说明"
+    echo
+    echo -e "${COLOR_YELLOW}此命令不需要任何额外的参数。${COLOR_RESET}"
+}
+
+show_list_modules_usage() {
+    echo -e "${COLOR_SKYBLUE}用法: $0 lm|list-modules${COLOR_RESET}"
+    echo
+    echo -e "${COLOR_WHITE}列出可用的 Frida 模块。这个命令将：${COLOR_RESET}"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 显示所有可用的 Frida 模块"
+    echo -e "  ${COLOR_GREEN}•${COLOR_RESET} 包括模块名称、支持的操作系统和架构"
+    echo
+    echo -e "${COLOR_YELLOW}此命令不需要任何额外的参数。${COLOR_RESET}"
+}
+
+quick_start_guide() {
+    echo -e "${COLOR_SKYBLUE}快速开始指南${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}1.${COLOR_RESET} 设置环境: $0 setup"
+    echo -e "${COLOR_GREEN}2.${COLOR_RESET} 查看可用的 Frida 版本: $0 list"
+    echo -e "${COLOR_GREEN}3.${COLOR_RESET} 构建 Frida: $0 build -v <版本> 或 $0 build -latest"
+    echo -e "${COLOR_GREEN}4.${COLOR_RESET} 下载 Frida 模块: $0 download -latest -m frida-server ./output"
+    echo -e "${COLOR_GREEN}5.${COLOR_RESET} 修补 Frida 模块: $0 patch -m frida-server -latest"
+    echo -e "${COLOR_GREEN}6.${COLOR_RESET} 配置设置: $0 config edit"
+    echo -e "\n${COLOR_YELLOW}详细使用说明请运行: $0 help <命令>${COLOR_RESET}"
+}
 # 函数：解析命令行参数
 parse_arguments() {
     if [ $# -eq 0 ]; then
@@ -214,15 +368,22 @@ parse_arguments() {
         update_frida_modules
         check_version
         ;;
+    q | quickstart)
+        quick_start_guide
+        ;;
     h | help)
         if [ $# -eq 0 ]; then
             show_main_usage
         else
             case "$1" in
-            b | build) show_build_usage ;;
-            p | patch) show_patch_usage ;;
-            conf | config) show_config_usage ;;
-            dl | download) show_download_usage ;;
+                b | build) show_build_usage ;;
+                p | patch) show_patch_usage ;;
+                conf | config) show_config_usage ;;
+                dl | download) show_download_usage ;;
+                s | setup) show_setup_usage ;;
+                u | upgrade) show_upgrade_usage ;;
+                ls | list) show_list_usage ;;
+                lm | list-modules) show_list_modules_usage ;;
             *)
                 log_error "未知命令: $1"
                 show_main_usage
@@ -250,12 +411,15 @@ parse_build_args() {
     AUTO_CONFIRM="false"
     USE_LATEST="false"
     FRIDA_VERSION=""
+    clean="false"
+    LOCAL_DEB=""
+    LOCAL_ARCH=""
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
         -v)
-            if [ "$USE_LATEST" = "true" ]; then
-                log_error "错误: -v 和 -latest 不能同时使用" >&2
+            if [ "$USE_LATEST" = "true" ] || [ -n "$LOCAL_DEB" ]; then
+                log_error "错误: -v 和 -latest 或 -l 不能同时使用" >&2
                 show_build_usage
                 exit 1
             fi
@@ -263,8 +427,8 @@ parse_build_args() {
             shift 2
             ;;
         -latest)
-            if [ -n "$FRIDA_VERSION" ]; then
-                log_error "错误: -v 和 -latest 不能同时使用" >&2
+            if [ -n "$FRIDA_VERSION" ] || [ -n "$LOCAL_DEB" ]; then
+                log_error "错误: -latest 和 -v 或 -l 不能同时使用" >&2
                 show_build_usage
                 exit 1
             fi
@@ -279,6 +443,25 @@ parse_build_args() {
             AUTO_CONFIRM="true"
             shift
             ;;
+        -c | --clean)
+            clean="true"
+            shift
+            ;;
+        -l | --local)
+            if [ -n "$FRIDA_VERSION" ] || [ "$USE_LATEST" = "true" ]; then
+                log_error "错误: -l 和 -v 或 -latest 不能同时使用" >&2
+                show_build_usage
+                exit 1
+            fi
+            if [ -z "$2" ] || [ -z "$3" ]; then
+                log_error "错误: 使用本地文件时必须指定处理器架构 arm, arm64 或 arm64e" >&2
+                show_build_usage
+                exit 1
+            fi
+            LOCAL_ARCH="$2"
+            LOCAL_DEB="$3"
+            shift 3
+            ;;
         *)
             log_error "无效选项: $1" >&2
             show_build_usage
@@ -290,8 +473,8 @@ parse_build_args() {
     if [ "$USE_LATEST" = "true" ]; then
         FRIDA_VERSION=$(get_latest_frida_version)
         log_info "使用最新的 Frida 版本: $FRIDA_VERSION"
-    elif [ -z "$FRIDA_VERSION" ]; then
-        log_error "错误: 必须指定 Frida 版本 (-v) 或使用最新版本 (-latest)" >&2
+    elif [ -z "$FRIDA_VERSION" ] && [ -z "$LOCAL_DEB" ]; then
+        log_error "错误: 必须指定 Frida 版本 (-v) 或使用最新版本 (-latest) 或使用本地文件 (-l)" >&2
         show_build_usage
         exit 1
     else
@@ -299,7 +482,7 @@ parse_build_args() {
     fi
 
     # 执行构建逻辑
-    build_frida
+    build_frida "$clean" "$LOCAL_DEB" "$LOCAL_ARCH"
 }
 parse_config_args() {
     if [ $# -eq 0 ]; then
@@ -335,6 +518,9 @@ parse_config_args() {
     ls | list)
         list_config
         ;;
+    edit)
+        interactive_config_editor
+        ;;
     frida-tools)
         install_frida_tools
         ;;
@@ -351,8 +537,13 @@ set_config() {
     local value="$2"
     case "$option" in
     proxy)
-        CURL_PROXY="$value"
-        log_success "HTTP 代理已设置为: $CURL_PROXY"
+        if [[ "$value" == socks5://* || "$value" == socks5h://* || "$value" == socks5a://* || "$value" == http://* || "$value" == https://* ]]; then
+            CURL_PROXY="$value"
+            log_success "代理已设置为: $CURL_PROXY"
+        else
+            log_error "无效的代理格式。请使用 'socks5://', 'socks5h://', 'socks5a://', 'http://' 或 'https://' 前缀。"
+            return 1
+        fi
         ;;
     port)
         FRIDA_SERVER_PORT="$value"
@@ -435,6 +626,49 @@ update_config_file() {
     log_success "配置已更新: $CONFIG_FILE"
 }
 
+interactive_config_editor() {
+    while true; do
+        echo -e "${COLOR_SKYBLUE}交互式配置编辑器${COLOR_RESET}"
+        echo -e "${COLOR_GREEN}1.${COLOR_RESET} 编辑 HTTP 代理 ${COLOR_GRAY}(当前: ${CURL_PROXY:-未设置})${COLOR_RESET}"
+        echo -e "${COLOR_GREEN}2.${COLOR_RESET} 编辑 Frida 服务器端口 ${COLOR_GRAY}(当前: ${FRIDA_SERVER_PORT:-$DEF_FRIDA_SERVER_PORT})${COLOR_RESET}"
+        echo -e "${COLOR_GREEN}3.${COLOR_RESET} 编辑 Frida 魔改名 ${COLOR_GRAY}(当前: ${FRIDA_NAME:-未设置})${COLOR_RESET}"
+        echo -e "${COLOR_GREEN}4.${COLOR_RESET} 退出"
+        read -p "请选择要编辑的项目 (1-4): " choice
+        case $choice in
+            1) 
+                read -p "输入新的 HTTP 代理 (当前: ${CURL_PROXY:-未设置}): " new_proxy
+                if [ -n "$new_proxy" ]; then
+                    set_config proxy "$new_proxy"
+                else
+                    echo -e "${COLOR_YELLOW}保持原值不变${COLOR_RESET}"
+                fi
+                ;;
+            2) 
+                read -p "输入新的 Frida 服务器端口 (当前: ${FRIDA_SERVER_PORT:-$DEF_FRIDA_SERVER_PORT}): " new_port
+                if [ -n "$new_port" ]; then
+                    set_config port "$new_port"
+                else
+                    echo -e "${COLOR_YELLOW}保持原值不变${COLOR_RESET}"
+                fi
+                ;;
+            3) 
+                read -p "输入新的 Frida 魔改名 (当前: ${FRIDA_NAME:-未设置}): " new_name
+                if [ -n "$new_name" ]; then
+                    set_config frida-name "$new_name"
+                else
+                    echo -e "${COLOR_YELLOW}保持原值不变${COLOR_RESET}"
+                fi
+                ;;
+            4) 
+                return 
+                ;;
+            *) 
+                echo -e "${COLOR_BG_WHITE}${COLOR_RED}无效的选择${COLOR_RESET}" 
+                ;;
+        esac
+        echo
+    done
+}
 list_frida_versions() {
     log_info "获取 Frida 最新版本列表..."
 
@@ -477,7 +711,8 @@ update_frida_modules() {
     # 确保 CURL_PROXY 环境变量可用于 Python 脚本
     export CURL_PROXY
 
-    local new_modules=$($python_cmd -c "$(cat <<EOF
+    local new_modules=$($python_cmd -c "$(
+        cat <<EOF
 import os
 import re
 import requests
@@ -568,7 +803,7 @@ def main():
 if __name__ == "__main__":
     main()
 EOF
-)")
+    )")
 
     if [ $? -ne 0 ]; then
         log_error "更新 FRIDA_MODULES 失败"
@@ -577,7 +812,7 @@ EOF
 
     # 更新配置文件中的 FRIDA_MODULES
     sed -i '' '/^FRIDA_MODULES=/,/^)/d' "$CONFIG_FILE"
-    echo "$new_modules" >> "$CONFIG_FILE"
+    echo "$new_modules" >>"$CONFIG_FILE"
 
     log_success "FRIDA_MODULES 更新完成"
     return 0
@@ -605,7 +840,7 @@ list_frida_modules() {
     done
 
     # 使用 column 命令对齐输出，并删除临时文件
-    column -t -s $'\t' < "$temp_file"
+    column -t -s $'\t' <"$temp_file"
     rm -f "$temp_file"
 }
 
@@ -763,17 +998,8 @@ download_frida_module() {
         fi
 
         log_info "正在下载 $filename 到 $dir"
-        if [ -n "$CURL_PROXY" ]; then
-            curl -L -o "$output_file" --proxy "$CURL_PROXY" "$url" || {
-                log_error "下载 $filename 失败"
-                continue
-            }
-        else
-            curl -L -o "$output_file" "$url" || {
-                log_error "下载 $filename 失败"
-                continue
-            }
-        fi
+        download_with_progress "$url" "$output_file" "$filename"
+
         log_success "下载 $filename 完成"
         # 解压逻辑
         if [[ "$no_extract" != true ]]; then
@@ -1179,21 +1405,19 @@ check_and_install_tool() {
 # 函数：下载 Frida
 download_frida() {
     local arch=$1
+    local clean=$2
     local filename="frida_${FRIDA_VERSION}_iphoneos-${arch}.deb"
-    if [ ! -f "$filename" ]; then
-        log_info "下载 $filename"
-        # 如果配置了代理 CURL_PROXY
-        if [ -n "$CURL_PROXY" ]; then
-            curl -L -o "$filename" --proxy "$CURL_PROXY" "https://github.com/frida/frida/releases/download/${FRIDA_VERSION}/${filename}" || {
-                log_error "下载 $filename 失败"
-                exit 1
-            }
-        else
-            curl -L -o "$filename" "https://github.com/frida/frida/releases/download/${FRIDA_VERSION}/${filename}" || {
-                log_error "下载 $filename 失败"
-                exit 1
-            }
+    # 如果本地文件存在
+    if [ -f "$filename" ]; then
+        if [ "$clean" = "true" ]; then
+            log_warning "清理旧文件: $filename"
+            rm -f $filename
         fi
+    fi
+
+    if [ ! -f "$filename" ]; then
+        local url="https://github.com/frida/frida/releases/download/${FRIDA_VERSION}/${filename}"
+        download_with_progress "$url" "$filename" "$filename"
     else
         log_warning "本地存在 $filename"
     fi
@@ -1247,6 +1471,69 @@ modify_launch_daemon() {
     fi
 
     log_success "plist 文件修改完成"
+
+    # 收到一个 arm64e 的版本，对它做了适配：
+    # 检查 usr/sbin/frida-server-wrapper 和 usr/sbin/frida-server.ent
+    # 存在则更名 ${FRIDA_NAME}-server-wrapper 和 usr/sbin/${FRIDA_NAME}-server.ent
+    # 打开 ${FRIDA_NAME}-server-wrapper ，进行替换
+    # exec /usr/sbin/frida-server $@ 替换为 exec /usr/sbin/${FRIDA_NAME}-server $@
+    # 打开 usr/sbin/${FRIDA_NAME}-server.ent，进行替换
+    # <string>re.frida.Server</string> 替换为 <string>re.${FRIDA_NAME}.Server</string>
+    # 修改2个文件权限
+    local frida_server_wrapper_file="${build}/usr/sbin/frida-server-wrapper"
+    local new_frida_server_wrapper_file="${build}/usr/sbin/${FRIDA_NAME}-server-wrapper"
+    local frida_server_ent_file="${build}/usr/sbin/frida-server.ent"
+    local new_frida_server_ent_file="${build}/usr/sbin/${FRIDA_NAME}-server.ent"
+
+    if [ -f "$frida_server_wrapper_file" ]; then
+        log_success "正在修改 frida-server-wrapper 文件: $frida_server_wrapper_file"
+        sed -i '' 's/exec \/usr\/sbin\/frida-server/exec \/usr\/sbin\/'"${FRIDA_NAME}"'-server/g' "$frida_server_wrapper_file"
+        if [ $? -ne 0 ]; then
+            log_error "错误: 修改 frida-server-wrapper 文件失败"
+            return 1
+        fi
+        log_success "frida-server-wrapper 文件修改完成"
+        mv "$frida_server_wrapper_file" "$new_frida_server_wrapper_file"
+        if [ $? -ne 0 ]; then
+            log_error "错误: 重命名 frida-server-wrapper 文件失败"
+            return 1
+        fi
+        log_success "frida-server-wrapper 文件已重命名为: $new_frida_server_wrapper_file"
+        sudo chown root:wheel $new_frida_server_wrapper_file
+        if [ $? -ne 0 ]; then
+            log_error "错误: 修改 frida-server-wrapper 文件权限失败"
+            return 1
+        fi
+        log_success "frida-server-wrapper 文件权限修改完成"
+    else
+        log_warning "警告: frida-server-wrapper 文件不存在: $frida_server_wrapper_file"
+    fi
+
+    if [ -f "$frida_server_ent_file" ]; then
+        log_success "正在修改 frida-server.ent 文件: $frida_server_ent_file"
+        sed -i '' 's/<string>re\.frida\.Server/<string>re.'"${FRIDA_NAME}"'.Server/g' "$frida_server_ent_file"
+        if [ $? -ne 0 ]; then
+            log_error "错误: 修改 frida-server.ent 文件失败"
+            return 1
+        fi
+        log_success "frida-server.ent 文件修改完成"
+        mv "$frida_server_ent_file" "$new_frida_server_ent_file"
+        if [ $? -ne 0 ]; then
+            log_error "错误: 重命名 frida-server.ent 文件失败"
+            return 1
+        fi
+        log_success "frida-server.ent 文件已重命名为: $new_frida_server_ent_file"
+        sudo chown root:wheel $new_frida_server_ent_file
+        if [ $? -ne 0 ]; then
+            log_error "错误: 修改 frida-server.ent 文件权限失败"
+            return 1
+        fi
+        log_success "frida-server.ent 文件权限修改完成"
+    else
+        log_warning "警告: frida-server.ent 文件不存在: $frida_server_ent_file"
+    fi
+
+    log_success "frida-server-wrapper 和 frida-server.ent 文件修改完成"
 
     # 重命名 plist 文件
     local new_plist
@@ -1549,11 +1836,19 @@ modify_core_py('$FRIDA_NAME')
 }
 
 build_frida() {
+    local clean=$1
+    local local_deb=$2
+    local local_arch=$3
     # 检查并设置 Frida 版本
-    if [ -z "$FRIDA_VERSION" ]; then
-        log_error "未指定 Frida 版本"
-        show_build_usage
-        exit 1
+    if [ -n "$local_deb" ]; then
+        input_file="$local_deb"
+        log_info "使用本地文件: $input_file"
+    else
+        if [ -z "$FRIDA_VERSION" ]; then
+            log_error "未指定 Frida 版本"
+            show_build_usage
+            exit 1
+        fi
     fi
 
     log_info "使用 Frida 服务器端口: $FRIDA_SERVER_PORT"
@@ -1584,25 +1879,38 @@ build_frida() {
             exit 1
         fi
     fi
+    
+    local architectures=("arm" "arm64")
+    for arch in "${architectures[@]}"; do
+        local input_file
+        if [ -n "$local_deb" ]; then
+            input_file="$local_deb"
+            OUTPUT_FILENAME="${local_deb}_${FRIDA_NAME}_tcp.deb"
+            if [ "$local_arch" = "arm64e" ]; then
+                arch="arm"
+            fi
+            log_info "使用本地文件: $input_file"
+        else
+            input_file="frida_${FRIDA_VERSION}_iphoneos-${arch}.deb"
+            OUTPUT_FILENAME="frida_${FRIDA_VERSION}_iphoneos-${arch}_${FRIDA_NAME}_tcp.deb"
+            download_frida $arch $clean
+        fi
 
-    for arch in arm arm64; do
-        download_frida $arch
-
-        BUILD_DIR="frida_${FRIDA_VERSION}_iphoneos-${arch}"
+        BUILD_DIR="frida_build_${arch}"
         rm -rf "$BUILD_DIR"
-        dpkg-deb -R "frida_${FRIDA_VERSION}_iphoneos-${arch}.deb" "$BUILD_DIR"
+        dpkg-deb -R "$input_file" "$BUILD_DIR"
 
         log_cinfo $COLOR_GREEN "正在修改 Frida ${COLOR_PURPLE}${FRIDA_VERSION}${COLOR_RESET} 版本 (${COLOR_SKYBLUE}${arch}${COLOR_RESET})"
         modify_launch_daemon "$BUILD_DIR" "$arch"
         modify_debian_files "$BUILD_DIR" "$arch"
         modify_binary "$BUILD_DIR" "$arch"
 
-        OUTPUT_FILENAME="frida_${FRIDA_VERSION}_iphoneos-${arch}_${FRIDA_NAME}_tcp.deb"
         repackage_deb "$BUILD_DIR" "$OUTPUT_FILENAME"
 
         mkdir -p ../dist
         mv "$OUTPUT_FILENAME" ../dist/
         log_success "Frida ${FRIDA_VERSION} 版本 (${arch}) 修改完成"
+        
         log_info "新版本名：${FRIDA_NAME}"
         log_info "请使用新版本名：${FRIDA_NAME} 进行调试"
         log_info "请使用端口：${FRIDA_SERVER_PORT} 进行调试"
@@ -1616,6 +1924,10 @@ build_frida() {
         log_info "frida -U -f com.xxx.xxx -l"
         log_info "frida -H <iPhone-IP>:${FRIDA_SERVER_PORT} -f com.xxx.xxx --no-pause"
         log_info "-------------------------------------------------"
+
+        if [ -n "$local_deb" ]; then
+            return 0  # 如果是本地文件，只处理一次
+        fi
     done
 
     # 确认执行
@@ -1640,8 +1952,8 @@ initialize_config() {
         echo "CURL_PROXY=" >>"$CONFIG_FILE"
         echo "AUTO_CONFIRM=$DEF_AUTO_CONFIRM" >>"$CONFIG_FILE"
         echo "FRIDA_NAME=" >>"$CONFIG_FILE"
-        echo "FRIDA_MODULES=(" >> "$CONFIG_FILE"
-        echo ")" >> "$CONFIG_FILE"
+        echo "FRIDA_MODULES=(" >>"$CONFIG_FILE"
+        echo ")" >>"$CONFIG_FILE"
     fi
 }
 is_conda_env() {
@@ -1734,14 +2046,14 @@ log_config_info() {
 }
 check_version() {
     local current_version="$VERSION"
-    local repo_owner="suifei"  # 替换为您的 GitHub 用户名
-    local repo_name="fridare"  # 替换为您的仓库名
+    local repo_owner="suifei" # 替换为您的 GitHub 用户名
+    local repo_name="fridare" # 替换为您的仓库名
 
     log_info "检查版本更新..."
     local latest_info=$(curl -s "https://api.github.com/repos/$repo_owner/$repo_name/releases/latest")
     local latest_version=$(echo "$latest_info" | jq -r '.tag_name')
     local download_url=$(echo "$latest_info" | jq -r '.zipball_url')
-    
+
     if [ -z "$latest_version" ] || [ -z "$download_url" ]; then
         log_error "无法获取最新版本信息"
         return 1
@@ -1767,11 +2079,7 @@ check_version() {
     local temp_dir=$(mktemp -d)
     local zip_file="$temp_dir/fridare-$latest_version.zip"
 
-    if ! curl -L "$download_url" -o "$zip_file"; then
-        log_error "下载失败"
-        rm -rf "$temp_dir"
-        return 1
-    fi
+    download_with_progress "$download_url" "$zip_file" "Fridare 版本 $latest_version"
 
     log_info "解压文件..."
     if ! unzip -q "$zip_file" -d "$temp_dir"; then
@@ -1783,7 +2091,7 @@ check_version() {
     log_info "更新本地文件..."
     local extract_dir=$(find "$temp_dir" -maxdepth 1 -type d | grep -v "^$temp_dir$" | head -n 1)
     local script_dir=$(dirname "$0")
-    
+
     # 使用 cp 替代 rsync
     if ! (cd "$extract_dir" && cp -R . "$script_dir/"); then
         log_error "更新本地文件失败"
@@ -1798,7 +2106,7 @@ check_version() {
         fi
     done
 
-    chmod -R 755 "$script_dir"  # 根据需要调整权限
+    chmod -R 755 "$script_dir" # 根据需要调整权限
     rm -rf "$temp_dir"
     log_success "更新完成，新版本：$latest_version"
     log_info "请重新运行脚本以使用新版本"
@@ -1811,10 +2119,10 @@ version_compare() {
     fi
     local IFS=.
     local i ver1=($1) ver2=($2)
-    for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do
+    for ((i = ${#ver1[@]}; i < ${#ver2[@]}; i++)); do
         ver1[i]=0
     done
-    for ((i=0; i<${#ver1[@]}; i++)); do
+    for ((i = 0; i < ${#ver1[@]}; i++)); do
         if [[ -z ${ver2[i]} ]]; then
             ver2[i]=0
         fi
@@ -1839,6 +2147,14 @@ main() {
         }
         sudo_keep_alive
         trap cleanup EXIT
+    fi
+    # 检查是否是首次运行
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo -e "${COLOR_YELLOW}欢迎使用 Fridare！这似乎是您第一次运行本工具。${COLOR_RESET}"
+        echo -e "${COLOR_YELLOW}以下是快速开始指南：${COLOR_RESET}\n"
+        quick_start_guide
+        echo -e "\n${COLOR_YELLOW}按回车键继续...${COLOR_RESET}"
+        read
     fi
     # 读取配置文件（如果存在）
     if [ -f "$CONFIG_FILE" ]; then

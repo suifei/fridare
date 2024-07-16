@@ -45,6 +45,10 @@ Fridare 是一个用于修改和定制 Frida-server 的魔改工具，专为 iOS
 - 支持 Conda 环境
 - 支持 macho, elf, pe 文件格式
 - 支持 Windows,Linux,MacOS,Android,IOS
+- 支持自更新
+
+### v3.1.1
+- 增加了 `upgrade` 命令，用于自动更新 Fridare 脚本
 
 ### v3.1.0
 - 增加了 `patch` 命令，用于修补指定的 Frida 模块
