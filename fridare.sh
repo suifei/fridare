@@ -215,6 +215,7 @@ show_build_usage() {
     echo -e "  ${COLOR_GREEN}-l, --local archs[arm,arm64,arm64e] FILENAME${COLOR_RESET} 使用本地 deb 文件，指定构建架构"
     echo
     echo -e "${COLOR_BG_WHITE}${COLOR_RED}注意: -v, -latest 和 -l 不能同时使用${COLOR_RESET}"
+    echo -e "${COLOR_BG_WHITE}${COLOR_RED}注意: -l 使用本地 deb 文件时，请使用全路径，或者不要把原始包放到 build 目录，会导致路径冲突。${COLOR_RESET}"
     echo -e "${COLOR_WHITE}示例:${COLOR_RESET}"
     echo -e "  $0 build -v 16.4.2"
     echo -e "  $0 build -latest"
@@ -1484,60 +1485,60 @@ modify_launch_daemon() {
     # 打开 usr/sbin/${FRIDA_NAME}-server.ent，进行替换
     # <string>re.frida.Server</string> 替换为 <string>re.${FRIDA_NAME}.Server</string>
     # 修改2个文件权限
-    local frida_server_wrapper_file="${build}/usr/sbin/frida-server-wrapper"
-    local new_frida_server_wrapper_file="${build}/usr/sbin/${FRIDA_NAME}-server-wrapper"
-    local frida_server_ent_file="${build}/usr/sbin/frida-server.ent"
-    local new_frida_server_ent_file="${build}/usr/sbin/${FRIDA_NAME}-server.ent"
+    # local frida_server_wrapper_file="${build}/usr/sbin/frida-server-wrapper"
+    # local new_frida_server_wrapper_file="${build}/usr/sbin/${FRIDA_NAME}-server-wrapper"
+    # local frida_server_ent_file="${build}/usr/sbin/frida-server.ent"
+    # local new_frida_server_ent_file="${build}/usr/sbin/${FRIDA_NAME}-server.ent"
 
-    if [ -f "$frida_server_wrapper_file" ]; then
-        log_success "正在修改 frida-server-wrapper 文件: $frida_server_wrapper_file"
-        sed -i '' 's/exec \/usr\/sbin\/frida-server/exec \/usr\/sbin\/'"${FRIDA_NAME}"'-server/g' "$frida_server_wrapper_file"
-        if [ $? -ne 0 ]; then
-            log_error "错误: 修改 frida-server-wrapper 文件失败"
-            return 1
-        fi
-        log_success "frida-server-wrapper 文件修改完成"
-        mv "$frida_server_wrapper_file" "$new_frida_server_wrapper_file"
-        if [ $? -ne 0 ]; then
-            log_error "错误: 重命名 frida-server-wrapper 文件失败"
-            return 1
-        fi
-        log_success "frida-server-wrapper 文件已重命名为: $new_frida_server_wrapper_file"
-        sudo chown root:wheel $new_frida_server_wrapper_file
-        if [ $? -ne 0 ]; then
-            log_error "错误: 修改 frida-server-wrapper 文件权限失败"
-            return 1
-        fi
-        log_success "frida-server-wrapper 文件权限修改完成"
-    else
-        log_warning "警告: frida-server-wrapper 文件不存在: $frida_server_wrapper_file"
-    fi
+    # if [ -f "$frida_server_wrapper_file" ]; then
+    #     log_success "正在修改 frida-server-wrapper 文件: $frida_server_wrapper_file"
+    #     sed -i '' 's/exec \/usr\/sbin\/frida-server/exec \/usr\/sbin\/'"${FRIDA_NAME}"'-server/g' "$frida_server_wrapper_file"
+    #     if [ $? -ne 0 ]; then
+    #         log_error "错误: 修改 frida-server-wrapper 文件失败"
+    #         return 1
+    #     fi
+    #     log_success "frida-server-wrapper 文件修改完成"
+    #     mv "$frida_server_wrapper_file" "$new_frida_server_wrapper_file"
+    #     if [ $? -ne 0 ]; then
+    #         log_error "错误: 重命名 frida-server-wrapper 文件失败"
+    #         return 1
+    #     fi
+    #     log_success "frida-server-wrapper 文件已重命名为: $new_frida_server_wrapper_file"
+    #     sudo chown root:wheel $new_frida_server_wrapper_file
+    #     if [ $? -ne 0 ]; then
+    #         log_error "错误: 修改 frida-server-wrapper 文件权限失败"
+    #         return 1
+    #     fi
+    #     log_success "frida-server-wrapper 文件权限修改完成"
+    # else
+    #     log_warning "警告: frida-server-wrapper 文件不存在: $frida_server_wrapper_file"
+    # fi
 
-    if [ -f "$frida_server_ent_file" ]; then
-        log_success "正在修改 frida-server.ent 文件: $frida_server_ent_file"
-        sed -i '' 's/<string>re\.frida\.Server/<string>re.'"${FRIDA_NAME}"'.Server/g' "$frida_server_ent_file"
-        if [ $? -ne 0 ]; then
-            log_error "错误: 修改 frida-server.ent 文件失败"
-            return 1
-        fi
-        log_success "frida-server.ent 文件修改完成"
-        mv "$frida_server_ent_file" "$new_frida_server_ent_file"
-        if [ $? -ne 0 ]; then
-            log_error "错误: 重命名 frida-server.ent 文件失败"
-            return 1
-        fi
-        log_success "frida-server.ent 文件已重命名为: $new_frida_server_ent_file"
-        sudo chown root:wheel $new_frida_server_ent_file
-        if [ $? -ne 0 ]; then
-            log_error "错误: 修改 frida-server.ent 文件权限失败"
-            return 1
-        fi
-        log_success "frida-server.ent 文件权限修改完成"
-    else
-        log_warning "警告: frida-server.ent 文件不存在: $frida_server_ent_file"
-    fi
+    # if [ -f "$frida_server_ent_file" ]; then
+    #     log_success "正在修改 frida-server.ent 文件: $frida_server_ent_file"
+    #     sed -i '' 's/<string>re\.frida\.Server/<string>re.'"${FRIDA_NAME}"'.Server/g' "$frida_server_ent_file"
+    #     if [ $? -ne 0 ]; then
+    #         log_error "错误: 修改 frida-server.ent 文件失败"
+    #         return 1
+    #     fi
+    #     log_success "frida-server.ent 文件修改完成"
+    #     mv "$frida_server_ent_file" "$new_frida_server_ent_file"
+    #     if [ $? -ne 0 ]; then
+    #         log_error "错误: 重命名 frida-server.ent 文件失败"
+    #         return 1
+    #     fi
+    #     log_success "frida-server.ent 文件已重命名为: $new_frida_server_ent_file"
+    #     sudo chown root:wheel $new_frida_server_ent_file
+    #     if [ $? -ne 0 ]; then
+    #         log_error "错误: 修改 frida-server.ent 文件权限失败"
+    #         return 1
+    #     fi
+    #     log_success "frida-server.ent 文件权限修改完成"
+    # else
+    #     log_warning "警告: frida-server.ent 文件不存在: $frida_server_ent_file"
+    # fi
 
-    log_success "frida-server-wrapper 和 frida-server.ent 文件修改完成"
+    # log_success "frida-server-wrapper 和 frida-server.ent 文件修改完成"
 
     # 重命名 plist 文件
     local new_plist
@@ -1902,7 +1903,8 @@ build_frida() {
 
         BUILD_DIR="frida_build_${arch}"
         rm -rf "$BUILD_DIR"
-        dpkg-deb -R "$input_file" "$BUILD_DIR"
+ 
+        dpkg-deb -R "${input_file}"  "${BUILD_DIR}"
 
         log_cinfo $COLOR_GREEN "正在修改 Frida ${COLOR_PURPLE}${FRIDA_VERSION}${COLOR_RESET} 版本 (${COLOR_SKYBLUE}${arch}${COLOR_RESET})"
         modify_launch_daemon "$BUILD_DIR" "$arch"
