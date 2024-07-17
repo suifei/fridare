@@ -5,7 +5,7 @@
 
 set -e # 遇到错误立即退出
 
-VERSION="3.1.1"
+VERSION="3.1.2"
 # 默认值设置
 DEF_FRIDA_SERVER_PORT=8899
 DEF_AUTO_CONFIRM="false"
@@ -106,53 +106,52 @@ download_with_progress() {
     local curl_cmd="curl -L --progress-bar --fail --show-error"
     if [ -n "$CURL_PROXY" ]; then
         case "$CURL_PROXY" in
-            socks4://*)
-                local proxy=${CURL_PROXY#socks4://}
-                curl_cmd+=" --socks4 $proxy"
-                ;;
-            socks4a://*)
-                local proxy=${CURL_PROXY#socks4a://}
-                curl_cmd+=" --socks4a $proxy"
-                ;;
-            socks5://*)
-                local proxy=${CURL_PROXY#socks5://}
-                curl_cmd+=" --socks5 $proxy"
-                ;;
-            socks5h://*)
-                local proxy=${CURL_PROXY#socks5h://}
-                curl_cmd+=" --socks5-hostname $proxy"
-                ;;
-            http://*)
-                curl_cmd+=" --proxy $CURL_PROXY"
-                ;;
-            https://*)
-                curl_cmd+=" --proxy $CURL_PROXY"
-                ;;
-            *)
-                log_warning "未知的代理协议，将作为 HTTP 代理使用: $CURL_PROXY"
-                curl_cmd+=" --proxy $CURL_PROXY"
-                ;;
+        socks4://*)
+            local proxy=${CURL_PROXY#socks4://}
+            curl_cmd+=" --socks4 $proxy"
+            ;;
+        socks4a://*)
+            local proxy=${CURL_PROXY#socks4a://}
+            curl_cmd+=" --socks4a $proxy"
+            ;;
+        socks5://*)
+            local proxy=${CURL_PROXY#socks5://}
+            curl_cmd+=" --socks5 $proxy"
+            ;;
+        socks5h://*)
+            local proxy=${CURL_PROXY#socks5h://}
+            curl_cmd+=" --socks5-hostname $proxy"
+            ;;
+        http://*)
+            curl_cmd+=" --proxy $CURL_PROXY"
+            ;;
+        https://*)
+            curl_cmd+=" --proxy $CURL_PROXY"
+            ;;
+        *)
+            log_warning "未知的代理协议，将作为 HTTP 代理使用: $CURL_PROXY"
+            curl_cmd+=" --proxy $CURL_PROXY"
+            ;;
         esac
     fi
 
     while [ $retry_count -gt 0 ]; do
         echo -e "${COLOR_SKYBLUE}正在下载 $description...${COLOR_RESET}"
-        
-        if $curl_cmd "$url" -o "$temp_file" 2>&1 | tee /dev/stderr | \
-            sed -u 's/^[# ]*\([0-9]*\.[0-9]%\).*\([ 0-9.]*\(KiB\|MiB\|GiB\)\/s\).*$/\1\n速度: \2/' | \
+
+        if $curl_cmd "$url" -o "$temp_file" 2>&1 | tee /dev/stderr |
+            sed -u 's/^[# ]*\([0-9]*\.[0-9]%\).*\([ 0-9.]*\(KiB\|MiB\|GiB\)\/s\).*$/\1\n速度: \2/' |
             while IFS= read -r line; do
                 if [[ $line =~ ^[0-9]+\.[0-9]% ]]; then
                     percent=${line%\%*}
                     completed=$(printf "%.0f" $percent)
-                    printf "\r进度: [%-50s] %d%%" $(printf "=%.0s" $(seq 1 $((completed/2)))) "$completed"
+                    printf "\r进度: [%-50s] %d%%" $(printf "=%.0s" $(seq 1 $((completed / 2)))) "$completed"
                 elif [[ $line =~ ^速度: ]]; then
                     printf " %s" "$line"
                 fi
-            done
-        then
+            done; then
             echo # 换行
             mv "$temp_file" "$output_file"
-            local file_size=$(wc -c < "$output_file")
+            local file_size=$(wc -c <"$output_file")
             echo -e "${COLOR_GREEN}下载完成: $output_file (大小: $file_size 字节)${COLOR_RESET}"
             return 0
         else
@@ -160,7 +159,7 @@ download_with_progress() {
             local curl_exit_code=$?
             log_error "下载失败: $output_file (curl exit code: $curl_exit_code)"
             if [ -f "$temp_file" ]; then
-                log_error "临时文件大小: $(wc -c < "$temp_file") 字节"
+                log_error "临时文件大小: $(wc -c <"$temp_file") 字节"
                 rm -f "$temp_file"
             fi
             retry_count=$((retry_count - 1))
@@ -222,7 +221,7 @@ show_build_usage() {
     echo -e "  $0 build -l arm64 frida-server_16.4.2_amd64.deb"
     echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb "
     echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb" -p 8000"
-    echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb" -p 8000 -y"
+    echo -e " $0 build -c -l arm64 frida-server_16.4.2_amd64.deb" -p 8000 -y"
 }
 
 show_patch_usage() {
@@ -366,7 +365,7 @@ parse_arguments() {
         ;;
     u | upgrade)
         update_frida_modules
-        check_version
+        check_version "false"
         ;;
     q | quickstart)
         quick_start_guide
@@ -376,20 +375,25 @@ parse_arguments() {
             show_main_usage
         else
             case "$1" in
-                b | build) show_build_usage ;;
-                p | patch) show_patch_usage ;;
-                conf | config) show_config_usage ;;
-                dl | download) show_download_usage ;;
-                s | setup) show_setup_usage ;;
-                u | upgrade) show_upgrade_usage ;;
-                ls | list) show_list_usage ;;
-                lm | list-modules) show_list_modules_usage ;;
+            b | build) show_build_usage ;;
+            p | patch) show_patch_usage ;;
+            conf | config) show_config_usage ;;
+            dl | download) show_download_usage ;;
+            s | setup) show_setup_usage ;;
+            u | upgrade) show_upgrade_usage ;;
+            ls | list) show_list_usage ;;
+            lm | list-modules) show_list_modules_usage ;;
             *)
                 log_error "未知命令: $1"
                 show_main_usage
                 ;;
             esac
         fi
+        ;;
+    install)
+        update_frida_modules
+        is_install="true"
+        check_version $is_install
         ;;
     *)
         log_error "未知命令: $command"
@@ -635,36 +639,36 @@ interactive_config_editor() {
         echo -e "${COLOR_GREEN}4.${COLOR_RESET} 退出"
         read -p "请选择要编辑的项目 (1-4): " choice
         case $choice in
-            1) 
-                read -p "输入新的 HTTP 代理 (当前: ${CURL_PROXY:-未设置}): " new_proxy
-                if [ -n "$new_proxy" ]; then
-                    set_config proxy "$new_proxy"
-                else
-                    echo -e "${COLOR_YELLOW}保持原值不变${COLOR_RESET}"
-                fi
-                ;;
-            2) 
-                read -p "输入新的 Frida 服务器端口 (当前: ${FRIDA_SERVER_PORT:-$DEF_FRIDA_SERVER_PORT}): " new_port
-                if [ -n "$new_port" ]; then
-                    set_config port "$new_port"
-                else
-                    echo -e "${COLOR_YELLOW}保持原值不变${COLOR_RESET}"
-                fi
-                ;;
-            3) 
-                read -p "输入新的 Frida 魔改名 (当前: ${FRIDA_NAME:-未设置}): " new_name
-                if [ -n "$new_name" ]; then
-                    set_config frida-name "$new_name"
-                else
-                    echo -e "${COLOR_YELLOW}保持原值不变${COLOR_RESET}"
-                fi
-                ;;
-            4) 
-                return 
-                ;;
-            *) 
-                echo -e "${COLOR_BG_WHITE}${COLOR_RED}无效的选择${COLOR_RESET}" 
-                ;;
+        1)
+            read -p "输入新的 HTTP 代理 (当前: ${CURL_PROXY:-未设置}): " new_proxy
+            if [ -n "$new_proxy" ]; then
+                set_config proxy "$new_proxy"
+            else
+                echo -e "${COLOR_YELLOW}保持原值不变${COLOR_RESET}"
+            fi
+            ;;
+        2)
+            read -p "输入新的 Frida 服务器端口 (当前: ${FRIDA_SERVER_PORT:-$DEF_FRIDA_SERVER_PORT}): " new_port
+            if [ -n "$new_port" ]; then
+                set_config port "$new_port"
+            else
+                echo -e "${COLOR_YELLOW}保持原值不变${COLOR_RESET}"
+            fi
+            ;;
+        3)
+            read -p "输入新的 Frida 魔改名 (当前: ${FRIDA_NAME:-未设置}): " new_name
+            if [ -n "$new_name" ]; then
+                set_config frida-name "$new_name"
+            else
+                echo -e "${COLOR_YELLOW}保持原值不变${COLOR_RESET}"
+            fi
+            ;;
+        4)
+            return
+            ;;
+        *)
+            echo -e "${COLOR_BG_WHITE}${COLOR_RED}无效的选择${COLOR_RESET}"
+            ;;
         esac
         echo
     done
@@ -1879,7 +1883,7 @@ build_frida() {
             exit 1
         fi
     fi
-    
+
     local architectures=("arm" "arm64")
     for arch in "${architectures[@]}"; do
         local input_file
@@ -1910,7 +1914,7 @@ build_frida() {
         mkdir -p ../dist
         mv "$OUTPUT_FILENAME" ../dist/
         log_success "Frida ${FRIDA_VERSION} 版本 (${arch}) 修改完成"
-        
+
         log_info "新版本名：${FRIDA_NAME}"
         log_info "请使用新版本名：${FRIDA_NAME} 进行调试"
         log_info "请使用端口：${FRIDA_SERVER_PORT} 进行调试"
@@ -1926,7 +1930,7 @@ build_frida() {
         log_info "-------------------------------------------------"
 
         if [ -n "$local_deb" ]; then
-            return 0  # 如果是本地文件，只处理一次
+            return 0 # 如果是本地文件，只处理一次
         fi
     done
 
@@ -2044,85 +2048,6 @@ log_config_info() {
     log_skyblue "  FRIDA_NAME: $FRIDA_NAME"
     echo # 空行，为了更好的可读性
 }
-check_version() {
-    local current_version="$VERSION"
-    local repo_owner="suifei" # Replace with your GitHub username
-    local repo_name="fridare" # Replace with your repository name
-
-    log_info "检查版本更新..."
-    local latest_info=$(curl -s "https://api.github.com/repos/$repo_owner/$repo_name/releases/latest")
-    local latest_version=$(echo "$latest_info" | jq -r '.tag_name')
-    local download_url=$(echo "$latest_info" | jq -r '.zipball_url')
-
-    if [ -z "$latest_version" ] || [ -z "$download_url" ]; then
-        log_error "无法获取最新版本信息"
-        return 1
-    fi
-
-    # Remove 'v' if present in version strings
-    current_version="${current_version#v}"
-    latest_version="${latest_version#v}"
-
-    if version_compare "$current_version" "$latest_version"; then
-        log_success "当前版本 ($current_version) 已是最新"
-        return 0
-    fi
-
-    log_warning "发现新版本：$latest_version（当前版本：$current_version）"
-    echo "更新说明："
-    echo "$latest_info" | jq -r '.body' | sed 's/^/  /'
-
-    read -p "是否更新到最新版本？(y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_info "取消更新"
-        return 0
-    fi
-
-    log_info "开始下载最新版本..."
-    local temp_dir=$(mktemp -d)
-    local zip_file="$temp_dir/fridare-$latest_version.zip"
-
-    download_with_progress "$download_url" "$zip_file" "Fridare 版本 $latest_version"
-
-    log_info "解压文件..."
-    if ! unzip -q "$zip_file" -d "$temp_dir"; then
-        log_error "解压失败"
-        rm -rf "$temp_dir"
-        return 1
-    fi
-
-    log_info "更新本地文件..."
-    local extract_dir=$(find "$temp_dir" -maxdepth 1 -type d | grep -v "^$temp_dir$" | head -n 1)
-    local script_dir=$(dirname "$0")
-
-    # Use cp instead of rsync
-    if ! (cd "$extract_dir" && cp -R . "$temp_dir/extracted_files"); then
-        log_error "更新本地文件失败"
-        rm -rf "$temp_dir"
-        return 1
-    fi
-
-    # Copy extracted files to script directory
-    if ! cp -R "$temp_dir/extracted_files/." "$script_dir/"; then
-        log_error "更新本地文件失败"
-        rm -rf "$temp_dir"
-        return 1
-    fi
-
-    # Delete old files if present
-    find "$script_dir" -type f | while read file; do
-        if [ ! -e "$extract_dir/${file#$script_dir/}" ]; then
-            rm "$file"
-        fi
-    done
-
-    chmod -R 755 "$script_dir" # Adjust permissions as needed
-    rm -rf "$temp_dir"
-    log_success "更新完成，新版本：$latest_version"
-    log_info "请重新运行脚本以使用新版本"
-    exit 0
-}
 
 version_compare() {
     local v1="$1"
@@ -2133,22 +2058,139 @@ version_compare() {
     v2="${v2#v}"
 
     # Split the versions into arrays
-    IFS='.' read -r -a ver1 <<< "$v1"
-    IFS='.' read -r -a ver2 <<< "$v2"
+    IFS='.' read -r -a ver1 <<<"$v1"
+    IFS='.' read -r -a ver2 <<<"$v2"
 
     # Compare each part of the version
-    for ((i=0; i<${#ver1[@]}; i++)); do
-        if [[ -z ${ver2[i]} ]]; then
-            ver2[i]=0
-        fi
-        if ((10#${ver1[i]} > 10#${ver2[i]})); then
-            return 1
-        elif ((10#${ver1[i]} < 10#${ver2[i]})); then
-            return 0
+    for ((i = 0; i < ${#ver1[@]} || i < ${#ver2[@]}; i++)); do
+        local num1=$((${ver1[i]:-0}))
+        local num2=$((${ver2[i]:-0}))
+        if ((num1 > num2)); then
+            echo ">" # v1 is greater
+            return
+        elif ((num1 < num2)); then
+            echo "<" # v2 is greater
+            return
         fi
     done
-    return 1
+    echo "=" # versions are equal
 }
+
+check_version() {
+    local is_install=$1
+    local current_version="$VERSION"
+    local repo_owner="suifei"
+    local repo_name="fridare"
+    local next="false"
+
+    log_info "检查版本更新..."
+    local releases_info=$(curl -s "https://api.github.com/repos/$repo_owner/$repo_name/releases")
+
+    if [ -z "$releases_info" ]; then
+        log_error "无法获取版本信息"
+        return 1
+    fi
+
+    # 获取所有非预发布版本，并按版本号排序
+    local versions=$(echo "$releases_info" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -rV)
+    local latest_version=$(echo "$versions" | head -n1)
+
+    if [ -z "$latest_version" ]; then
+        log_error "无法获取最新版本信息"
+        return 1
+    fi
+
+    local download_url=$(echo "$releases_info" | jq -r ".[] | select(.tag_name == \"$latest_version\") | .zipball_url")
+
+    if [ -z "$download_url" ]; then
+        log_error "无法获取下载链接"
+        return 1
+    fi
+
+    current_version="${current_version#v}"
+    latest_version="${latest_version#v}"
+
+    result=$(version_compare "$current_version" "$latest_version")
+
+    if [ "$result" = "=" ]; then
+        log_success "当前版本 (${current_version}) 已是最新正式版本"
+        return 0
+    elif [ "$result" = ">" ]; then
+        log_success "当前版本 (${current_version}) 比最新正式版本 (${latest_version}) 更新"
+        return 0
+    elif [ "$result" = "<" ]; then
+        log_warning "发现新的正式版本：${latest_version}（当前版本：${current_version}）"
+        echo "更新说明："
+        echo "$releases_info" | jq -r ".[] | select(.tag_name == \"$latest_version\") | .body" | sed 's/^/  /'
+
+        read -p "是否更新到最新正式版本？(y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_info "取消更新"
+            return 0
+        fi
+        next="true"
+    else
+        log_error "版本比较出错"
+        return 1
+    fi
+    if [ "$next" = "true" ] || [ "$is_install" = "true" ]; then
+
+        # 下载和更新过程保持不变
+        log_info "开始下载最新正式版本..."
+        local temp_dir=$(mktemp -d)
+        local zip_file="$temp_dir/fridare-$latest_version.zip"
+        local extract_dir="$temp_dir/extracted_files"
+
+        download_with_progress "$download_url" "$zip_file" "Fridare 版本 ${latest_version}"
+
+        log_info "解压文件..."
+        if ! unzip -q "$zip_file" -d "$extract_dir"; then
+            log_error "解压失败"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+
+        log_info "更新本地文件..."
+        local script_dir=$(dirname "$0")
+
+        # 找到解压后的目录（应该只有一个）
+        local update_dir=$(find "$extract_dir" -maxdepth 1 -type d | grep -v "^$extract_dir$" | head -n 1)
+
+        if [ -z "$update_dir" ]; then
+            log_error "无法找到更新文件目录"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+
+        log_info "正在从 $update_dir 复制文件到 $script_dir"
+
+        # 复制新文件到脚本目录
+        if ! cp -R "$update_dir/"* "$script_dir/"; then
+            log_error "复制新文件失败"
+            rm -rf "$temp_dir"
+            return 1
+        fi
+
+        # 删除旧文件
+        find "$script_dir" -type f | while read file; do
+            if [ ! -e "$update_dir/${file#$script_dir/}" ]; then
+                rm "$file"
+            fi
+        done
+
+        # 调整权限
+        chmod -R 755 "$script_dir"
+
+        # 清理临时文件
+        rm -rf "$temp_dir"
+
+        log_success "更新完成，新版本：${latest_version}"
+        log_info "请重新运行脚本以使用新版本"
+        exit 0
+    fi
+}
+
 # 主函数
 main() {
     initialize_config

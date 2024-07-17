@@ -47,6 +47,11 @@ Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida
 - 支持 Windows,Linux,MacOS,Android,IOS
 - 支持自更新
 
+一键安装:
+```shell
+ curl -s https://raw.githubusercontent.com/suifei/fridare/main/fridare.sh | bash -s install
+```
+
 ### v3.1.1
 - 增加了 `upgrade` 命令，用于自动更新 Fridare 脚本
 
