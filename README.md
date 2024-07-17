@@ -22,7 +22,8 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/csuifei?style=social)](https://twitter.com/csuifei)
 
 Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida-server 的自动化魔改工具。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
-[CHANGELOG](CHANGELOG)
+
+**[Android 文档](docs/android.md)|[iOS 文档](docs/ios.md)|[安装指北](docs/install.md)|[CHANGELOG](CHANGELOG)**
 
 欢迎大家入QQ群讨论：[QQ 555354813](screenshots/555354813.jpg) ，如本项目对你有所帮助，记得给作者加星鼓励哦！
 
