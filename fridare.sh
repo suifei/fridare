@@ -189,6 +189,7 @@ show_main_usage() {
     echo -e "  ${COLOR_GREEN}quickstart,    q${COLOR_RESET}       显示快速开始指南"
     echo -e "  ${COLOR_GREEN}build,         b${COLOR_RESET}       重新打包 Frida"
     echo -e "  ${COLOR_GREEN}patch,         p${COLOR_RESET}       修补指定的 Frida 模块"
+    echo -e "  ${COLOR_GREEN}patch-tools,   p${COLOR_RESET}       修补 frida-tools 模块"
     echo -e "  ${COLOR_GREEN}list,         ls${COLOR_RESET}       列出可用的 Frida 版本"
     echo -e "  ${COLOR_GREEN}download,     dl${COLOR_RESET}       下载特定版本的 Frida"
     echo -e "  ${COLOR_GREEN}list-modules, lm${COLOR_RESET}       列出可用的 Frida 模块"
@@ -542,27 +543,16 @@ set_config() {
     local value="$2"
     case "$option" in
     proxy)
-        if [[ "$value" == socks5://* || "$value" == socks5h://* || "$value" == socks5a://* || "$value" == http://* || "$value" == https://* ]]; then
-            CURL_PROXY="$value"
-            log_success "代理已设置为: $CURL_PROXY"
-        else
-            log_error "无效的代理格式。请使用 'socks5://', 'socks5h://', 'socks5a://', 'http://' 或 'https://' 前缀。"
-            return 1
-        fi
+        CURL_PROXY="$value"
+        log_success "代理已设置为: $CURL_PROXY"
         ;;
     port)
         FRIDA_SERVER_PORT="$value"
         log_success "Frida 服务器端口已设置为: $FRIDA_SERVER_PORT"
         ;;
     frida-name)
-        if [[ "$value" =~ ^[a-zA-Z]{5}$ ]]; then
-            FRIDA_NAME="$value"
-            log_success "Frida 魔改名已设置为: $FRIDA_NAME"
-        else
-            log_error "无效的 Frida 魔改名: $value"
-            log_info "Frida 魔改名必须是恰好 5 个字母（a-z 或 A-Z）"
-            return 1
-        fi
+        FRIDA_NAME="$value"
+        log_success "Frida 魔改名已设置为: $FRIDA_NAME"
         ;;
     *)
         log_error "未知的配置选项: $option"
@@ -603,38 +593,23 @@ list_config() {
     [ -n "$FRIDA_NAME" ] && log_info "Frida 魔改名: $FRIDA_NAME"
 }
 update_config_file() {
-    # 读取现有配置
-    local current_config=$(cat "$CONFIG_FILE")
-
-    # 更新配置
-    echo "# Fridare Configuration File" >"$CONFIG_FILE"
-    echo "$current_config" | while IFS='=' read -r key value; do
-        case "$key" in
-        FRIDA_SERVER_PORT)
-            echo "FRIDA_SERVER_PORT=${FRIDA_SERVER_PORT:-$value}"
-            ;;
-        CURL_PROXY)
-            echo "CURL_PROXY=${CURL_PROXY:-$value}"
-            ;;
-        AUTO_CONFIRM)
-            echo "AUTO_CONFIRM=${AUTO_CONFIRM:-$value}"
-            ;;
-        FRIDA_NAME)
-            echo "FRIDA_NAME=${FRIDA_NAME:-$value}"
-            ;;
-        *)
-            echo "$key=$value"
-            ;;
-        esac
-    done >>"$CONFIG_FILE"
-
+    echo "#Fridare.sh config" >"$CONFIG_FILE"
+    echo "FRIDA_SERVER_PORT=${FRIDA_SERVER_PORT}" >>"$CONFIG_FILE"
+    echo "CURL_PROXY=${CURL_PROXY}" >>"$CONFIG_FILE"
+    echo "AUTO_CONFIRM=${AUTO_CONFIRM}" >>"$CONFIG_FILE"
+    echo "FRIDA_NAME=${FRIDA_NAME}" >>"$CONFIG_FILE"
+    echo "FRIDA_MODULES=(" >>"$CONFIG_FILE"
+    for module in "${FRIDA_MODULES[@]}"; do
+        echo "$module" >>"$CONFIG_FILE"
+    done
+    echo ")" >>"$CONFIG_FILE"
     log_success "配置已更新: $CONFIG_FILE"
 }
 
 interactive_config_editor() {
     while true; do
         echo -e "${COLOR_SKYBLUE}交互式配置编辑器${COLOR_RESET}"
-        echo -e "${COLOR_GREEN}1.${COLOR_RESET} 编辑 HTTP 代理 ${COLOR_GRAY}(当前: ${CURL_PROXY:-未设置})${COLOR_RESET}"
+        echo -e "${COLOR_GREEN}1.${COLOR_RESET} 编辑 WEB 代理 ${COLOR_GRAY}(当前: ${CURL_PROXY:-未设置})${COLOR_RESET}"
         echo -e "${COLOR_GREEN}2.${COLOR_RESET} 编辑 Frida 服务器端口 ${COLOR_GRAY}(当前: ${FRIDA_SERVER_PORT:-$DEF_FRIDA_SERVER_PORT})${COLOR_RESET}"
         echo -e "${COLOR_GREEN}3.${COLOR_RESET} 编辑 Frida 魔改名 ${COLOR_GRAY}(当前: ${FRIDA_NAME:-未设置})${COLOR_RESET}"
         echo -e "${COLOR_GREEN}4.${COLOR_RESET} 退出"
@@ -715,7 +690,7 @@ update_frida_modules() {
 
     # 确保 CURL_PROXY 环境变量可用于 Python 脚本
     export CURL_PROXY
-
+    pip install requests[socks] >/dev/null 2>&1
     local new_modules=$($python_cmd -c "$(
         cat <<EOF
 import os
@@ -725,7 +700,13 @@ import requests
 def get_proxy_settings():
     curl_proxy = os.environ.get('CURL_PROXY', '')
     if curl_proxy:
-        return {"http": curl_proxy, "https": curl_proxy}
+        if curl_proxy.startswith('socks5://'):
+            return {"http": curl_proxy, "https": curl_proxy}
+        elif curl_proxy.startswith(('http://', 'https://')):
+            return {"http": curl_proxy, "https": curl_proxy}
+        else:
+            print(f"警告：不支持的代理协议: {curl_proxy}")
+            return None
     return None
 
 def get_latest_release():
@@ -800,10 +781,8 @@ def generate_frida_modules():
 
 def main():
     frida_modules = generate_frida_modules()
-    print("FRIDA_MODULES=(")
     for module in frida_modules:
         print(f"    {module}")
-    print(")")
 
 if __name__ == "__main__":
     main()
@@ -815,9 +794,12 @@ EOF
         return 1
     fi
 
+    FRIDA_MODULES=()
+    FRIDA_MODULES=("$new_modules")
+    update_config_file
     # 更新配置文件中的 FRIDA_MODULES
-    sed -i '' '/^FRIDA_MODULES=/,/^)/d' "$CONFIG_FILE"
-    echo "$new_modules" >>"$CONFIG_FILE"
+    # sed -i '' '/^FRIDA_MODULES=/,/^)/d' "$CONFIG_FILE"
+    # echo "$new_modules" >>"$CONFIG_FILE"
 
     log_success "FRIDA_MODULES 更新完成"
     return 0
@@ -999,13 +981,12 @@ download_frida_module() {
 
         if [[ -f "$output_file" && "$force" != true ]]; then
             log_info "文件 $filename 已存在，跳过下载"
-            continue
+        else
+            log_info "正在下载 $filename 到 $dir"
+            download_with_progress "$url" "$output_file" "$filename"
+
+            log_success "下载 $filename 完成"
         fi
-
-        log_info "正在下载 $filename 到 $dir"
-        download_with_progress "$url" "$output_file" "$filename"
-
-        log_success "下载 $filename 完成"
         # 解压逻辑
         if [[ "$no_extract" != true ]]; then
             if [[ "$filename" != *.deb && "$filename" != *.whl ]]; then # 排除 deb 和 whl 文件
@@ -1015,6 +996,7 @@ download_frida_module() {
                         log_error "解压 $filename 失败"
                         continue
                     }
+                    rm -rf $output_file
                 else
                     case "$filename" in
                     *.tar.xz)
@@ -1023,6 +1005,7 @@ download_frida_module() {
                             log_error "解压 $filename 失败"
                             continue
                         }
+                        rm -rf $output_file
                         ;;
                     *.xz)
                         log_info "解压 $filename..."
@@ -1030,6 +1013,7 @@ download_frida_module() {
                             log_error "解压 $filename 失败"
                             continue
                         }
+                        rm -rf $output_file
                         ;;
                     *.gz)
                         log_info "解压 $filename..."
@@ -1037,6 +1021,7 @@ download_frida_module() {
                             log_error "解压 $filename 失败"
                             continue
                         }
+                        rm -rf $output_file
                         ;;
                     *)
                         log_warning "无法识别的压缩格式: $filename，跳过解压"
@@ -1903,8 +1888,8 @@ build_frida() {
 
         BUILD_DIR="frida_build_${arch}"
         rm -rf "$BUILD_DIR"
- 
-        dpkg-deb -R "${input_file}"  "${BUILD_DIR}"
+
+        dpkg-deb -R "${input_file}" "${BUILD_DIR}"
 
         log_cinfo $COLOR_GREEN "正在修改 Frida ${COLOR_PURPLE}${FRIDA_VERSION}${COLOR_RESET} 版本 (${COLOR_SKYBLUE}${arch}${COLOR_RESET})"
         modify_launch_daemon "$BUILD_DIR" "$arch"
@@ -2231,6 +2216,7 @@ main() {
     fi
     # 读取配置文件（如果存在）
     if [ -f "$CONFIG_FILE" ]; then
+        FRIDA_MODULES=()
         source "$CONFIG_FILE"
     fi
 
