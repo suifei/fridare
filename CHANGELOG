@@ -2,6 +2,27 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## v3.1.2 - 2024-07-17
+
+### Added
+- 增加对多平台的支持：现在支持 `macOS`、`iOS`、`Android`、`Linux` 和 `Windows`
+- 新增 `upgrade` 命令：用于自动更新 Fridare 脚本
+- 新增一键安装功能：
+  ```shell
+  curl -s https://raw.githubusercontent.com/suifei/fridare/main/fridare.sh | bash -s install
+  ```
+
+### Changed
+- 优化版本检查和更新流程
+
+### Fixed
+- 修复了在 Windows 系统上无法正确识别和安装 Frida 工具的问题
+- 修复了在 macOS 系统上无法正确下载 Frida 工具的问题
+
+### Other Changes
+- 更新版本号至 3.1.2
+- 代码重构和优化，提高整体性能和稳定性
+
 ## [3.1.0] - 2024-07-16
 ### Added
 - 增加了 `patch` 命令，用于修补指定的 Frida 模块
