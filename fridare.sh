@@ -2114,10 +2114,8 @@ check_version() {
 
     if [ "$result" = "=" ]; then
         log_success "当前版本 (${current_version}) 已是最新正式版本"
-        return 0
     elif [ "$result" = ">" ]; then
         log_success "当前版本 (${current_version}) 比最新正式版本 (${latest_version}) 更新"
-        return 0
     elif [ "$result" = "<" ]; then
         log_warning "发现新的正式版本：${latest_version}（当前版本：${current_version}）"
         echo "更新说明："
@@ -2132,7 +2130,6 @@ check_version() {
         next="true"
     else
         log_error "版本比较出错"
-        return 1
     fi
     if [ "$next" = "true" ] || [ "$is_install" = "true" ]; then
 
