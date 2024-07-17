@@ -2154,6 +2154,12 @@ check_version() {
         log_info "更新本地文件..."
         local script_dir=$(dirname "$0")
 
+        if [ "$is_install" = "true" ]; then
+            #创建目录
+            mkdir -p ~/fridare
+            script_dir=~/fridare
+        fi
+
         # 找到解压后的目录（应该只有一个）
         local update_dir=$(find "$extract_dir" -maxdepth 1 -type d | grep -v "^$extract_dir$" | head -n 1)
 
