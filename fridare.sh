@@ -2155,6 +2155,8 @@ check_version() {
             #创建目录
             mkdir -p ~/fridare
             script_dir=~/fridare
+            log_success "文件夹 ${script_dir} 已创建，请将此文件夹添加到 PATH 环境变量中"
+            log_skyblue "  export PATH=\$PATH:${script_dir}"
         fi
 
         # 找到解压后的目录（应该只有一个）
