@@ -2149,14 +2149,22 @@ check_version() {
         fi
 
         log_info "更新本地文件..."
-        local script_dir=$(dirname "$0")
+        local script_dir="$(dirname "$0")"
+        local install_dir="${script_dir}/fridare"
 
         if [ "$is_install" = "true" ]; then
-            #创建目录
-            mkdir -p ~/fridare
-            script_dir=~/fridare
-            log_success "文件夹 ${script_dir} 已创建，请将此文件夹添加到 PATH 环境变量中"
-            log_skyblue "  export PATH=\$PATH:${script_dir}"
+            # 创建目录
+            mkdir -p "$install_dir"
+            script_dir="$install_dir"
+            log_success "文件夹 \"${script_dir}\" 已创建，请将此文件夹添加到 PATH 环境变量中"
+            log_skyblue "  export PATH=\$PATH:\"${script_dir}\""
+            # 加入 .bashrc 或者 .zshrc 的提示
+            if [ -f "$HOME/.bashrc" ]; then
+                log_skyblue "  echo \"export PATH=\$PATH:\\\"${script_dir}\\\"\" >> ~/.bashrc"
+            fi
+            if [ -f "$HOME/.zshrc" ]; then
+                log_skyblue "  echo \"export PATH=\$PATH:\\\"${script_dir}\\\"\" >> ~/.zshrc"
+            fi
         fi
 
         # 找到解压后的目录（应该只有一个）
@@ -2186,6 +2194,8 @@ check_version() {
 
         # 调整权限
         chmod -R 755 "$script_dir"
+        # 删除.git
+        rm -rf "$script_dir/.git"
 
         # 清理临时文件
         rm -rf "$temp_dir"
