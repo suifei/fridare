@@ -182,7 +182,10 @@ download_with_progress() {
 }
 show_main_usage() {
     echo -e "${COLOR_SKYBLUE}Frida 重打包工具 v${VERSION}${COLOR_RESET}"
-    echo
+    # 计算并显示当前脚本的 MD5 值
+    local script_path="$0"
+    local script_md5=$(md5 -q "$script_path" 2>/dev/null || md5sum "$script_path" | cut -d ' ' -f 1)
+    echo -e "${COLOR_GREEN}脚本 MD5: ${COLOR_YELLOW}${script_md5}${COLOR_RESET}"
     echo -e "${COLOR_WHITE}用法: $0 <命令> [选项]${COLOR_RESET}"
     echo
     echo -e "${COLOR_YELLOW}命令:${COLOR_RESET}"
