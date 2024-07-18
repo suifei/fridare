@@ -23,7 +23,7 @@
 
 Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida-server 的自动化魔改工具。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
 
-**[Android 文档](docs/android.md)|[iOS 文档](docs/ios.md)|[安装指北](docs/install.md)|[CHANGELOG](CHANGELOG)**
+**[Android 文档](docs/android.md)|[iOS 文档](docs/ios.md)|[frida-tools 文档](docs/patch-tools.md)|[安装指北](docs/install.md)|[CHANGELOG](CHANGELOG)**
 
 欢迎大家入QQ群讨论：[QQ 555354813](screenshots/555354813.jpg) ，如本项目对你有所帮助，记得给作者加星鼓励哦！
 
@@ -53,6 +53,35 @@ Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida
 ```shell
  curl -s https://raw.githubusercontent.com/suifei/fridare/main/fridare.sh | bash -s install
 ```
+
+## [3.1.4] - 2024-07-18
+
+### Added
+- 增加 `patch-tools` 命令，用于修补 frida-tools 模块
+- 新增 `render_markdown` 函数，用于在终端中渲染简单的 Markdown 格式
+- 添加 `generate_random_name` 函数，用于生成随机的 Frida 魔改名
+- 实现 `move_file` 函数，用于处理文件移动时的 "are identical" 错误
+
+### Improved 
+- 优化 `list_frida_versions` 函数，现在能够渲染 Markdown 格式的版本说明
+- 改进 `build_frida` 函数，支持使用本地 deb 文件进行构建
+- 增强 `patch_frida_tools` 和 `restore_frida_tools` 函数的功能和错误处理
+- 优化 `modify_frida_tools` 函数，提高修改 frida-tools 的可靠性
+- 改进 `download_frida_module` 函数，增加对特定操作系统和架构的支持
+
+### Fixed
+- 修复了在某些情况下无法正确获取 Frida 路径的问题
+- 解决了移动文件时可能遇到的 "are identical" 错误
+
+### Changed
+- 更新 `show_main_usage` 和其他使用说明函数，以反映新增的功能
+- 调整 `parse_arguments` 函数，支持新增的 `patch-tools` 命令
+- 修改配置文件的处理方式，增加了对 `FRIDA_NAME` 的支持
+
+### Other Changes
+- 代码结构优化，提高了整体可读性和可维护性
+- 增加了更多的日志输出，提供更详细的执行信息
+- 更新了版本号至 3.1.4
 
 ## v3.1.2 - 2024-07-17
 
@@ -431,6 +460,37 @@ Fridare is a modification tool designed for customizing Frida-server, specifical
 [CHANGELOG](CHANGELOG)
 
 ## Features
+
+Here's the English version of the changelog:
+
+## [v3.1.4] - 2024-07-18
+
+### Added
+- Introduced new `patch-tools` command for modifying the frida-tools module
+- Implemented `render_markdown` function to display simple Markdown formatting in the terminal
+- Added `generate_random_name` function to create random Frida modification names
+- Created `move_file` function to handle "are identical" errors during file moves
+
+### Improved
+- Enhanced `list_frida_versions` function to render Markdown-formatted version descriptions
+- Upgraded `build_frida` function to support building from local deb files
+- Expanded functionality and error handling in `patch_frida_tools` and `restore_frida_tools` functions
+- Optimized `modify_frida_tools` function for more reliable frida-tools modifications
+- Enhanced `download_frida_module` function with support for specific OS and architecture
+
+### Fixed
+- Resolved issues with incorrect Frida path detection in certain scenarios
+- Addressed "are identical" errors that could occur during file moves
+
+### Changed
+- Updated `show_main_usage` and other usage instruction functions to reflect new features
+- Adjusted `parse_arguments` function to accommodate the new `patch-tools` command
+- Modified configuration file handling to include support for `FRIDA_NAME`
+
+### Other
+- Improved overall code structure for better readability and maintainability
+- Added more detailed log outputs for enhanced execution information
+- Updated version number to 3.1.4
 
 ### New Features v3.0.0
 - Added `fridare.sh` script, integrating all functionalities and providing a more complete command-line interface
