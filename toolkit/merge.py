@@ -19,7 +19,6 @@ def get_language(file_extension):
         '.xml': 'xml',
         '.sql': 'sql',
         '.ts': 'typescript',
-        
     }
     return language_map.get(file_extension.lower(), '')
 
