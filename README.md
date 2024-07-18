@@ -54,7 +54,7 @@ Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida
  curl -s https://raw.githubusercontent.com/suifei/fridare/main/fridare.sh | bash -s install
 ```
 
-## [3.1.4] - 2024-07-18
+## [v3.1.4] - 2024-07-18
 
 ### Added
 - 增加 `patch-tools` 命令，用于修补 frida-tools 模块
