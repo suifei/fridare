@@ -189,17 +189,18 @@ show_main_usage() {
     echo -e "${COLOR_WHITE}用法: $0 <命令> [选项]${COLOR_RESET}"
     echo
     echo -e "${COLOR_YELLOW}命令:${COLOR_RESET}"
-    echo -e "  ${COLOR_GREEN}q,    quickstart${COLOR_RESET}   显示快速开始指南"
-    echo -e "  ${COLOR_GREEN}b,    build${COLOR_RESET}        重新打包 Frida"
-    echo -e "  ${COLOR_GREEN}p,    patch${COLOR_RESET}        修补指定的 Frida 模块"
-    echo -e "  ${COLOR_GREEN}pt,   patch-tools${COLOR_RESET}  修补 frida-tools 模块"
-    echo -e "  ${COLOR_GREEN}ls,   list${COLOR_RESET}         列出可用的 Frida 版本"
-    echo -e "  ${COLOR_GREEN}dl,   download${COLOR_RESET}     下载特定版本的 Frida"
-    echo -e "  ${COLOR_GREEN}lm,   list-modules${COLOR_RESET} 列出可用的 Frida 模块"
-    echo -e "  ${COLOR_GREEN}s,    setup${COLOR_RESET}        检查并安装系统依赖"
-    echo -e "  ${COLOR_GREEN}conf, config${COLOR_RESET}       设置配置选项"
-    echo -e "  ${COLOR_GREEN}u,    upgrade${COLOR_RESET}      更新配置，检查新版本"
-    echo -e "  ${COLOR_GREEN}h,    help${COLOR_RESET}         显示帮助信息"
+    echo -e "  ${COLOR_GREEN}q,    quickstart${COLOR_RESET}     显示快速开始指南"
+    echo -e "  ${COLOR_GREEN}b,    build${COLOR_RESET}          重新打包 Frida"
+    echo -e "  ${COLOR_GREEN}p,    patch${COLOR_RESET}          修补指定的 Frida 模块"
+    echo -e "  ${COLOR_GREEN}pt,   patch-tools${COLOR_RESET}    修补 frida-tools 模块"
+    echo -e "  ${COLOR_GREEN}pwt,  patch-wintools${COLOR_RESET} 修补 Windows frida-tools 模块"
+    echo -e "  ${COLOR_GREEN}ls,   list${COLOR_RESET}           列出可用的 Frida 版本"
+    echo -e "  ${COLOR_GREEN}dl,   download${COLOR_RESET}       下载特定版本的 Frida"
+    echo -e "  ${COLOR_GREEN}lm,   list-modules${COLOR_RESET}   列出可用的 Frida 模块"
+    echo -e "  ${COLOR_GREEN}s,    setup${COLOR_RESET}          检查并安装系统依赖"
+    echo -e "  ${COLOR_GREEN}conf, config${COLOR_RESET}         设置配置选项"
+    echo -e "  ${COLOR_GREEN}u,    upgrade${COLOR_RESET}        更新配置，检查新版本"
+    echo -e "  ${COLOR_GREEN}h,    help${COLOR_RESET}           显示帮助信息"
     echo
     echo -e "${COLOR_WHITE}运行 '$0 help <命令>' 以获取特定命令的更多信息。${COLOR_RESET}"
     echo -e "${COLOR_WHITE}新用户？ 运行 '$0 quickstart' 获取快速入门指南。${COLOR_RESET}"
@@ -451,13 +452,6 @@ parse_patch_tools_args() {
         show_patch_tools_usage
         exit 1
     fi
-
-    # 查找 frida-tools 路径
-    # FRIDA_TOOLS_PATH=$(find_frida_path)
-    # if [ -z "$FRIDA_TOOLS_PATH" ]; then
-    #     log_error "无法找到 frida-tools 路径"
-    #     exit 1
-    # fi
 
     local python_cmd=$(get_python_cmd)
     if [ -z "$python_cmd" ]; then
@@ -1846,7 +1840,7 @@ find_frida_path() {
     return 1
 }
 generate_random_name() {
-    cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z' | fold -w 5 | head -n 1
+    cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 5 | head -n 1
 }
 patch_frida_tools() {
     local local_frida_name="$1"
