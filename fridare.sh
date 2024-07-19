@@ -799,114 +799,94 @@ list_frida_versions() {
     echo -e "\n${COLOR_SKYBLUE}提示: 使用 'fridare.sh build -v <版本号>' 来构建特定版本${COLOR_RESET}"
 }
 FRIDA_MODULES=()
-update_frida_modules() {
-    log_info "正在更新 FRIDA_MODULES..."
-    local python_cmd=$(get_python_cmd)
-    if [ -z "$python_cmd" ]; then
-        log_error "未找到 Python 解释器"
-        return 1
+
+get_proxy_settings() {
+    curl_proxy=$(echo $CURL_PROXY)
+    if [[ -n $curl_proxy ]]; then
+        echo "$curl_proxy"
+    else
+        echo ""
+    fi
+}
+
+get_latest_release() {
+    url="https://api.github.com/repos/frida/frida/releases/latest"
+    proxies=$(get_proxy_settings)
+
+    if [[ -n $proxies ]]; then
+        response=$(curl -s -H "Accept: application/json" -x "$proxies" "$url")
+    else
+        response=$(curl -s -H "Accept: application/json" "$url")
     fi
 
+    echo "$response"
+}
+
+parse_filename() {
+    filename=$1
+    if [[ $filename =~ (frida[-_]?[a-zA-Z0-9\-]+)?[-_](v?[0-9]+\.[0-9]+\.[0-9]+)[-_]([a-zA-Z0-9\-]+)[-_]([a-zA-Z0-9_]+) ]]; then
+        module_type=${BASH_REMATCH[1]}
+        version=${BASH_REMATCH[2]}
+        os=${BASH_REMATCH[3]}
+        arch=${BASH_REMATCH[4]}
+
+        [[ $filename == *"."* ]] && ext=${filename##*.} || ext="N/A"
+
+        [[ $arch == "64" ]] && arch="x86_64"
+        [[ $arch == *"_"* ]] && arch=${arch##*_}
+
+        if [[ $os == "cp"* && $os == *"-"* ]] || [[ $os == *"node-"* ]] || [[ $os == *"electron-"* ]]; then
+            IFS='-' read -ra os_info <<<"$os"
+            os_count=${#os_info[@]}
+            if [ $os_count -gt 0 ]; then
+                new_os=${os_info[$os_count - 1]}
+                if [ $os_count -gt 2 ]; then
+                    if [[ $os == "cp"* ]]; then
+                        new_module_type="frida-python-${os_info[0]}-${os_info[1]}"
+                    else
+                        new_module_type="frida-${os_info[0]}-${os_info[1]}"
+                    fi
+                    module_type=$new_module_type
+                fi
+                os=$new_os
+            fi
+        elif [[ $os == *"-"* ]]; then
+            os=${os%%-*}
+        fi
+
+        [[ -z $module_type && $filename == *"deb"* ]] && module_type="frida-${os}-deb"
+        [[ -z $module_type && $filename == *"gum-graft"* ]] && module_type="gum-graft" && os=${filename##*-} && arch=${filename##*-}.${ext}
+
+        echo "$module_type:$version:$os:$arch:$ext"
+    else
+        echo "null"
+    fi
+}
+
+generate_frida_modules() {
+    release=$(get_latest_release)
+    assets=$(echo "$release" | awk -F'"' '/"browser_download_url":/{print $4}')
+
+    frida_modules=()
+    for asset in $assets; do
+        filename=$(basename "$asset")
+        parsed=$(parse_filename "$filename")
+        if [[ $parsed != "null" ]]; then
+            IFS=':' read -r module_type version os arch ext <<<"$parsed"
+            [[ $version == v* ]] && version=${version#v}
+            asset_name=${filename//$version/"{VERSION}"}
+            frida_modules+=("$module_type:$os:$arch:$asset_name")
+        fi
+    done
+
+    printf '%s\n' "${frida_modules[@]}"
+}
+
+update_frida_modules() {
+    log_info "正在更新 FRIDA_MODULES..."
+
     # 确保 CURL_PROXY 环境变量可用于 Python 脚本
-    export CURL_PROXY
-    pip install requests[socks] >/dev/null 2>&1
-    local new_modules=$($python_cmd -c "$(
-        cat <<EOF
-import os
-import re
-import requests
-
-def get_proxy_settings():
-    curl_proxy = os.environ.get('CURL_PROXY', '')
-    if curl_proxy:
-        if curl_proxy.startswith('socks5://'):
-            return {"http": curl_proxy, "https": curl_proxy}
-        elif curl_proxy.startswith(('http://', 'https://')):
-            return {"http": curl_proxy, "https": curl_proxy}
-        else:
-            print(f"警告：不支持的代理协议: {curl_proxy}")
-            return None
-    return None
-
-def get_latest_release():
-    url = "https://api.github.com/repos/frida/frida/releases/latest"
-    proxies = get_proxy_settings()
-    try:
-        response = requests.get(url, proxies=proxies)
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        print(f"Error fetching latest release: {str(e)}")
-        return None
-
-def parse_filename(filename):
-    pattern = re.compile(r'(?P<module_type>frida[-_]?[a-zA-Z0-9\-]+)?[-_](?P<version>v?\d+\.\d+\.\d+)[-_](?P<os>[a-zA-Z0-9\-]+)[-_](?P<arch>[a-zA-Z0-9_]+)')
-    match = pattern.search(filename)
-    if match:
-        module_type = match.group('module_type') or 'N/A'
-        version = match.group('version')
-        os = match.group('os')
-        arch = match.group('arch')
-        if '.' in filename:
-            ext = filename.split('.')[-1]
-        else:
-            ext = 'N/A'
-        if '64' == arch:
-            arch = 'x86_64'
-        elif '_' in arch:
-            arch = arch.split('_')[-1]
-        if os.startswith('cp') and '-' in os:
-            os_info = os.split('-')
-            os = os_info[-1]
-            module_type = 'frida-python-' + os_info[0] + '-' + os_info[1]
-        elif 'node-' in os:
-            os_info = os.split('-')
-            os = os_info[-1]
-            module_type = 'frida-' + os_info[0] + '-' + os_info[1]
-        elif 'electron-' in os:
-            os_info = os.split('-')
-            os = os_info[-1]
-            module_type = 'frida-' + os_info[0] + '-' + os_info[1]
-        elif '-' in os:
-            os = os.split('-')[0]
-
-        if 'N/A' == module_type and 'deb' in filename:
-            module_type = 'frida-' + os + '-deb'
-        elif 'N/A' == module_type and 'gum-graft' in filename:
-            module_type = 'gum-graft'
-            os = filename.split('-')[-2]
-            arch = filename.split('-')[-1].split('.')[0]
-        return (module_type, version, os, arch, ext)
-    return None
-
-def generate_frida_modules():
-    release = get_latest_release()
-    if not release:
-        return []
-
-    assets = release['assets']
-    frida_modules = []
-
-    for asset in assets:
-        parsed = parse_filename(asset['name'])
-        if parsed:
-            module_type, version, os, arch, ext = parsed
-            if 'v' == version[0]:
-                version = version[1:]
-            asset_name = asset['name'].replace(version, '{VERSION}')
-            frida_modules.append(f'"{module_type}:{os}:{arch}:{asset_name}"')
-
-    return frida_modules
-
-def main():
-    frida_modules = generate_frida_modules()
-    for module in frida_modules:
-        print(f"    {module}")
-
-if __name__ == "__main__":
-    main()
-EOF
-    )")
+    local new_modules=$(generate_frida_modules)
 
     if [ $? -ne 0 ]; then
         log_error "更新 FRIDA_MODULES 失败"
@@ -915,11 +895,8 @@ EOF
 
     FRIDA_MODULES=()
     FRIDA_MODULES=("$new_modules")
-    update_config_file
     # 更新配置文件中的 FRIDA_MODULES
-    # sed -i '' '/^FRIDA_MODULES=/,/^)/d' "$CONFIG_FILE"
-    # echo "$new_modules" >>"$CONFIG_FILE"
-
+    update_config_file
     log_success "FRIDA_MODULES 更新完成"
     return 0
 }
@@ -1906,6 +1883,42 @@ restore_frida_tools() {
     log_success "frida-tools 已恢复到原版"
 }
 # 函数：修订frida-tools
+modify_core_py() {
+    frida_name=$1
+    path=$2
+    p="${path}/core.py"
+    b="${p}.fridare"
+    if [ ! -f "$b" ]; then
+        echo "Creating backup: $b"
+        cp "$p" "$b"
+    else
+        echo "Backup already exists: $b"
+    fi
+    replaced=0
+    while IFS= read -r line; do
+        # echo "Processing line: $line" >&2  # Debug output
+
+        if [[ $line =~ [\'\"](([^\'\"]+):rpc)[\'\"] ]]; then
+            old=${BASH_REMATCH[2]}
+            new=$(printf "%-5s" "${frida_name:0:5}")
+            new_line=${line//$old:rpc/$new:rpc}
+            if [ "$new_line" != "$line" ]; then
+                echo "Replaced \"$old:rpc\" with \"$new:rpc\"" >&2
+                line=$new_line
+                ((replaced++))
+            fi
+        fi
+
+        echo "$line"
+    done < "$p" > "${p}.tmp"
+    if [ $replaced -gt 0 ]; then
+        mv "${p}.tmp" "$p"
+        echo "Replacement complete. Made $replaced replacements."
+    else
+        echo "No matching pattern found, no changes made"
+        rm "${p}.tmp"
+    fi
+}
 modify_frida_tools() {
     local local_frida_name="$1"
 
@@ -1946,50 +1959,7 @@ modify_frida_tools() {
     mv test.so "$pylib"
     chmod 755 "$pylib"
 
-    $python_cmd -c "
-import os, frida, shutil, re, sys
-
-def modify_core_py(frida_name):
-    p = os.path.join(os.path.dirname(frida.__file__), 'core.py')
-    b = p + '.fridare'
-    if not os.path.exists(b):
-        print(f'Creating backup: {b}')
-        shutil.copy2(p, b)
-    else:
-        print(f'Backup already exists: {b}')
-    try:
-        with open(p, 'r') as f:
-            lines = f.readlines()
-        replaced = False
-        for i, line in enumerate(lines):
-            matches = re.finditer(r'\"([^\"]{5}):rpc\"', line)
-            for match in matches:
-                old = match.group(1)
-                new = frida_name[:5].ljust(5)
-                line = line.replace(f'\"{old}:rpc\"', f'\"{new}:rpc\"')
-                print(f'Line {i+1}: Replaced \"{old}:rpc\" with \"{new}:rpc\"')
-                replaced = True
-            lines[i] = line
-        if replaced:
-            with open(p, 'w') as f:
-                f.writelines(lines)
-            print('Replacement complete')
-        else:
-            print('No matching pattern found, no changes made')
-    except Exception as e:
-        print(f'Error: {e}')
-        if os.path.exists(b):
-            print('Restoring from backup')
-            shutil.copy2(b, p)
-        else:
-            print('No backup found to restore from')
-        sys.exit(1)
-
-modify_core_py('$local_frida_name')
-" || {
-        log_error "修改 core.py 失败"
-        return 1
-    }
+    modify_core_py "$local_frida_name" "$pylib_path"
 
     log_success "frida-tools 修改完成"
     return 0
