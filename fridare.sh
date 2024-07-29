@@ -259,6 +259,9 @@ show_patch_tools_usage() {
     echo -e "  $0 patch-tools name abcde"
     echo -e "  $0 patch-tools restore"
 }
+show_patch_wintools_usage(){
+    echo -e "${COLOR_SKYBLUE}用法: $0 需要到windows系统下，使用win子目录内的工具进行处理${COLOR_RESET}"
+}
 show_config_usage() {
     echo -e "${COLOR_SKYBLUE}用法: $0 config <操作> <选项> [<值>]${COLOR_RESET}"
     echo
@@ -414,12 +417,17 @@ parse_arguments() {
     pt | patch-tools)
         parse_patch_tools_args "$@"
         ;;
+    pwt | patch-wintools)
+        parse_patch_wintools_args "$@"
     *)
         log_error "未知命令: $command"
         show_main_usage
         exit 1
         ;;
     esac
+}
+parse_patch_wintools_args(){
+    show_patch_wintools_usage
 }
 parse_patch_tools_args() {
     local action=""

@@ -23,7 +23,7 @@
 
 Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida-server 的自动化魔改工具。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
 
-**[Android 文档](docs/android.md)|[iOS 文档](docs/ios.md)|[frida-tools 文档](docs/patch-tools.md)|[安装指北](docs/install.md)|[CHANGELOG](CHANGELOG)**
+**[Windows 下使用](win/README.md)|[Android 文档](docs/android.md)|[iOS 文档](docs/ios.md)|[frida-tools 文档](docs/patch-tools.md)|[安装指北](docs/install.md)|[CHANGELOG](CHANGELOG)**
 
 欢迎大家入QQ群讨论：[QQ 555354813](screenshots/555354813.jpg) ，如本项目对你有所帮助，记得给作者加星鼓励哦！
 
@@ -45,7 +45,7 @@ Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida
 - 列出可用 Frida 版本和模块
 - 支持 Conda 环境
 - 支持 macho, elf, pe 文件格式
-- 支持 Windows,Linux,MacOS,Android,IOS
+- 支持 Windows,Linux,MacOS,Android,IOS 的patch
 - 支持自更新
 
 欢迎使用新的一键安装功能快速开始使用 Fridare！
@@ -53,6 +53,14 @@ Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida
 ```shell
  curl -s https://raw.githubusercontent.com/suifei/fridare/main/fridare.sh | bash -s install
 ```
+
+## [v3.1.5] - 2024-07-29 Windows 支持
+
+### Added
+- 新增 `patch-frida.cmd` 脚本,用于在 Windows 环境下修改 frida-server
+- 新增 `patch-frida-tools.cmd` 脚本,用于在 Windows 环境下修改 frida-tools
+- 增加对 Windows 平台的全面支持
+- 更新了使用说明,增加了 Windows 平台的详细教程
 
 ## [v3.1.4] - 2024-07-18
 
