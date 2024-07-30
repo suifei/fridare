@@ -506,6 +506,12 @@ func buildReplacements(fridaNewName string, format ExecutableFormat) []Replaceme
 					{Old: []byte("frida-agent-32.so"), New: []byte(fridaNewName + "-agent-32.so")},
 					{Old: []byte("frida-agent-64.so"), New: []byte(fridaNewName + "-agent-64.so")},
 					{Old: []byte("gum-"), New: []byte(fridaNewName[:3] + "-")},
+					{Old: []byte("REJECT"), New: []byte(fridaNewName + "-")},
+					{Old: []byte("frida.js"), New: []byte(fridaNewName + ".js")},
+					{Old: []byte("gmain"), New: []byte(fridaNewName)},
+					{Old: []byte("gadget"), New: []byte(fridaNewName + "t")},
+					{Old: []byte("pool-"), New: []byte(fridaNewName)},
+					{Old: []byte("frida"), New: []byte(fridaNewName)},
 				},
 			},
 			{
@@ -514,6 +520,11 @@ func buildReplacements(fridaNewName string, format ExecutableFormat) []Replaceme
 				Items: []*Replacement{
 					{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
 					{Old: []byte("gum-"), New: []byte(fridaNewName[:3] + "-")},
+					{Old: []byte("REJECT"), New: []byte(fridaNewName + "-")},
+					{Old: []byte("frida.js"), New: []byte(fridaNewName + ".js")},
+					{Old: []byte("gadget"), New: []byte(fridaNewName + "t")},
+					{Old: []byte("pool-"), New: []byte(fridaNewName)},
+					{Old: []byte("frida"), New: []byte(fridaNewName)},
 				},
 			},
 		}

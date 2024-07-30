@@ -419,6 +419,7 @@ parse_arguments() {
         ;;
     pwt | patch-wintools)
         parse_patch_wintools_args "$@"
+        ;;
     *)
         log_error "未知命令: $command"
         show_main_usage
