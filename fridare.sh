@@ -5,7 +5,7 @@
 
 set -e # 遇到错误立即退出
 
-VERSION="3.1.5"
+VERSION="3.1.7"
 # 默认值设置
 DEF_FRIDA_SERVER_PORT=8899
 DEF_AUTO_CONFIRM="false"
