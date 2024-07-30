@@ -2,7 +2,7 @@
 
 ## 最新更新
 
-### v3.2.1 - Windows 支持
+### v3.1.5 - Windows 支持
 
 - 新增 `patch-frida.cmd` 脚本,用于在 Windows 环境下修改 frida-server
 - 新增 `patch-frida-tools.cmd` 脚本,用于在 Windows 环境下修改 frida-tools
