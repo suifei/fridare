@@ -1244,7 +1244,7 @@ patch_frida_module() {
     download_frida_module "$version" false "$module" false "$output_dir" false "$os" "$arch" "$force"
 
     # 获取下载的文件路径
-    local downloaded_file=$(find "$output_dir" -name "${module}*" -type f | head -n 1)
+    local downloaded_file=$(find "$output_dir" -name "${module}*-${os}*-${arch}*" -type f | head -n 1)
     if [ -z "$downloaded_file" ]; then
         log_error "无法找到下载的模块文件"
         return 1
