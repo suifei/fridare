@@ -225,9 +225,9 @@ show_build_usage() {
     echo -e "  $0 build -v 16.4.2"
     echo -e "  $0 build -latest"
     echo -e "  $0 build -l arm64 frida-server_16.4.2_amd64.deb"
-    echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb "
-    echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb" -p 8000"
-    echo -e " $0 build -c -l arm64 frida-server_16.4.2_amd64.deb" -p 8000 -y"
+    echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb"
+    echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb -p 8000"
+    echo -e "  $0 build -c -l arm64 frida-server_16.4.2_amd64.deb -p 8000 -y"
 }
 
 show_patch_usage() {
