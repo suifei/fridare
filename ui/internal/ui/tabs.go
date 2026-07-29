@@ -212,7 +212,7 @@ func (mt *ModifyTab) analyzeFile(filePath string) {
 // validateInput 验证输入
 func (mt *ModifyTab) validateInput(name string, filePath string) {
 	inputValid := name != ""
-	nameValid := len(name) == 5 && utils.IsFridaNewName(name)
+	nameValid := core.ValidateMagicName(name) == nil
 	filePathValid := utils.FileExists(filePath)
 
 	if inputValid && nameValid && filePathValid {
@@ -569,7 +569,7 @@ func (pt *PackageTab) selectOutputPath() {
 // validateInput 验证输入
 func (pt *PackageTab) validateInput() {
 	outputPathValid := pt.outputPathEntry.Text != ""
-	magicNameValid := len(pt.magicNameEntry.Text) == 5 && utils.IsFridaNewName(pt.magicNameEntry.Text)
+	magicNameValid := core.ValidateMagicName(pt.magicNameEntry.Text) == nil
 	portValid := pt.isValidPort(pt.portEntry.Text)
 	fileValid := pt.debFileEntry.Text != ""
 
@@ -2019,11 +2019,10 @@ func (st *SettingsTab) validateAndUpdateConfig() error {
 	}
 
 	magicName := strings.TrimSpace(st.magicNameEntry.Text)
-	if len(magicName) == 5 {
-		st.config.MagicName = magicName
-	} else {
-		return fmt.Errorf("魔改名称必须是5个字符")
+	if err := core.ValidateMagicName(magicName); err != nil {
+		return err
 	}
+	st.config.MagicName = magicName
 
 	st.config.AutoConfirm = st.autoConfirmCheck.Checked
 
@@ -2183,37 +2182,18 @@ func (ct *CreateTab) setupUI() {
 	agentSelectBtn := widget.NewButton("选择", ct.selectFridaAgent)
 	outputSelectBtn := widget.NewButton("选择", ct.selectOutputPath)
 
-	// 基本配置验证器和事件
+	// 基本配置验证器和事件（与 hexreplace / ToolsTab 一致：恰好 5 个小写 a-z）
 	ct.magicNameEntry.Validator = func(text string) error {
-		if len(text) != 5 {
-			return fmt.Errorf("魔改名称必须是5个字符")
+		if err := core.ValidateMagicName(strings.TrimSpace(text)); err != nil {
+			return err
 		}
-		if len(text) == 0 {
-			return fmt.Errorf("魔改名称不能为空")
-		}
-
-		// 检查首字符必须是字母
-		first := text[0]
-		if !((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z')) {
-			return fmt.Errorf("魔改名称必须以字母开头")
-		}
-
-		// 检查所有字符必须是字母或数字
-		for i, c := range text {
-			if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
-				return fmt.Errorf("第%d个字符'%c'无效，只能包含字母和数字", i+1, c)
-			}
-		}
-
 		// 检查是否为保留名称
-		lowerText := strings.ToLower(text)
 		reservedNames := []string{"frida", "admin", "root", "user", "guest"}
 		for _, reserved := range reservedNames {
-			if lowerText == reserved {
+			if text == reserved {
 				return fmt.Errorf("'%s'是保留名称，请使用其他名称", text)
 			}
 		}
-
 		return nil
 	}
 

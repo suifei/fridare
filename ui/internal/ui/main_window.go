@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"fridare-gui/internal/assets"
 	"fridare-gui/internal/config"
+	"fridare-gui/internal/core"
 	"fridare-gui/internal/utils"
 	"log"
 	"strconv"
@@ -573,17 +574,9 @@ func (mw *MainWindow) testProxy() {
 	}()
 }
 
-// isValidMagicName 验证魔改名称
+// isValidMagicName 验证魔改名称（与 core.ValidateMagicName / hexreplace 一致：5×a-z）
 func isValidMagicName(name string) bool {
-	if len(name) != 5 {
-		return false
-	}
-	for _, c := range name {
-		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
-			return false
-		}
-	}
-	return true
+	return core.ValidateMagicName(name) == nil
 }
 
 // updateGlobalMagicName 更新全局魔改名称

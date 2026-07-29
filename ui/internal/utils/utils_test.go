@@ -5,32 +5,24 @@ import (
 	"unicode"
 )
 
-func TestIsFridaNewName_AcceptsAlnumStartingWithLetter(t *testing.T) {
+func TestIsFridaNewName_ExactlyFiveLowercaseAZ(t *testing.T) {
 	cases := []struct {
 		in   string
 		want bool
 	}{
 		{"abcde", true},
-		{"Ab12c", true},
-		{"a1234", true},
+		{"qwxyz", true},
+		{"Ab12c", false}, // uppercase + digits
+		{"a1234", false}, // digits
+		{"ABCDE", false}, // uppercase
 		{"1abcd", false},
 		{"abcd!", false},
+		{"abcd", false},   // too short
+		{"abcdef", false}, // too long
+		{"fridare", false},
 		{"", false},
 	}
 	for _, tc := range cases {
-		if tc.in == "" {
-			// empty: IsFridaNewName indexes s[0] — protect by length in callers;
-			// document current behavior
-			func() {
-				defer func() {
-					if recover() == nil && tc.in == "" {
-						// if no panic, result should be false or panic
-					}
-				}()
-				_ = IsFridaNewName(tc.in)
-			}()
-			continue
-		}
 		got := IsFridaNewName(tc.in)
 		if got != tc.want {
 			t.Errorf("IsFridaNewName(%q)=%v want %v", tc.in, got, tc.want)
@@ -50,6 +42,12 @@ func TestGenerateRandomName_LengthAndCharset(t *testing.T) {
 		}
 		if !IsFridaNewName(name) {
 			t.Fatalf("GenerateRandomName not valid IsFridaNewName: %q", name)
+		}
+		// no digits allowed (hexreplace contract)
+		for _, c := range name {
+			if c < 'a' || c > 'z' {
+				t.Fatalf("GenerateRandomName must be [a-z]{5}, got %q", name)
+			}
 		}
 		seen[name] = true
 	}

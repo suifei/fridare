@@ -346,12 +346,15 @@ var (
 	nameRand   = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
-// GenerateRandomName 生成随机名称（5个字符，第一位必须是字母，用1-5字母单词+数字补充）
+// GenerateRandomName 生成随机魔改名：恰好 5 个小写字母 a-z。
+// 必须与 core.ValidateMagicName / hexreplace isStringAlpha 一致，禁止数字填充。
 func GenerateRandomName() string {
 	// 使用包级 RNG，避免紧循环中 UnixNano 相同导致 seed 重复
 	nameRandMu.Lock()
 	defer nameRandMu.Unlock()
 	rng := nameRand
+
+	const letters = "abcdefghijklmnopqrstuvwxyz"
 
 	// 1字母单词（常用缩写）
 	oneLetterWords := []string{
@@ -568,28 +571,38 @@ func GenerateRandomName() string {
 
 	// 从选中的长度类别中随机选择一个单词
 	baseWord := selectedWords[rng.Intn(len(selectedWords))]
+	baseWord = strings.ToLower(baseWord)
 
-	// 如果单词长度不足5个字符，用数字补充
-	if len(baseWord) < 5 {
-		needed := 5 - len(baseWord)
-		for i := 0; i < needed; i++ {
-			baseWord += fmt.Sprintf("%d", rng.Intn(10))
+	// 只保留 a-z，丢弃词表中可能混入的非字母字符
+	cleaned := make([]byte, 0, 5)
+	for i := 0; i < len(baseWord); i++ {
+		c := baseWord[i]
+		if c >= 'a' && c <= 'z' {
+			cleaned = append(cleaned, c)
 		}
+	}
+	baseWord = string(cleaned)
+
+	// 不足 5 位用小写字母填充（禁止数字，否则 HexReplacer/ValidateMagicName 会失败）
+	for len(baseWord) < 5 {
+		baseWord += string(letters[rng.Intn(len(letters))])
+	}
+	if len(baseWord) > 5 {
+		baseWord = baseWord[:5]
 	}
 
 	return baseWord
 }
-// isFridaNewName 检查字符串必须是 A-Za-z0-9
+
+// IsFridaNewName 检查是否为合法魔改名：恰好 5 个小写字母 a-z（与 core.ValidateMagicName 一致）
 func IsFridaNewName(s string) bool {
+	if len(s) != 5 {
+		return false
+	}
 	for _, c := range s {
-		//必须是 A-Za-z0-9
-		if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+		if c < 'a' || c > 'z' {
 			return false
 		}
-	}
-	//如果第一个字符不是字母也不行
-	if s[0] < 'A' || (s[0] > 'Z' && s[0] < 'a') || s[0] > 'z' {
-		return false
 	}
 	return true
 }

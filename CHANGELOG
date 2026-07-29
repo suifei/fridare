@@ -5,6 +5,7 @@
 ## v4.0.1 - 2026-07-29
 
 ### Fixed (follow-up)
+- **GenerateRandomName 数字填充**：改为 a-z 填充，与 ValidateMagicName/HexReplacer 一致；ModifyTab/PackageTab/CreateTab 统一用 ValidateMagicName
 - **ToolsTab 默认魔改名 `fridare`（6字符）**：改为空默认 + 严格 5 位 a-z 校验；`performPatch`/`PatchCorePyRPC` 对非法名返回错误，禁止静默 SUCCESS
 - 回归测试：非法/6 字符魔改名不得走通 tools patch 成功路径
 
