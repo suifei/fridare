@@ -13,7 +13,7 @@ import (
 const (
 	AppID   = "com.suifei.fridare"
 	AppName = "Fridare GUI"
-	Version = "4.0.2"
+	Version = "4.0.3"
 )
 
 func main() {

@@ -2,6 +2,19 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## v4.0.3 - 2026-07-29
+
+### Added
+- **多平台静态编译发布**：`fridare-create` / `fridare-patch` / `hexreplace` 使用 `CGO_ENABLED=0` 纯 Go 静态链接
+  - windows-amd64 / windows-arm64
+  - linux-amd64 / linux-arm64
+  - darwin-amd64 / darwin-arm64
+- **Windows GUI 预编译**（Fyne 需 CGO/OpenGL，本机构建 windows-amd64）
+- 发布脚本：`scripts/build-release.ps1`
+
+### Notes
+- GUI 依赖系统图形栈，无法做成与 CLI 工具同等的纯静态跨平台二进制；Linux/macOS 请本机 `cd ui && ./build.sh`
+
 ## v4.0.2 - 2026-07-29
 
 ### Fixed
