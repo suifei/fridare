@@ -5,7 +5,6 @@ import (
 	"debug/macho"
 	"debug/pe"
 	"fmt"
-	"fridare-gui/internal/utils"
 	"io"
 	"os"
 )
@@ -42,9 +41,9 @@ func NewHexReplacer() *HexReplacer {
 
 // PatchFile patches a binary file with the given frida new name
 func (hr *HexReplacer) PatchFile(inputFilePath, fridaNewName, outputFilePath string, progressCallback func(float64, string)) error {
-	// Validate frida new name (must be exactly 5 characters, all lowercase)
-	if len(fridaNewName) != 5 || !utils.IsFridaNewName(fridaNewName) {
-		return fmt.Errorf("frida new name must be exactly 5 lowercase alphabetic characters")
+	// Validate frida new name (exactly 5 lowercase a-z — same as hexreplace CLI / tools tab)
+	if err := ValidateMagicName(fridaNewName); err != nil {
+		return err
 	}
 
 	if progressCallback != nil {

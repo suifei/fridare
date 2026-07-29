@@ -5,15 +5,37 @@ import (
 	"testing"
 )
 
+func TestValidateMagicName(t *testing.T) {
+	valid := []string{"abcde", "qwxyz", "zzzzz"}
+	for _, n := range valid {
+		if err := ValidateMagicName(n); err != nil {
+			t.Errorf("ValidateMagicName(%q) unexpected err: %v", n, err)
+		}
+	}
+	invalid := []string{
+		"", "a", "abcd", "abcdef", // length
+		"fridare",                  // 6 chars — the old ToolsTab default
+		"ABCDE", "AbCdE",           // case
+		"abc12", "ab_cd", "ab-cd",  // non a-z
+	}
+	for _, n := range invalid {
+		if err := ValidateMagicName(n); err == nil {
+			t.Errorf("ValidateMagicName(%q) want error", n)
+		}
+	}
+}
+
 func TestPatchCorePyRPC_ReplacesChannelOnly(t *testing.T) {
-	// Realistic snippets from frida core.py-style sources
 	src := `
 def _rpc():
     return "frida:rpc"
 # module still imports native extension by fixed name
 # see also agent path markers: frida-agent
 `
-	out, n := PatchCorePyRPC(src, "abcde")
+	out, n, err := PatchCorePyRPC(src, "abcde")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if n != 1 {
 		t.Fatalf("expected 1 replacement, got %d", n)
 	}
@@ -23,7 +45,6 @@ def _rpc():
 	if strings.Contains(out, "frida:rpc") {
 		t.Fatalf("frida:rpc should be gone: %q", out)
 	}
-	// Must NOT touch other frida-prefixed strings
 	if !strings.Contains(out, "frida-agent") {
 		t.Fatalf("must not rewrite frida-agent: %q", out)
 	}
@@ -31,17 +52,29 @@ def _rpc():
 
 func TestPatchCorePyRPC_IdempotentWhenMissing(t *testing.T) {
 	src := `return "abcde:rpc"`
-	out, n := PatchCorePyRPC(src, "xyzab")
+	out, n, err := PatchCorePyRPC(src, "xyzab")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if n != 0 || out != src {
 		t.Fatalf("expected no change when frida:rpc absent, n=%d out=%q", n, out)
 	}
 }
 
-func TestPatchCorePyRPC_RejectsBadMagicLen(t *testing.T) {
+func TestPatchCorePyRPC_RejectsInvalidMagic(t *testing.T) {
 	src := `"frida:rpc"`
-	out, n := PatchCorePyRPC(src, "ab")
-	if n != 0 || out != src {
-		t.Fatalf("short magic must not patch")
+	for _, bad := range []string{"fridare", "ab", "ABCDE", "abc12"} {
+		out, n, err := PatchCorePyRPC(src, bad)
+		if err == nil {
+			t.Fatalf("PatchCorePyRPC(%q) want error", bad)
+		}
+		if n != 0 || out != src {
+			t.Fatalf("invalid magic must not mutate content: n=%d out=%q", n, out)
+		}
+		// must not look like a silent "no frida:rpc found" success path
+		if !strings.Contains(err.Error(), "魔改名称") && !strings.Contains(err.Error(), "5") {
+			t.Fatalf("error should mention magic name rule: %v", err)
+		}
 	}
 }
 
@@ -50,13 +83,12 @@ func TestWouldBreakFridaImport_NaiveGlobalReplace(t *testing.T) {
 	if !WouldBreakFridaImport(initPy, "led20") {
 		t.Fatal("naive global frida->led20 must be detected as breaking import _frida")
 	}
-	// Correct path: only RPC channel — import line unchanged
 	corePy := `channel = "frida:rpc"`
-	patched, _ := PatchCorePyRPC(corePy, "led20")
-	if strings.Contains(patched, "import _led20") {
-		t.Fatal("PatchCorePyRPC must never invent import _led20")
+	patched, _, err := PatchCorePyRPC(corePy, "ledab")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if WouldBreakFridaImport(initPy, "led20") && strings.Contains(initPy, "import _frida") {
-		// documenting the bug we fixed in GUI: do not apply ReplaceAll("frida", magic) to init
+	if strings.Contains(patched, "import _ledab") {
+		t.Fatal("PatchCorePyRPC must never invent import _ledab")
 	}
 }

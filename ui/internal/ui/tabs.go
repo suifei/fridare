@@ -789,25 +789,17 @@ func (tt *ToolsTab) setupUI() {
 		tt.patchStatusLabel,
 	))
 
-	// 魔改配置区域
-	tt.magicNameEntry = fixedWidthEntry(180, "魔改名称")
-	tt.magicNameEntry.SetText("fridare")
+	// 魔改配置区域（必须与 hexreplace 一致：恰好 5 个小写 a-z；禁止默认 6 字符 "fridare"）
+	tt.magicNameEntry = fixedWidthEntry(180, "5个小写字母 a-z")
+	if tt.config != nil && core.ValidateMagicName(tt.config.MagicName) == nil {
+		tt.magicNameEntry.SetText(tt.config.MagicName)
+	} else {
+		tt.magicNameEntry.SetText("") // 强制用户填写合法 5 字符名，避免静默 no-op 却显示 SUCCESS
+	}
 
-	// 魔改名称验证器
+	// 魔改名称验证器：与 core.ValidateMagicName / hexreplace 完全一致
 	tt.magicNameEntry.Validator = func(text string) error {
-		if len(text) == 0 {
-			return fmt.Errorf("魔改名称不能为空")
-		}
-		if len(text) > 10 {
-			return fmt.Errorf("魔改名称不能超过10个字符")
-		}
-		// 检查字符合法性
-		for i, c := range text {
-			if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
-				return fmt.Errorf("第%d个字符'%c'无效，只能包含字母、数字、下划线和横线", i+1, c)
-			}
-		}
-		return nil
+		return core.ValidateMagicName(strings.TrimSpace(text))
 	}
 
 	tt.portEntry = fixedWidthEntry(160, "端口")
@@ -1314,8 +1306,12 @@ func (tt *ToolsTab) copyFile(src, dst string) error {
 	return err
 }
 
-// performPatch 执行魔改
+// performPatch 执行魔改（入口强制校验魔改名，非法名不得返回成功）
 func (tt *ToolsTab) performPatch(magicName, port string) error {
+	if err := core.ValidateMagicName(magicName); err != nil {
+		return err
+	}
+
 	// 1. Python代码字符串魔改
 	if err := tt.patchPythonFiles(magicName, port); err != nil {
 		return fmt.Errorf("Python文件魔改失败: %v", err)
@@ -1336,6 +1332,10 @@ func (tt *ToolsTab) performPatch(magicName, port string) error {
 func (tt *ToolsTab) patchPythonFiles(magicName, port string) error {
 	_ = port // 端口由设备端 server 决定，Python 包侧无需改默认端口字符串
 
+	if err := core.ValidateMagicName(magicName); err != nil {
+		return err
+	}
+
 	filePath := filepath.Join(tt.fridaInfo.InstallPath, "core.py")
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		tt.addLog("WARN: core.py 不存在，跳过 Python 文本魔改")
@@ -1347,7 +1347,10 @@ func (tt *ToolsTab) patchPythonFiles(magicName, port string) error {
 		return fmt.Errorf("读取文件 core.py 失败: %v", err)
 	}
 
-	contentStr, n := core.PatchCorePyRPC(string(content), magicName)
+	contentStr, n, err := core.PatchCorePyRPC(string(content), magicName)
+	if err != nil {
+		return err
+	}
 	if n > 0 {
 		if err := os.WriteFile(filePath, []byte(contentStr), 0644); err != nil {
 			return fmt.Errorf("写入文件 core.py 失败: %v", err)
@@ -1459,9 +1462,8 @@ func (tt *ToolsTab) patchSingleSOFile(soFile, magicName, port string) error {
 
 // hexReplace 执行十六进制替换 - 使用HexReplacer进行专业的二进制魔改
 func (tt *ToolsTab) hexReplace(filePath, oldStr, newStr string) error {
-	// 检查新字符串长度（魔改名称必须是5个字符）
-	if len(newStr) != 5 {
-		return fmt.Errorf("魔改名称必须是5个字符，当前为: %s (%d字符)", newStr, len(newStr))
+	if err := core.ValidateMagicName(newStr); err != nil {
+		return err
 	}
 
 	// 创建临时输出文件

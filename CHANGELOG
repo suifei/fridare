@@ -4,6 +4,10 @@
 
 ## v4.0.1 - 2026-07-29
 
+### Fixed (follow-up)
+- **ToolsTab 默认魔改名 `fridare`（6字符）**：改为空默认 + 严格 5 位 a-z 校验；`performPatch`/`PatchCorePyRPC` 对非法名返回错误，禁止静默 SUCCESS
+- 回归测试：非法/6 字符魔改名不得走通 tools patch 成功路径
+
 ### Fixed
 - **魔改名生成失败**：`generate_random_name` 在部分环境下返回空串导致「无法生成有效的 Frida 魔改名」
 - **deb 输出路径错误**：修复 dist 日志打印绝对路径嵌套、安装指引路径错误
