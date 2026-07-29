@@ -1,5 +1,23 @@
 # Fridare Windows 使用指南
 
+## 重要：`.cmd` / `.bat` 编码约定（Windows）
+
+**cmd.exe 默认使用系统代码页（中文 Windows 多为 GBK/CP936），不是 UTF-8。**  
+若在 `.cmd` / `.bat` 中写入中文（即使文件是 UTF-8），会导致：
+
+- 提示乱码、条件判断异常、`goto` 标签失效
+- 脚本中途退出或“执行不正常”
+
+**约定（必须遵守）：**
+
+| 文件类型 | 语言 |
+|----------|------|
+| `*.cmd` / `*.bat` | **仅 ASCII 英文**（注释、echo、提示全部英文） |
+| `*.ps1` / GUI / Markdown | 可用中文（PowerShell / GUI 支持 Unicode） |
+
+仓库内脚本：`win/patch-frida.cmd`、`win/patch-frida-tools.cmd`、`ui/build.bat` 均为全英文。  
+贡献代码时请勿向这些文件添加中文；可用 `test_cmd_ascii.ps1` 做检查。
+
 ## 最新更新
 
 ### v4.0.1
@@ -7,6 +25,7 @@
 - 完善 `patch-frida-tools.cmd`：自动查找 `_frida*.pyd`、同步修改 `core.py` 中的 `frida:rpc`
 - 新增 GUI 本机构建脚本：`ui/build.ps1`、`ui/build.bat`（无需 bash）
 - 修复 GUI 过度替换 Python 源码导致 `import _xxxxx` 失败的问题
+- **Windows `.cmd`/`.bat` 全英文**：避免 cmd 代码页与 UTF-8 中文冲突
 
 ### v3.1.5 - Windows 支持
 

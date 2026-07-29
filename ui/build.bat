@@ -2,25 +2,28 @@
 setlocal
 cd /d "%~dp0"
 
-echo === Fridare GUI 构建工具 (Windows) ===
+:: English-only script: cmd.exe default code page breaks UTF-8 Chinese text.
+:: Do not add non-ASCII characters to this file.
+
+echo === Fridare GUI Build Tool (Windows) ===
 echo.
 
 if not exist build mkdir build
 
-echo 清理旧的构建文件...
+echo Cleaning old build artifacts...
 del /q build\fridare-gui.exe 2>nul
 del /q build\fridare-create.exe 2>nul
 del /q build\fridare-patch.exe 2>nul
 
-echo 构建应用程序...
+echo Building applications...
 where fyne >nul 2>nul
 if %ERRORLEVEL%==0 (
-    echo 使用 fyne build 构建 GUI...
+    echo Using fyne build for GUI...
     fyne build --src cmd/gui -o ../../build/fridare-gui.exe
     if errorlevel 1 goto :error
 ) else (
-    echo 未找到 fyne CLI，使用 go build...
-    echo 提示: go install fyne.io/fyne/v2/cmd/fyne@latest
+    echo fyne CLI not found, falling back to go build...
+    echo Tip: go install fyne.io/fyne/v2/cmd/fyne@latest
     go build -ldflags "-H windowsgui" -o build\fridare-gui.exe .\cmd\gui
     if errorlevel 1 goto :error
 )
@@ -31,14 +34,14 @@ go build -o build\fridare-patch.exe .\cmd\patch
 if errorlevel 1 goto :error
 
 echo.
-echo 构建完成!
+echo Build complete.
 echo.
-echo 生成的文件:
+echo Output files:
 dir /b build\fridare-*.exe
 echo.
-echo 运行: build\fridare-gui.exe
+echo Run: build\fridare-gui.exe
 goto :eof
 
 :error
-echo 构建失败
+echo Build failed.
 exit /b 1

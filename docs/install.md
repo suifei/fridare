@@ -97,6 +97,8 @@ cd ui
 .\build.bat
 ```
 
+> **Windows `.cmd` / `.bat` 注意**：cmd.exe 默认代码页不是 UTF-8。仓库内所有 `.cmd`/`.bat` **必须全英文（ASCII）**，写入中文会导致执行异常。详见 [win/README.md](../win/README.md)。
+
 生成：`ui\build\fridare-gui.exe`、`fridare-create.exe`、`fridare-patch.exe`。
 
 ### Linux / macOS 本机构建

@@ -66,7 +66,7 @@ fridare.sh 脚本提供了 `patch-tools` 命令，允许您修改 frida-tools �
    codesign -f -s - "$(python3 -c 'import frida,os; import glob; print(glob.glob(os.path.dirname(frida.__file__)+"/_frida*")[0])')"
    ```
 7. **切勿**对 `__init__.py` 做全局 `frida` 字符串替换，否则会破坏 `import _frida`。
-8. Windows 可使用 `win/patch-frida-tools.cmd`。
+8. Windows 可使用 `win/patch-frida-tools.cmd`（脚本内容为全英文 ASCII，适配 cmd.exe 代码页；勿改写成中文）。
 
 ## 常见问题
 
