@@ -2,6 +2,25 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## v4.0.2 - 2026-07-29
+
+### Fixed
+- **魔改名全链路统一为 5 位小写 a-z**：ToolsTab / ModifyTab / PackageTab / HexReplacer / GenerateRandomName 与 hexreplace 一致
+- **ToolsTab 默认 `fridare`（6 字符）**：改为空默认 + 严格校验，非法名不得 silent SUCCESS
+- **GenerateRandomName 数字填充**：改为 a-z 填充，避免随机名启用按钮后 PatchFile 失败
+- **frida-tools 查找/恢复/macOS codesign**：conda 上层目录、`_frida*.so/.pyd`、import 失败仍可 restore、ad-hoc 签名
+- **GUI**：Fyne 主线程 UI；禁止 `__init__.py` 裸 `frida` 替换；Windows SysProcAttr build tags
+- **Windows `.cmd`/`.bat`**：全英文 ASCII + CRLF（适配 cmd.exe GBK 代码页）；`.gitattributes` 强制 CRLF
+
+### Added
+- Windows 构建：`ui/build.ps1`、`ui/build.bat`、`ui/build.sh windows`
+- `win/test_cmd_ascii.ps1` 校验批处理 ASCII/CRLF
+- 回归测试：tools patch、magic name 契约、hexreplace 规则
+- **Release 附带 Windows GUI 预编译包**
+
+### Changed
+- 脚本与 GUI 版本号统一为 **4.0.2**
+
 ## v4.0.1 - 2026-07-29
 
 ### Fixed (follow-up)

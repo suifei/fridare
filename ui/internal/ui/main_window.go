@@ -358,7 +358,7 @@ func (mw *MainWindow) applyTheme() {
 // showAbout 显示关于对话框
 func (mw *MainWindow) showAbout() {
 	// 创建简单的对话框内容
-	content := widget.NewLabel(`Fridare GUI v1.0.0
+	content := widget.NewLabel(`Fridare GUI v4.0.2
 
 Frida 重打包和修补工具的图形界面版本
 
