@@ -78,6 +78,45 @@ fridare.sh help
 fridare.sh build -latest
 ```
 
+## 构建 GUI 版本
+
+### Windows 本机
+
+需要安装 [Go](https://go.dev/dl/)（1.21+）。可选安装 fyne CLI：
+
+```powershell
+go install fyne.io/fyne/v2/cmd/fyne@latest
+```
+
+然后在 `ui` 目录执行：
+
+```powershell
+cd ui
+.\build.ps1
+# 或
+.\build.bat
+```
+
+生成：`ui\build\fridare-gui.exe`、`fridare-create.exe`、`fridare-patch.exe`。
+
+### Linux / macOS 本机构建
+
+```bash
+cd ui
+./build.sh
+```
+
+### 在 Linux/macOS 上交叉编译 Windows GUI
+
+```bash
+# Ubuntu: sudo apt install gcc-mingw-w64
+# macOS: brew install mingw-w64
+cd ui
+./build.sh windows
+```
+
+说明：Windows 专用 API（如隐藏控制台窗口）已使用 Go build tags 隔离，交叉编译时不会再出现 `HideWindow` / `CreationFlags` 编译错误。
+
 这个命令会下载并魔改最新版本的 Frida。
 
 ## 注意事项

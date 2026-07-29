@@ -2,6 +2,27 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## v4.0.1 - 2026-07-29
+
+### Fixed
+- **魔改名生成失败**：`generate_random_name` 在部分环境下返回空串导致「无法生成有效的 Frida 魔改名」
+- **deb 输出路径错误**：修复 dist 日志打印绝对路径嵌套、安装指引路径错误
+- **frida-tools 原生库查找**：兼容 conda / 上层 site-packages / `_frida.abi3.so` / `_frida*.pyd` 等多种布局
+- **macOS 魔改后 frida 被 kill**：patch 后自动 ad-hoc `codesign`；restore 在 import 失败时仍可定位包路径
+- **GUI 错误替换 Python 源码**：不再对 `__init__.py` 做裸 `frida` 全局替换，修复 `ModuleNotFoundError: No module named '_xxxxx'`
+- **Fyne 线程安全**：后台任务更新 UI 统一走 `fyne.Do`，消除 `should have been called in fyne.Do` 刷屏
+- **GUI 交叉编译**：`HideWindow`/`CreationFlags` 拆分为 Windows build-tag 文件，Linux 交叉编译不再报错
+
+### Added
+- Windows 本机构建：`ui/build.ps1`、`ui/build.bat`
+- `ui/build.sh windows` 交叉编译 Windows GUI 说明与实现
+- 文档补充：iOS 手动启动 launchctl、patch-tools 常见问题、安装与构建说明
+
+### Changed
+- 魔改名统一为 **5 个小写字母 a-z**（与 hexreplace 一致）
+- `dpkg-deb` 优先使用 `--root-owner-group` 减少打包警告
+- 脚本版本号同步至 4.0.1
+
 ## v4.0.0 - 2025-01-02
 
 ### Added

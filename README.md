@@ -79,20 +79,30 @@ Fridare 现在提供了基于 Fyne 框架的现代化图形用户界面，让 Fr
 
 #### 📦 构建GUI版本
 
+**Windows（推荐 PowerShell / CMD，无需 bash）：**
+```powershell
+cd ui
+.\build.ps1
+# 或 .\build.bat
+```
+
+**Linux / macOS：**
 ```bash
 cd ui
 ./build.sh
+# 交叉编译 Windows: ./build.sh windows
 ```
 
 构建完成后将生成三个可执行文件：
-- `fridare-gui.exe` - 主GUI应用程序
-- `fridare-create.exe` - 创建工具 
-- `fridare-patch.exe` - 补丁工具
+- `fridare-gui` / `fridare-gui.exe` - 主GUI应用程序
+- `fridare-create` / `fridare-create.exe` - 创建工具 
+- `fridare-patch` / `fridare-patch.exe` - 补丁工具
 
 #### 🖥️ 运行GUI应用
 
 ```bash
-./build/fridare-gui.exe
+./build/fridare-gui.exe   # Windows
+./build/fridare-gui       # Linux/macOS
 ```
 
 GUI版本保持了与命令行版本完全相同的功能，同时提供了更加友好的用户体验。无论您是新手还是专家，都可以轻松使用图形界面来修改和配置 Frida 服务器。

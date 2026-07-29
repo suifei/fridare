@@ -87,10 +87,32 @@ $ ./fridare.sh build -latest
 
 如果需要完整功能，建议输入 `y` 同意修改。
 
+## 安装后无法自动启动？
+
+部分无根越狱（Dopamine 等）上 `extrainst_` 可能不会自动 `launchctl load`。安装 deb 后请手动：
+
+```bash
+# rootless
+launchctl load /var/jb/Library/LaunchDaemons/re.<魔改名>.server.plist
+# 或前台调试
+/var/jb/usr/sbin/<魔改名> -l 0.0.0.0:8899
+
+# rootful
+launchctl load /Library/LaunchDaemons/re.<魔改名>.server.plist
+```
+
+确认进程：
+```bash
+ps aux | grep <魔改名>
+```
+
+**说明**：请使用与设备匹配的 deb 架构（rootless 用 `iphoneos-arm64`，rootful 用 `iphoneos-arm`）。RootHide 等隐藏环境可能导致 launchd 路径异常，建议在标准 rootless/rootful 环境测试。
+
 ## 注意事项
 
 1. 每次运行脚本都会生成新的魔改名称，确保使用最新生成的名称和端口号。
-2. 魔改后的 frida-server 可能会绕过一些基本的检测，但不保证能绕过所有检测机制。
-3. 使用魔改版本可能会影响某些 Frida 功能，特别是如果没有修改 frida-tools。
-4. 确保在合法和授权的情况下使用此工具。
+2. **必须同时魔改 PC 端 frida-tools**，且魔改名与设备端完全一致，否则 spawn 易卡住或崩溃。
+3. 魔改后的 frida-server 可能会绕过一些基本的检测，但不保证能绕过所有检测机制。
+4. 使用魔改版本可能会影响某些 Frida 功能，特别是如果没有修改 frida-tools。
+5. 确保在合法和授权的情况下使用此工具。
 

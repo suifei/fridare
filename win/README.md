@@ -2,12 +2,28 @@
 
 ## 最新更新
 
+### v4.0.1
+
+- 完善 `patch-frida-tools.cmd`：自动查找 `_frida*.pyd`、同步修改 `core.py` 中的 `frida:rpc`
+- 新增 GUI 本机构建脚本：`ui/build.ps1`、`ui/build.bat`（无需 bash）
+- 修复 GUI 过度替换 Python 源码导致 `import _xxxxx` 失败的问题
+
 ### v3.1.5 - Windows 支持
 
 - 新增 `patch-frida.cmd` 脚本,用于在 Windows 环境下修改 frida-server
 - 新增 `patch-frida-tools.cmd` 脚本,用于在 Windows 环境下修改 frida-tools
 - 增加对 Windows 平台的全面支持
 - 更新了使用说明,增加了 Windows 平台的详细教程
+
+## 构建 GUI（Windows）
+
+```powershell
+# 安装 Go 后
+go install fyne.io/fyne/v2/cmd/fyne@latest   # 可选
+cd ui
+.\build.ps1
+.\build\fridare-gui.exe
+```
 
 ## Windows 下的使用教程
 

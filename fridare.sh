@@ -5,7 +5,7 @@
 
 set -e # 遇到错误立即退出
 
-VERSION="3.1.7"
+VERSION="4.0.1"
 # 默认值设置
 DEF_FRIDA_SERVER_PORT=8899
 DEF_AUTO_CONFIRM="false"
@@ -252,7 +252,7 @@ show_patch_tools_usage() {
     echo -e "${COLOR_SKYBLUE}用法: $0 patch-tools <操作> [选项]${COLOR_RESET}"
     echo
     echo -e "${COLOR_YELLOW}操作:${COLOR_RESET}"
-    echo -e "  ${COLOR_GREEN}name${COLOR_RESET}                     配置 frida-tools 魔改名，5个（a-zA-Z）字符，留空则读取配置的名称\"${COLOR_GREEN}${FRIDA_NAME}${COLOR_RESET}\"，否则随机生成"
+    echo -e "  ${COLOR_GREEN}name${COLOR_RESET}                     配置 frida-tools 魔改名，5个小写字母（a-z），留空则读取配置的名称\"${COLOR_GREEN}${FRIDA_NAME}${COLOR_RESET}\"，否则随机生成"
     echo -e "  ${COLOR_GREEN}restore${COLOR_RESET}                  恢复 frida-tools 到原版"
     echo
     echo -e "${COLOR_WHITE}示例:${COLOR_RESET}"
@@ -640,6 +640,10 @@ set_config() {
         log_success "Frida 服务器端口已设置为: $FRIDA_SERVER_PORT"
         ;;
     frida-name)
+        if [[ ! "$value" =~ ^[a-z]{5}$ ]]; then
+            log_error "无效的魔改名: $value（必须是恰好 5 个小写字母 a-z）"
+            return 1
+        fi
         FRIDA_NAME="$value"
         log_success "Frida 魔改名已设置为: $FRIDA_NAME"
         ;;
@@ -724,9 +728,9 @@ interactive_config_editor() {
             read -p "输入新的 Frida 魔改名 (当前: ${FRIDA_NAME:-未设置}): " new_name
             if [ -n "$new_name" ]; then
                 # 检查新名称是否有效
-                if [[ ! "$new_name" =~ ^[a-zA-Z]{5}$ ]]; then
+                if [[ ! "$new_name" =~ ^[a-z]{5}$ ]]; then
                     log_error "无效的魔改名: $new_name"
-                    log_info "魔改名必须是恰好 5 个字母（a-z 或 A-Z）"
+                    log_info "魔改名必须是恰好 5 个小写字母（a-z）"
                 else
                     set_config frida-name "$new_name"
                 fi
@@ -1271,12 +1275,12 @@ patch_frida_module() {
     if [ -z "$FRIDA_NAME" ]; then
         log_error "未指定 Frida 魔改名，请使用 config set frida-name 命令指定"
         read -p "请输入本次所采用的 Frida 魔改名: " value
-        if [[ "$value" =~ ^[a-zA-Z]{5}$ ]]; then
+        if [[ "$value" =~ ^[a-z]{5}$ ]]; then
             FRIDA_NAME="$value"
             log_success "Frida 魔改名已设置为: $FRIDA_NAME"
         else
             log_error "无效的 Frida 魔改名: $value"
-            log_info "Frida 魔改名必须是恰好 5 个字母（a-z 或 A-Z）"
+            log_info "Frida 魔改名必须是恰好 5 个小写字母（a-z）"
             return 1
         fi
     else
@@ -1781,11 +1785,18 @@ repackage_deb() {
     local output_filename=$2
     # 在打包之前删除 .DS_Store 文件
     remove_ds_store "$build"
-    # 打包
-    dpkg-deb -b "$build" "$output_filename" || {
-        log_error "打包 $output_filename 失败"
-        exit 1
-    }
+    # 打包（优先 root-owner-group，避免 dpkg 权限警告）
+    if dpkg-deb --help 2>&1 | grep -q root-owner-group; then
+        dpkg-deb --root-owner-group -b "$build" "$output_filename" || {
+            log_error "打包 $output_filename 失败"
+            exit 1
+        }
+    else
+        dpkg-deb -b "$build" "$output_filename" || {
+            log_error "打包 $output_filename 失败"
+            exit 1
+        }
+    fi
 
     rm -rf "$build"
 
@@ -1834,8 +1845,135 @@ find_frida_path() {
     return 1
 }
 generate_random_name() {
-    cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-z' | fold -w 5 | head -n 1
+    # 兼容 macOS / Linux / 无 /dev/urandom 管道异常等环境
+    local name=""
+    local chars="abcdefghijklmnopqrstuvwxyz"
+    local i idx
+    for i in 1 2 3 4 5; do
+        idx=$((RANDOM % 26))
+        name="${name}${chars:$idx:1}"
+    done
+    # 兜底：若 RANDOM 异常导致空串，用 od/tr
+    if [[ ! "$name" =~ ^[a-z]{5}$ ]]; then
+        if [ -r /dev/urandom ]; then
+            name=$(od -An -N8 -tx1 /dev/urandom 2>/dev/null | tr -dc 'a-f' | head -c 5)
+        fi
+    fi
+    if [[ ! "$name" =~ ^[a-z]{5}$ ]]; then
+        name="abcde"
+    fi
+    echo "$name"
 }
+
+# 解析 frida 包目录：优先 import，失败则扫描常见 site-packages（魔改损坏后仍可 restore）
+resolve_frida_package_path() {
+    local hint_path="$1"
+    local python_cmd
+    local path=""
+
+    if [ -n "$hint_path" ] && [ -d "$hint_path" ]; then
+        echo "$hint_path"
+        return 0
+    fi
+
+    python_cmd=$(get_python_cmd)
+    if [ -n "$python_cmd" ]; then
+        path=$($python_cmd -c "import os, frida; print(os.path.dirname(frida.__file__))" 2>/dev/null)
+        if [ -n "$path" ] && [ -d "$path" ]; then
+            echo "$path"
+            return 0
+        fi
+        # 不依赖 import frida（魔改后可能无法 import）
+        path=$($python_cmd -c "
+import site, os, glob
+cands = []
+try:
+    cands += site.getsitepackages()
+except Exception:
+    pass
+try:
+    cands.append(site.getusersitepackages())
+except Exception:
+    pass
+for base in cands:
+    p = os.path.join(base, 'frida')
+    if os.path.isdir(p):
+        print(p)
+        break
+" 2>/dev/null)
+        if [ -n "$path" ] && [ -d "$path" ]; then
+            echo "$path"
+            return 0
+        fi
+    fi
+
+    path=$(find_frida_path 2>/dev/null)
+    if [ -n "$path" ] && [ -d "$path" ]; then
+        echo "$path"
+        return 0
+    fi
+    return 1
+}
+
+# 查找 frida 原生扩展库（.so / .pyd / .dylib），兼容 conda、上层目录、多命名
+find_frida_native_lib() {
+    local pkg_path="$1"
+    local f parent
+
+    if [ -z "$pkg_path" ] || [ ! -d "$pkg_path" ]; then
+        return 1
+    fi
+
+    # 1) 包目录内常见命名
+    for f in \
+        "$pkg_path"/_frida.abi3.so \
+        "$pkg_path"/_frida*.so \
+        "$pkg_path"/_frida*.pyd \
+        "$pkg_path"/_frida*.dylib \
+        "$pkg_path"/*.abi3.so \
+        "$pkg_path"/*.so \
+        "$pkg_path"/*.pyd; do
+        if [ -f "$f" ] && [[ "$f" != *.fridare ]]; then
+            echo "$f"
+            return 0
+        fi
+    done
+
+    # 2) 部分发行版把扩展放在 site-packages 根目录（上层）
+    parent=$(dirname "$pkg_path")
+    for f in \
+        "$parent"/_frida.abi3.so \
+        "$parent"/_frida*.so \
+        "$parent"/_frida*.pyd \
+        "$parent"/_frida*.dylib; do
+        if [ -f "$f" ] && [[ "$f" != *.fridare ]]; then
+            log_info "在上层目录找到 frida 原生库: $f"
+            echo "$f"
+            return 0
+        fi
+    done
+
+    # 3) 递归一层（排除备份）
+    f=$(find "$pkg_path" -maxdepth 2 \( -name '_frida*.so' -o -name '_frida*.pyd' -o -name '_frida*.dylib' \) ! -name '*.fridare' 2>/dev/null | head -n 1)
+    if [ -n "$f" ] && [ -f "$f" ]; then
+        echo "$f"
+        return 0
+    fi
+
+    return 1
+}
+
+# macOS 修改原生库后需 ad-hoc 重签，否则进程会被 kill
+resign_if_darwin() {
+    local target="$1"
+    if [ "$(uname -s)" = "Darwin" ] && [ -f "$target" ]; then
+        if command -v codesign >/dev/null 2>&1; then
+            log_info "正在对原生库进行 ad-hoc 代码签名: $target"
+            codesign -f -s - "$target" 2>/dev/null || log_warning "codesign 失败，若 frida 被 kill 请手动: codesign -f -s - \"$target\""
+        fi
+    fi
+}
+
 patch_frida_tools() {
     local local_frida_name="$1"
 
@@ -1852,10 +1990,10 @@ patch_frida_tools() {
         fi
     fi
 
-    # 检查新名称是否有效
-    if [[ ! "$local_frida_name" =~ ^[a-zA-Z]{5}$ ]]; then
+    # 检查新名称是否有效（仅小写 a-z，与 hexreplace 一致）
+    if [[ ! "$local_frida_name" =~ ^[a-z]{5}$ ]]; then
         log_error "无效的魔改名: $local_frida_name"
-        log_info "魔改名必须是恰好 5 个字母（a-z 或 A-Z）"
+        log_info "魔改名必须是恰好 5 个小写字母（a-z）"
         return 1
     fi
 
@@ -1864,40 +2002,54 @@ patch_frida_tools() {
 
 restore_frida_tools() {
     log_info "开始恢复 frida-tools 到原版..."
-    local python_cmd=$(get_python_cmd)
-    if [ -z "$python_cmd" ]; then
-        log_error "未找到 Python 解释器"
+    local hint_path="$1"
+    local frida_tools_path
+
+    frida_tools_path=$(resolve_frida_package_path "$hint_path")
+    if [ -z "$frida_tools_path" ] || [ ! -d "$frida_tools_path" ]; then
+        log_error "无法定位 frida 包目录。可手动指定 site-packages/frida 路径后重试。"
         return 1
     fi
+    log_info "frida 包目录: $frida_tools_path"
 
-    local frida_tools_path=$($python_cmd -c "import os, frida; print(os.path.dirname(frida.__file__))" 2>/dev/null)
-    if [ $? -ne 0 ]; then
-        log_error "执行 Python 命令失败，请确保 frida 已正确安装"
-        return 1
-    fi
-    # 恢复 Python 库文件
-    local pylib_backup=$(ls $frida_tools_path/*.so.fridare 2>/dev/null)
-    local pylib=$(ls $frida_tools_path/*.so 2>/dev/null)
+    # 恢复原生库：优先 *.fridare 备份
+    local pylib_backup=""
+    local restored=0
+    for pylib_backup in \
+        "$frida_tools_path"/*.so.fridare \
+        "$frida_tools_path"/*.pyd.fridare \
+        "$frida_tools_path"/*.dylib.fridare \
+        "$(dirname "$frida_tools_path")"/*.so.fridare \
+        "$(dirname "$frida_tools_path")"/*.pyd.fridare; do
+        if [ -f "$pylib_backup" ]; then
+            local original="${pylib_backup%.fridare}"
+            log_info "正在恢复原生库: $original"
+            mv -f "$pylib_backup" "$original"
+            resign_if_darwin "$original"
+            restored=1
+        fi
+    done
 
-    if [ -z "$pylib_backup" ]; then
-        log_warning "未找到 Python 库文件的备份"
-        return 1
-    else
-        log_info "正在恢复 Python 库文件: $pylib"
-        mv "$pylib_backup" "$pylib"
+    if [ $restored -eq 0 ]; then
+        log_warning "未找到 Python 原生库文件的备份 (*.fridare)"
     fi
 
     # 恢复 core.py 文件
     local core_py="$frida_tools_path/core.py"
     if [ -f "$core_py.fridare" ]; then
         log_info "正在恢复 core.py 文件: $core_py"
-        mv "$core_py.fridare" "$core_py"
+        mv -f "$core_py.fridare" "$core_py"
     else
         log_warning "未找到 core.py 文件的备份"
     fi
 
     rm -rf "$frida_tools_path/__pycache__"
-    log_success "frida-tools 已恢复到原版"
+    if [ $restored -eq 1 ] || [ -f "$core_py" ]; then
+        log_success "frida-tools 已恢复到原版"
+        return 0
+    fi
+    log_error "恢复失败：未找到任何备份文件"
+    return 1
 }
 # 函数：修订frida-tools
 modify_core_py() {
@@ -1905,6 +2057,10 @@ modify_core_py() {
     path=$2
     p="${path}/core.py"
     b="${p}.fridare"
+    if [ ! -f "$p" ]; then
+        echo "core.py not found: $p" >&2
+        return 1
+    fi
     if [ ! -f "$b" ]; then
         echo "Creating backup: $b"
         cp "$p" "$b"
@@ -1912,9 +2068,7 @@ modify_core_py() {
         echo "Backup already exists: $b"
     fi
     replaced=0
-    while IFS= read -r line; do
-        # echo "Processing line: $line" >&2  # Debug output
-
+    while IFS= read -r line || [ -n "$line" ]; do
         if [[ $line =~ [\'\"](([^\'\"]+):rpc)[\'\"] ]]; then
             old=${BASH_REMATCH[2]}
             new=$(printf "%-5s" "${frida_name:0:5}")
@@ -1922,7 +2076,7 @@ modify_core_py() {
             if [ "$new_line" != "$line" ]; then
                 echo "Replaced \"$old:rpc\" with \"$new:rpc\"" >&2
                 line=$new_line
-                ((replaced++))
+                ((replaced++)) || true
             fi
         fi
 
@@ -1933,7 +2087,7 @@ modify_core_py() {
         echo "Replacement complete. Made $replaced replacements."
     else
         echo "No matching pattern found, no changes made"
-        rm "${p}.tmp"
+        rm -f "${p}.tmp"
     fi
 }
 modify_frida_tools() {
@@ -1945,14 +2099,19 @@ modify_frida_tools() {
         return 1
     fi
 
-    local pylib_path=$($python_cmd -c "import os, frida; print(os.path.dirname(frida.__file__))" 2>/dev/null)
-    if [ $? -ne 0 ]; then
+    local pylib_path
+    pylib_path=$(resolve_frida_package_path "")
+    if [ -z "$pylib_path" ] || [ ! -d "$pylib_path" ]; then
         log_error "执行 Python 命令失败，请确保 frida 已正确安装"
         return 1
     fi
-    local pylib=$(ls $pylib_path/*.so 2>/dev/null)
-    if [ -z "$pylib" ]; then
-        log_error "未找到 frida Python 库"
+
+    local pylib
+    pylib=$(find_frida_native_lib "$pylib_path")
+    if [ -z "$pylib" ] || [ ! -f "$pylib" ]; then
+        log_error "未找到 frida Python 原生库 (_frida*.so / _frida*.pyd)"
+        log_info "已搜索: $pylib_path 及其上层目录"
+        log_info "可手动确认: ls -la \"$pylib_path\" \"$(dirname "$pylib_path")\" | head"
         return 1
     fi
 
@@ -1961,24 +2120,40 @@ modify_frida_tools() {
         log_info "创建备份: $pylib.fridare"
     else
         log_info "备份已存在: $pylib.fridare"
+        # 从干净备份再魔改，避免重复 patch
+        cp "$pylib.fridare" "$pylib"
     fi
 
     log_info "Python 库文件: $pylib"
     log_info "Frida 名称: $local_frida_name"
 
-    $SCRIPT_WORK_DIR/build/hexreplace "$pylib" "$local_frida_name" "test.so" || {
+    # 确保 hexreplace 可用
+    if [ ! -x "$SCRIPT_WORK_DIR/build/hexreplace" ]; then
+        (cd "$SCRIPT_WORK_DIR/hexreplace" && go build -o "$SCRIPT_WORK_DIR/build/hexreplace") || {
+            log_error "编译 hexreplace 工具失败"
+            return 1
+        }
+        chmod +x "$SCRIPT_WORK_DIR/build/hexreplace"
+    fi
+
+    local tmp_out
+    tmp_out=$(mktemp "${TMPDIR:-/tmp}/fridare_native.XXXXXX")
+    $SCRIPT_WORK_DIR/build/hexreplace "$pylib" "$local_frida_name" "$tmp_out" || {
         log_error "修改 frida Python 库失败"
+        rm -f "$tmp_out"
         return 1
     }
 
     rm -f "$pylib"
     rm -rf "$pylib_path/__pycache__"
-    mv test.so "$pylib"
+    mv "$tmp_out" "$pylib"
     chmod 755 "$pylib"
+    resign_if_darwin "$pylib"
 
     modify_core_py "$local_frida_name" "$pylib_path"
 
     log_success "frida-tools 修改完成"
+    log_info "请确保设备端 frida-server 与本地 frida-tools 使用相同魔改名: $local_frida_name"
     return 0
 }
 get_absolute_path() {
@@ -2078,26 +2253,46 @@ build_frida() {
 
     # 如果 FRIDA_NAME 为空，生成一个新的
     if [ -z "$FRIDA_NAME" ]; then
-        FRIDA_NAME=$(generate_random_name)
+        local gen_try=0
+        while [ $gen_try -lt 5 ]; do
+            FRIDA_NAME=$(generate_random_name)
+            if [[ "$FRIDA_NAME" =~ ^[a-z]{5}$ ]]; then
+                break
+            fi
+            gen_try=$((gen_try + 1))
+            FRIDA_NAME=""
+        done
         if [[ ! "$FRIDA_NAME" =~ ^[a-z]{5}$ ]]; then
             log_error "无法生成有效的 Frida 魔改名"
+            log_info "请手动设置: ./fridare.sh config set frida-name abcde"
             exit 1
         fi
+        log_info "已自动生成 Frida 魔改名: $FRIDA_NAME"
+    fi
+    # 统一要求 5 位小写字母（与 hexreplace 一致）
+    if [[ ! "$FRIDA_NAME" =~ ^[a-z]{5}$ ]]; then
+        log_error "无效的 Frida 魔改名: $FRIDA_NAME"
+        log_info "魔改名必须是恰好 5 个小写字母（a-z），例如: abcde"
+        exit 1
     fi
 
     local architectures=("arm" "arm64")
     for arch in "${architectures[@]}"; do
         local input_file
+        local output_basename
+        local dist_file
         if [ "$use_local" = "true" ]; then
             input_file="$local_deb"
-            OUTPUT_FILENAME="${local_deb}_${FRIDA_NAME}_tcp.deb"
+            output_basename="$(basename "${local_deb}" .deb)_${FRIDA_NAME}_tcp.deb"
+            OUTPUT_FILENAME="${SCRIPT_WORK_DIR}/build/${output_basename}"
             if [ "$local_arch" = "arm64e" ]; then
                 arch="arm"
             fi
             log_info "使用本地文件: $input_file"
         else
             input_file="${SCRIPT_WORK_DIR}/build/frida_${FRIDA_VERSION}_iphoneos-${arch}.deb"
-            OUTPUT_FILENAME="${SCRIPT_WORK_DIR}/build/frida_${FRIDA_VERSION}_iphoneos-${arch}_${FRIDA_NAME}_tcp.deb"
+            output_basename="frida_${FRIDA_VERSION}_iphoneos-${arch}_${FRIDA_NAME}_tcp.deb"
+            OUTPUT_FILENAME="${SCRIPT_WORK_DIR}/build/${output_basename}"
             download_frida $arch $FRIDA_VERSION $clean
         fi
 
@@ -2113,28 +2308,34 @@ build_frida() {
 
         repackage_deb "$BUILD_DIR" "$OUTPUT_FILENAME"
 
-        mkdir -p $SCRIPT_WORK_DIR/dist
-
-        mv "$OUTPUT_FILENAME" $SCRIPT_WORK_DIR/dist/ 2>&1 | grep -v "are identical" || true
+        mkdir -p "$SCRIPT_WORK_DIR/dist"
+        dist_file="$SCRIPT_WORK_DIR/dist/${output_basename}"
+        mv -f "$OUTPUT_FILENAME" "$dist_file" 2>&1 | grep -v "are identical" || true
 
         log_success "Frida ${FRIDA_VERSION} 版本 (${arch}) 修改完成"
 
         log_info "新版本名：${FRIDA_NAME}"
         log_info "请使用新版本名：${FRIDA_NAME} 进行调试"
         log_info "请使用端口：${FRIDA_SERVER_PORT} 进行调试"
-        log_info "新版本 deb 文件：$SCRIPT_WORK_DIR/dist/${OUTPUT_FILENAME}"
+        log_info "新版本 deb 文件：${dist_file}"
         log_info "-------------------------------------------------"
         log_info "iPhone 安装："
-        log_info "scp dist/${OUTPUT_FILENAME} root@<iPhone-IP>:/var/root"
+        log_info "scp dist/${output_basename} root@<iPhone-IP>:/tmp/"
         log_info "ssh root@<iPhone-IP>"
-        log_info "dpkg -i /var/root/${OUTPUT_FILENAME}"
-        log_info "PC 连接："
-        log_info "frida -U -f com.xxx.xxx -l"
-        log_info "frida -H <iPhone-IP>:${FRIDA_SERVER_PORT} -f com.xxx.xxx --no-pause"
+        log_info "dpkg -i /tmp/${output_basename}"
+        log_info "若未自动启动，手动执行："
+        log_info "  # rootless (Dopamine 等):"
+        log_info "  launchctl load /var/jb/Library/LaunchDaemons/re.${FRIDA_NAME}.server.plist"
+        log_info "  # 或直接前台运行："
+        log_info "  /var/jb/usr/sbin/${FRIDA_NAME} -l 0.0.0.0:${FRIDA_SERVER_PORT}"
+        log_info "  # rootful:"
+        log_info "  launchctl load /Library/LaunchDaemons/re.${FRIDA_NAME}.server.plist"
+        log_info "PC 连接（设备端与 PC 端魔改名必须一致，且需 patch-tools）："
+        log_info "frida -H <iPhone-IP>:${FRIDA_SERVER_PORT} -f com.xxx.xxx"
         log_info "-------------------------------------------------"
 
         if [ -n "$local_deb" ]; then
-            return 0 # 如果是本地文件，只处理一次
+            break # 如果是本地文件，只处理一次
         fi
     done
 

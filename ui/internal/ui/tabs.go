@@ -13,7 +13,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 	"unicode"
 
@@ -187,19 +186,24 @@ func (mt *ModifyTab) selectInputFile() {
 // analyzeFile 分析文件
 func (mt *ModifyTab) analyzeFile(filePath string) {
 	go func() {
-		mt.updateStatus("正在分析文件...")
+		fyne.Do(func() {
+			mt.updateStatus("正在分析文件...")
+		})
 
 		description, err := mt.hexReplacer.DescribeFile(filePath)
 		if err != nil {
-			mt.fileInfoText.ParseMarkdown(fmt.Sprintf("**错误:** %s", err.Error()))
-			mt.updateStatus("文件分析失败: " + err.Error())
+			errMsg := err.Error()
+			fyne.Do(func() {
+				mt.fileInfoText.ParseMarkdown(fmt.Sprintf("**错误:** %s", errMsg))
+				mt.updateStatus("文件分析失败: " + errMsg)
+			})
 			return
 		}
 
 		// 格式化显示信息
 		markdown := fmt.Sprintf("**文件路径:** %s\n\n**文件信息:**\n```\n%s\n```", filePath, description)
-		mt.fileInfoText.ParseMarkdown(markdown)
 		fyne.Do(func() {
+			mt.fileInfoText.ParseMarkdown(markdown)
 			mt.updateStatus("文件分析完成")
 		})
 	}()
@@ -253,59 +257,60 @@ func (mt *ModifyTab) startPatching() {
 
 	go func() {
 		defer func() {
-			mt.progressBar.Hide()
-			mt.progressLabel.Hide()
-			mt.patchBtn.Enable()
+			fyne.Do(func() {
+				mt.progressBar.Hide()
+				mt.progressLabel.Hide()
+				mt.patchBtn.Enable()
+			})
 		}()
 
-		mt.updateStatus("开始魔改二进制文件...")
-		mt.addLog("INFO: 开始魔改二进制文件")
-		mt.addLog(fmt.Sprintf("INFO: 输入文件: %s", inputPath))
-		mt.addLog(fmt.Sprintf("INFO: 输出文件: %s", outputPath))
-		mt.addLog(fmt.Sprintf("INFO: 魔改名称: %s", magicName))
+		fyne.Do(func() {
+			mt.updateStatus("开始魔改二进制文件...")
+			mt.addLog("INFO: 开始魔改二进制文件")
+			mt.addLog(fmt.Sprintf("INFO: 输入文件: %s", inputPath))
+			mt.addLog(fmt.Sprintf("INFO: 输出文件: %s", outputPath))
+			mt.addLog(fmt.Sprintf("INFO: 魔改名称: %s", magicName))
+		})
 
-		// 进度回调函数
+		// 进度回调必须在 UI 线程更新控件
 		progressCallback := func(progress float64, message string) {
-			mt.progressBar.SetValue(progress)
-			mt.progressLabel.SetText(message)
-			mt.updateStatus(message)
-			mt.addLog(fmt.Sprintf("INFO: %s (%.1f%%)", message, progress*100))
+			fyne.Do(func() {
+				mt.progressBar.SetValue(progress)
+				mt.progressLabel.SetText(message)
+				mt.updateStatus(message)
+				mt.addLog(fmt.Sprintf("INFO: %s (%.1f%%)", message, progress*100))
+			})
 		}
 
-		// 执行修改
 		err := mt.hexReplacer.PatchFile(inputPath, magicName, outputPath, progressCallback)
 		if err != nil {
 			errorMsg := "魔改失败: " + err.Error()
-			mt.updateStatus(errorMsg)
-			mt.progressLabel.SetText("魔改失败!")
-			mt.addLog("ERROR: " + errorMsg)
-
-			// 只显示最终错误结果的弹窗
-			dialog.ShowError(fmt.Errorf("魔改失败: %v", err), fyne.CurrentApp().Driver().AllWindows()[0])
+			fyne.Do(func() {
+				mt.updateStatus(errorMsg)
+				mt.progressLabel.SetText("魔改失败!")
+				mt.addLog("ERROR: " + errorMsg)
+				dialog.ShowError(fmt.Errorf("魔改失败: %v", err), fyne.CurrentApp().Driver().AllWindows()[0])
+			})
 			return
 		}
 
-		mt.progressBar.SetValue(1.0)
-		mt.progressLabel.SetText("魔改完成!")
-		successMsg := fmt.Sprintf("魔改完成! 输出文件: %s", outputPath)
-		mt.updateStatus(successMsg)
-		mt.addLog("SUCCESS: " + successMsg)
-
-		// 更新配置
 		mt.config.MagicName = magicName
-		mt.config.Save()
-		mt.addLog("INFO: 配置已保存")
+		_ = mt.config.Save()
 
-		// 只显示最终成功结果的弹窗
-		// 缩短路径显示以避免宽度问题
+		successMsg := fmt.Sprintf("魔改完成! 输出文件: %s", outputPath)
 		inputBaseName := filepath.Base(inputPath)
 		outputBaseName := filepath.Base(outputPath)
-
 		contentText := fmt.Sprintf("魔改完成!\n\n输入文件: %s\n输出文件: %s\n魔改名称: %s\n\n文件已保存到与输入文件相同的目录",
 			inputBaseName, outputBaseName, magicName)
 
-		// 使用简单的信息弹窗，内容会自动换行
-		dialog.ShowInformation("魔改完成", contentText, fyne.CurrentApp().Driver().AllWindows()[0])
+		fyne.Do(func() {
+			mt.progressBar.SetValue(1.0)
+			mt.progressLabel.SetText("魔改完成!")
+			mt.updateStatus(successMsg)
+			mt.addLog("SUCCESS: " + successMsg)
+			mt.addLog("INFO: 配置已保存")
+			dialog.ShowInformation("魔改完成", contentText, fyne.CurrentApp().Driver().AllWindows()[0])
+		})
 	}()
 }
 
@@ -620,12 +625,14 @@ func (pt *PackageTab) startPackaging() {
 // modifyExistingDebPackage 修改现有DEB包
 func (pt *PackageTab) modifyExistingDebPackage(outputPath string, port int, magicName string, debFile string) {
 
-	pt.updateStatus("开始修改DEB包...")
-	pt.addLog("INFO: 开始修改现有DEB包")
-	pt.addLog(fmt.Sprintf("INFO: 输入DEB文件: %s", debFile))
-	pt.addLog(fmt.Sprintf("INFO: 输出路径: %s", outputPath))
-	pt.addLog(fmt.Sprintf("INFO: 魔改名称: %s", magicName))
-	pt.addLog(fmt.Sprintf("INFO: 端口: %d", port))
+	fyne.Do(func() {
+		pt.updateStatus("开始修改DEB包...")
+		pt.addLog("INFO: 开始修改现有DEB包")
+		pt.addLog(fmt.Sprintf("INFO: 输入DEB文件: %s", debFile))
+		pt.addLog(fmt.Sprintf("INFO: 输出路径: %s", outputPath))
+		pt.addLog(fmt.Sprintf("INFO: 魔改名称: %s", magicName))
+		pt.addLog(fmt.Sprintf("INFO: 端口: %d", port))
+	})
 
 	// 创建DEB修改器
 	debModifier := core.NewDebModifier(debFile, outputPath, magicName, port)
@@ -644,34 +651,34 @@ func (pt *PackageTab) modifyExistingDebPackage(outputPath string, port int, magi
 	err := debModifier.ModifyDebPackage(progressCallback)
 	if err != nil {
 		errorMsg := "DEB包修改失败: " + err.Error()
-		pt.updateStatus(errorMsg)
-		pt.progressLabel.SetText("修改失败!")
-		pt.addLog("ERROR: " + errorMsg)
-
-		// 显示错误弹窗
-		dialog.ShowError(fmt.Errorf("DEB包修改失败: %v", err), fyne.CurrentApp().Driver().AllWindows()[0])
+		fyne.Do(func() {
+			pt.updateStatus(errorMsg)
+			pt.progressLabel.SetText("修改失败!")
+			pt.addLog("ERROR: " + errorMsg)
+			dialog.ShowError(fmt.Errorf("DEB包修改失败: %v", err), fyne.CurrentApp().Driver().AllWindows()[0])
+		})
 		return
 	}
-
-	pt.progressBar.SetValue(1.0)
-	pt.progressLabel.SetText("DEB包修改完成!")
-	successMsg := fmt.Sprintf("DEB包修改完成! 输出文件: %s", outputPath)
-	pt.updateStatus(successMsg)
-	pt.addLog("SUCCESS: " + successMsg)
 
 	// 更新配置
 	pt.config.MagicName = magicName
 	pt.config.DefaultPort = port
-	pt.config.Save()
-	pt.addLog("INFO: 配置已保存")
+	_ = pt.config.Save()
 
-	// 显示成功弹窗
+	successMsg := fmt.Sprintf("DEB包修改完成! 输出文件: %s", outputPath)
 	outputBaseName := filepath.Base(outputPath)
 	inputBaseName := filepath.Base(debFile)
 	contentText := fmt.Sprintf("DEB包修改完成!\n\n原始文件: %s\n输出文件: %s\n魔改名称: %s\n端口: %d\n\n修改后的文件已保存到指定位置",
 		inputBaseName, outputBaseName, magicName, port)
 
-	dialog.ShowInformation("DEB包修改完成", contentText, fyne.CurrentApp().Driver().AllWindows()[0])
+	fyne.Do(func() {
+		pt.progressBar.SetValue(1.0)
+		pt.progressLabel.SetText("DEB包修改完成!")
+		pt.updateStatus(successMsg)
+		pt.addLog("SUCCESS: " + successMsg)
+		pt.addLog("INFO: 配置已保存")
+		dialog.ShowInformation("DEB包修改完成", contentText, fyne.CurrentApp().Driver().AllWindows()[0])
+	})
 }
 
 // PythonEnv Python环境信息
@@ -1255,11 +1262,9 @@ func (tt *ToolsTab) createBackup() error {
 		return fmt.Errorf("创建备份目录失败: %v", err)
 	}
 
-	// 复制关键文件
+	// 复制关键 Python 文件（不备份 __init__.py：我们不再修改它）
 	filesToBackup := []string{
-		"_frida.py",
 		"core.py",
-		"__init__.py",
 	}
 
 	for _, file := range filesToBackup {
@@ -1271,6 +1276,19 @@ func (tt *ToolsTab) createBackup() error {
 				return fmt.Errorf("备份文件 %s 失败: %v", file, err)
 			}
 			tt.addLog(fmt.Sprintf("INFO: 已备份文件: %s", file))
+		}
+	}
+
+	// 备份原生扩展库
+	soFiles, err := tt.findSOFiles()
+	if err == nil {
+		for _, soFile := range soFiles {
+			dstPath := filepath.Join(backupPath, filepath.Base(soFile))
+			if err := tt.copyFile(soFile, dstPath); err != nil {
+				tt.addLog(fmt.Sprintf("WARN: 备份原生库失败 %s: %v", soFile, err))
+				continue
+			}
+			tt.addLog(fmt.Sprintf("INFO: 已备份原生库: %s", soFile))
 		}
 	}
 
@@ -1312,63 +1330,53 @@ func (tt *ToolsTab) performPatch(magicName, port string) error {
 }
 
 // patchPythonFiles 魔改Python文件
+// 注意：绝不能对 __init__.py 或任意 import 路径做裸 "frida" 全局替换，
+// 否则会把 import _frida 变成 import _xxxxx，导致 ModuleNotFoundError。
+// 客户端与服务端对齐只需替换 core.py 中的 "xxxxx:rpc" 通道名。
 func (tt *ToolsTab) patchPythonFiles(magicName, port string) error {
-	// 定义要魔改的文件和替换规则
-	patchRules := map[string]map[string]string{
-		"_frida.py": {
-			"frida-server": magicName + "-server",
-			"frida-agent":  magicName + "-agent",
-			"27042":        port,
-			"frida":        magicName,
-		},
-		"core.py": {
-			"frida-server": magicName + "-server",
-			"frida-agent":  magicName + "-agent",
-			"frida":        magicName,
-			"27042":        port,
-		},
-		"__init__.py": {
-			"frida": magicName,
-		},
+	_ = port // 端口由设备端 server 决定，Python 包侧无需改默认端口字符串
+
+	// 有序规则：先替换长串，避免被短串误伤
+	type rule struct {
+		old string
+		new string
+	}
+	// 仅处理 core.py 中的 RPC 通道标识（与 fridare.sh modify_core_py 一致）
+	coreRules := []rule{
+		{old: "frida:rpc", new: magicName + ":rpc"},
 	}
 
-	for file, rules := range patchRules {
-		filePath := filepath.Join(tt.fridaInfo.InstallPath, file)
+	filePath := filepath.Join(tt.fridaInfo.InstallPath, "core.py")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		tt.addLog("WARN: core.py 不存在，跳过 Python 文本魔改")
+		return nil
+	}
 
-		// 检查文件是否存在
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			tt.addLog(fmt.Sprintf("WARN: Python文件不存在，跳过: %s", file))
-			continue
-		}
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("读取文件 core.py 失败: %v", err)
+	}
 
-		// 读取文件内容
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			return fmt.Errorf("读取文件 %s 失败: %v", file, err)
-		}
-
-		contentStr := string(content)
-		originalContent := contentStr
-
-		// 应用替换规则
-		for oldStr, newStr := range rules {
-			if strings.Contains(contentStr, oldStr) {
-				contentStr = strings.ReplaceAll(contentStr, oldStr, newStr)
-				tt.addLog(fmt.Sprintf("INFO: 替换 '%s' -> '%s' 在文件 %s", oldStr, newStr, file))
-			}
-		}
-
-		// 如果内容有变化，写回文件
-		if contentStr != originalContent {
-			if err := os.WriteFile(filePath, []byte(contentStr), 0644); err != nil {
-				return fmt.Errorf("写入文件 %s 失败: %v", file, err)
-			}
-			tt.addLog(fmt.Sprintf("SUCCESS: 已魔改Python文件: %s", file))
-		} else {
-			tt.addLog(fmt.Sprintf("INFO: Python文件无需修改: %s", file))
+	contentStr := string(content)
+	originalContent := contentStr
+	for _, r := range coreRules {
+		if strings.Contains(contentStr, r.old) {
+			contentStr = strings.ReplaceAll(contentStr, r.old, r.new)
+			tt.addLog(fmt.Sprintf("INFO: 替换 '%s' -> '%s' 在文件 core.py", r.old, r.new))
 		}
 	}
 
+	if contentStr != originalContent {
+		if err := os.WriteFile(filePath, []byte(contentStr), 0644); err != nil {
+			return fmt.Errorf("写入文件 core.py 失败: %v", err)
+		}
+		tt.addLog("SUCCESS: 已魔改Python文件: core.py")
+	} else {
+		tt.addLog("INFO: core.py 中未找到 frida:rpc，可能已魔改或版本结构不同")
+	}
+
+	// 明确跳过 __init__.py / _frida.py 的裸字符串替换
+	tt.addLog("INFO: 已跳过 __init__.py 全局替换（避免破坏 import _frida）")
 	return nil
 }
 
@@ -1397,26 +1405,61 @@ func (tt *ToolsTab) patchSOFiles(magicName, port string) error {
 	return nil
 }
 
-// findSOFiles 查找SO文件
+// findSOFiles 查找SO文件（包目录 + 上层 site-packages，兼容 conda/多命名）
 func (tt *ToolsTab) findSOFiles() ([]string, error) {
 	var soFiles []string
+	seen := make(map[string]bool)
 
-	// 遍历frida安装目录
-	err := filepath.Walk(tt.fridaInfo.InstallPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // 忽略错误，继续遍历
+	addIfNative := func(path string, info os.FileInfo) {
+		if info == nil || info.IsDir() {
+			return
 		}
-
-		// 查找.so、.dll、.dylib文件
+		// 跳过备份
+		if strings.HasSuffix(path, ".fridare") || strings.Contains(path, "_original_backup") {
+			return
+		}
+		name := strings.ToLower(info.Name())
 		ext := strings.ToLower(filepath.Ext(path))
-		if ext == ".so" || ext == ".dll" || ext == ".dylib" || ext == ".pyd" {
-			soFiles = append(soFiles, path)
+		// 优先 _frida* 命名，避免误改无关 .so
+		isFridaNative := strings.HasPrefix(name, "_frida") ||
+			(strings.Contains(name, "frida") && (ext == ".so" || ext == ".pyd" || ext == ".dylib" || ext == ".dll"))
+		if !isFridaNative {
+			return
 		}
+		if ext == ".so" || ext == ".dll" || ext == ".dylib" || ext == ".pyd" {
+			if !seen[path] {
+				seen[path] = true
+				soFiles = append(soFiles, path)
+			}
+		}
+	}
 
+	// 1) 包目录
+	_ = filepath.Walk(tt.fridaInfo.InstallPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		addIfNative(path, info)
 		return nil
 	})
 
-	return soFiles, err
+	// 2) 上层目录（部分发行版把扩展放在 site-packages 根）
+	parent := filepath.Dir(tt.fridaInfo.InstallPath)
+	entries, err := os.ReadDir(parent)
+	if err == nil {
+		for _, e := range entries {
+			if e.IsDir() {
+				continue
+			}
+			info, err := e.Info()
+			if err != nil {
+				continue
+			}
+			addIfNative(filepath.Join(parent, e.Name()), info)
+		}
+	}
+
+	return soFiles, nil
 }
 
 // patchSingleSOFile 魔改单个SO文件
@@ -1538,18 +1581,36 @@ func (tt *ToolsTab) performRestore() error {
 		tt.progressBar.SetValue(0.5)
 	})
 
+	parent := filepath.Dir(tt.fridaInfo.InstallPath)
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
 
 		srcPath := filepath.Join(backupPath, file.Name())
-		dstPath := filepath.Join(tt.fridaInfo.InstallPath, file.Name())
+		name := file.Name()
+		ext := strings.ToLower(filepath.Ext(name))
+		// 原生库优先还原到当前实际所在位置
+		dstPath := filepath.Join(tt.fridaInfo.InstallPath, name)
+		if ext == ".so" || ext == ".pyd" || ext == ".dylib" || ext == ".dll" {
+			candidates := []string{
+				filepath.Join(tt.fridaInfo.InstallPath, name),
+				filepath.Join(parent, name),
+			}
+			// 若包目录没有但上层有同名文件，还原到上层
+			if _, err := os.Stat(candidates[0]); os.IsNotExist(err) {
+				if _, err2 := os.Stat(candidates[1]); err2 == nil {
+					dstPath = candidates[1]
+				}
+			} else {
+				dstPath = candidates[0]
+			}
+		}
 
 		if err := tt.copyFile(srcPath, dstPath); err != nil {
-			return fmt.Errorf("恢复文件 %s 失败: %v", file.Name(), err)
+			return fmt.Errorf("恢复文件 %s 失败: %v", name, err)
 		}
-		tt.addLog(fmt.Sprintf("INFO: 已恢复文件: %s", file.Name()))
+		tt.addLog(fmt.Sprintf("INFO: 已恢复文件: %s -> %s", name, dstPath))
 	}
 
 	// 删除备份目录
@@ -2513,14 +2574,7 @@ func (ct *CreateTab) UpdateGlobalConfig(magicName string, port int) {
 	}
 }
 
-func hideConsoleCmd(cmd *exec.Cmd) {
-	if runtime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow:    true,
-			CreationFlags: 0x08000000, // CREATE_NO_WINDOW
-		}
-	}
-}
+// hideConsoleCmd 在 platform 相关文件中实现（见 hide_console_windows.go / hide_console_other.go）
 
 // HelpTab 帮助标签页
 type HelpTab struct {
