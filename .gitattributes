@@ -1,0 +1,8 @@
+# Windows batch scripts: ASCII-only content + CRLF line endings required.
+# cmd.exe on Chinese Windows uses a legacy code page (GBK/CP936), not UTF-8.
+# LF-only line endings can also break batch parsing on some Windows setups.
+*.cmd text eol=crlf working-tree-encoding=UTF-8
+*.bat text eol=crlf working-tree-encoding=UTF-8
+
+# Keep shell scripts LF (Unix)
+*.sh text eol=lf

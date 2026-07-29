@@ -29,6 +29,17 @@ Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida
 
 **[Windows 下使用](win/README.md)|[Android 文档](docs/android.md)|[iOS 文档](docs/ios.md)|[frida-tools 文档](docs/patch-tools.md)|[安装指北](docs/install.md)|[CHANGELOG](CHANGELOG)**
 
+### 写给 Windows 用户（`.cmd` / `.bat` 小坑）
+
+中文 Windows 里 **cmd.exe 用的不是 UTF-8**，而是系统代码页（常见 GBK/CP936）。所以：
+
+1. **`.cmd` / `.bat` 里请只用英文（ASCII）** —— 写中文（哪怕文件是 UTF-8）容易乱码、`if`/`goto` 异常、脚本跑一半就挂。  
+2. **换行必须是 Windows 的 CRLF（`\r\n`）** —— 用 LF 存盘时，部分环境下批处理会解析失败。  
+3. 本仓库 `win/patch-frida.cmd`、`win/patch-frida-tools.cmd`、`ui/build.bat` 都按上面规则写好了；GUI / PowerShell / Markdown 可以用中文，不受影响。  
+4. 改完脚本可自检：`powershell -File win\test_cmd_ascii.ps1`  
+
+更细的说明见 [win/README.md](win/README.md)。
+
 欢迎大家入QQ群讨论：[QQ 555354813](screenshots/555354813.jpg) ，如本项目对你有所帮助，记得给作者加星鼓励哦！
 
 ## 特性

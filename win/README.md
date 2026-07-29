@@ -1,22 +1,29 @@
 # Fridare Windows 使用指南
 
-## 重要：`.cmd` / `.bat` 编码约定（Windows）
+## 重要：`.cmd` / `.bat` 在 Windows 上怎么写才不坑
 
-**cmd.exe 默认使用系统代码页（中文 Windows 多为 GBK/CP936），不是 UTF-8。**  
-若在 `.cmd` / `.bat` 中写入中文（即使文件是 UTF-8），会导致：
+中文 Windows 的 **cmd.exe 默认代码页是 GBK/CP936，不是 UTF-8**。再叠加上换行符习惯，很容易踩坑：
 
-- 提示乱码、条件判断异常、`goto` 标签失效
-- 脚本中途退出或“执行不正常”
+| 要求 | 说明 |
+|------|------|
+| **只用 ASCII 英文** | 注释、`echo`、提示全部英文。UTF-8 中文会乱码，还可能导致 `if` / `goto` 失效 |
+| **换行必须是 CRLF**（`\r\n`） | 用 LF（Unix）保存时，批处理在部分 Windows 环境下会解析异常 |
+| **不要 UTF-8 BOM** | 文件开头的 BOM 有时会让第一行 `@echo off` 失效 |
 
-**约定（必须遵守）：**
+**本仓库约定：**
 
-| 文件类型 | 语言 |
-|----------|------|
-| `*.cmd` / `*.bat` | **仅 ASCII 英文**（注释、echo、提示全部英文） |
-| `*.ps1` / GUI / Markdown | 可用中文（PowerShell / GUI 支持 Unicode） |
+| 文件 | 规则 |
+|------|------|
+| `*.cmd` / `*.bat` | ASCII + CRLF（已用 `.gitattributes` 强制检出为 CRLF） |
+| `*.ps1` / GUI / Markdown | 可用中文（支持 Unicode） |
 
-仓库内脚本：`win/patch-frida.cmd`、`win/patch-frida-tools.cmd`、`ui/build.bat` 均为全英文。  
-贡献代码时请勿向这些文件添加中文；可用 `test_cmd_ascii.ps1` 做检查。
+相关文件：`win/patch-frida.cmd`、`win/patch-frida-tools.cmd`、`ui/build.bat`。
+
+本地检查（非 ASCII 或不是 CRLF 会失败）：
+
+```powershell
+powershell -File win\test_cmd_ascii.ps1
+```
 
 ## 最新更新
 
