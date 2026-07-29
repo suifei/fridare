@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -340,10 +341,17 @@ func TestProxy(proxyURL string, testURL string, timeout int) (bool, string, erro
 	}
 }
 
+var (
+	nameRandMu sync.Mutex
+	nameRand   = rand.New(rand.NewSource(time.Now().UnixNano()))
+)
+
 // GenerateRandomName 生成随机名称（5个字符，第一位必须是字母，用1-5字母单词+数字补充）
 func GenerateRandomName() string {
-	// 创建随机生成器
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	// 使用包级 RNG，避免紧循环中 UnixNano 相同导致 seed 重复
+	nameRandMu.Lock()
+	defer nameRandMu.Unlock()
+	rng := nameRand
 
 	// 1字母单词（常用缩写）
 	oneLetterWords := []string{

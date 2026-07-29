@@ -1336,16 +1336,6 @@ func (tt *ToolsTab) performPatch(magicName, port string) error {
 func (tt *ToolsTab) patchPythonFiles(magicName, port string) error {
 	_ = port // 端口由设备端 server 决定，Python 包侧无需改默认端口字符串
 
-	// 有序规则：先替换长串，避免被短串误伤
-	type rule struct {
-		old string
-		new string
-	}
-	// 仅处理 core.py 中的 RPC 通道标识（与 fridare.sh modify_core_py 一致）
-	coreRules := []rule{
-		{old: "frida:rpc", new: magicName + ":rpc"},
-	}
-
 	filePath := filepath.Join(tt.fridaInfo.InstallPath, "core.py")
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		tt.addLog("WARN: core.py 不存在，跳过 Python 文本魔改")
@@ -1357,19 +1347,12 @@ func (tt *ToolsTab) patchPythonFiles(magicName, port string) error {
 		return fmt.Errorf("读取文件 core.py 失败: %v", err)
 	}
 
-	contentStr := string(content)
-	originalContent := contentStr
-	for _, r := range coreRules {
-		if strings.Contains(contentStr, r.old) {
-			contentStr = strings.ReplaceAll(contentStr, r.old, r.new)
-			tt.addLog(fmt.Sprintf("INFO: 替换 '%s' -> '%s' 在文件 core.py", r.old, r.new))
-		}
-	}
-
-	if contentStr != originalContent {
+	contentStr, n := core.PatchCorePyRPC(string(content), magicName)
+	if n > 0 {
 		if err := os.WriteFile(filePath, []byte(contentStr), 0644); err != nil {
 			return fmt.Errorf("写入文件 core.py 失败: %v", err)
 		}
+		tt.addLog(fmt.Sprintf("INFO: 替换 'frida:rpc' -> '%s:rpc' 在文件 core.py (%d 处)", magicName, n))
 		tt.addLog("SUCCESS: 已魔改Python文件: core.py")
 	} else {
 		tt.addLog("INFO: core.py 中未找到 frida:rpc，可能已魔改或版本结构不同")
