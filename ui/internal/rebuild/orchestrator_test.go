@@ -234,6 +234,7 @@ func TestDefaultModOps(t *testing.T) {
 	}
 	foundRPC := false
 	foundPairHyphen := false
+	foundPort := false
 	// Underscore / Vala namespace renames must NOT be in source ops (break valac ABI).
 	for _, op := range ops {
 		if op.Find == "frida:rpc" && op.Replace == "abcde:rpc" {
@@ -241,6 +242,12 @@ func TestDefaultModOps(t *testing.T) {
 		}
 		if op.Find == "frida-server" && op.Replace == "abcde-server" {
 			foundPairHyphen = true
+		}
+		if strings.Contains(op.Find, "DEFAULT_CONTROL_PORT") && strings.Contains(op.Replace, "27142") {
+			foundPort = true
+		}
+		if op.Find == OfficialListenPortASCII && op.Path == "**/*" {
+			t.Fatalf("listen port must not be a tree-wide 27042 replace: %+v", op)
 		}
 		if op.Find == "frida_agent" || op.Find == "namespace Frida.Agent" {
 			t.Fatalf("source ops must not include underscore/vala-namespace renames: %+v", op)
@@ -252,6 +259,9 @@ func TestDefaultModOps(t *testing.T) {
 	if !foundPairHyphen {
 		t.Fatal("hyphen basename renames required")
 	}
+	if !foundPort {
+		t.Fatal("DEFAULT_CONTROL_PORT op missing")
+	}
 }
 
 func TestArtifactDeployTips(t *testing.T) {
@@ -261,7 +271,7 @@ func TestArtifactDeployTips(t *testing.T) {
 		ListenPort:   27042,
 		TargetIDs:    []string{"android-arm64"},
 	})
-	if !strings.Contains(tips, "abcde") || !strings.Contains(tips, "whl") {
+	if !strings.Contains(tips, "abcde") || !strings.Contains(tips, "whl") || !strings.Contains(tips, "27042") {
 		t.Fatal(tips)
 	}
 	g := ToolsPatchGuidance("abcde", 27042)

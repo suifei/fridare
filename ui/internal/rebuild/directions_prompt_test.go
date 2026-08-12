@@ -7,7 +7,8 @@ import (
 
 func TestBuildAgentPrompt_EmbedsDirections(t *testing.T) {
 	p := BuildAgentPrompt(JobConfig{MagicName: "abcde", ListenPort: 27142, FridaVersion: "17.16.4", DirectionProfile: "safe", Goals: "test"}, "br", "/src")
-	for _, want := range []string{"L1_product_basename", "forbidden", "post_build", "方向清单", "profile=safe", "strongR"} {
+	for _, want := range []string{"L1_product_basename", "forbidden", "post_build", "方向清单", "profile=safe", "strongR",
+		"DEFAULT_CONTROL_PORT", "27042", "27142", "port=27142"} {
 		if !strings.Contains(p, want) {
 			t.Fatalf("prompt missing %q", want)
 		}

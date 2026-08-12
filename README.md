@@ -30,7 +30,7 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 | v4.0.3 | CLI 多平台静态链接（win/linux/darwin × amd64/arm64）+ Windows GUI 预编译 | [v4.0.3](https://github.com/suifei/fridare/releases/tag/v4.0.3) |
 | v4.0.0 | Fyne GUI + Windows 原生 deb 魔改 | [v4.0.0](https://github.com/suifei/fridare/releases) |
 
-**文档**：[双技术路线](docs/dual-track.md) · [17.17.0 deep 产物 kxmwp（用法 / GUI 自建 / 为何无 iOS）](docs/kxmwp-17.17.0.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
+**文档**：[双技术路线](docs/dual-track.md) · [17.17.0 deep 产物 kxmwp（用法 / GUI 自建 / 为何无 iOS；**端口仍是 27042**）](docs/kxmwp-17.17.0.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
 
 ### 双技术路线（v4.0.4）
 

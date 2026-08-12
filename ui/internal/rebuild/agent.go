@@ -123,7 +123,8 @@ func BuildAgentPrompt(cfg JobConfig, branch string, sourceDir string) string {
 	b.WriteString("2. Frida 版本: " + cfg.FridaVersion + "\n")
 	b.WriteString("3. 源码目录: " + sourceDir + "\n")
 	b.WriteString("4. 魔改名称(magic): " + cfg.MagicName + "（通常 5 个小写字母，与 frida-tools 对齐）\n")
-	b.WriteString(fmt.Sprintf("5. 监听端口: %d\n", cfg.ListenPort))
+	b.WriteString(fmt.Sprintf("5. 监听端口: %d（官方默认 %s，常量 DEFAULT_CONTROL_PORT）\n",
+		NormalizeListenPort(cfg.ListenPort), OfficialListenPortASCII))
 	b.WriteString("6. 编译目标: " + strings.Join(cfg.TargetIDs, ", ") + "\n")
 	b.WriteString("7. 参考业界 strongR-frida / phantom-frida：改可观测标识（进程名、so 名、线程名、路径、rpc 等）。\n")
 	prof := strings.ToLower(strings.TrimSpace(cfg.DirectionProfile))
@@ -149,6 +150,7 @@ func BuildAgentPrompt(cfg JobConfig, branch string, sourceDir string) string {
 	// Direction list gives the Agent a concrete dig direction (batch-tool aligned).
 	dirMan := directionManifestForConfig(cfg)
 	b.WriteString(DirectionGoalsPrompt(dirMan))
+	b.WriteString(ListenPortAgentGuidance(cfg.ListenPort))
 	b.WriteString("\n## 输出要求\n")
 	b.WriteString("- 先输出 JSON 魔改计划：paths + operations（replace/insert/delete/rewrite）\n")
 	b.WriteString("- 再在源码树执行修改；可选写入 fridare-agent-ops.tsv（path\\top\\tfind\\treplace）\n")
@@ -306,6 +308,9 @@ func expandOpsAgainstTree(sourceDir string, baseline []ModOp) []ModOp {
 			if !strings.Contains(s, op.Find) {
 				continue
 			}
+			if isListenPortFind(op.Find) && skipNumericTableVendorPath(relSlash) {
+				continue
+			}
 			concrete = append(concrete, ModOp{
 				Path: relSlash, Operation: op.Operation, Description: op.Description,
 				Find: op.Find, Replace: op.Replace,
@@ -323,7 +328,8 @@ func shouldSkipModDir(base string) bool {
 	case ".git", "node_modules", "build", ".deps", "deps", "releng", ".github",
 		"frida-clr", "frida-go", "frida-node", "frida-qml", "frida-swift",
 		"frida-python", "frida-tools",
-		"test", "tests", "examples", "docs":
+		"test", "tests", "examples", "docs",
+		"brotli", "capstone", "xz", "lzma", "openssl", "zlib", "nghttp2":
 		return true
 	}
 	if strings.HasPrefix(base, "build-") {
@@ -675,6 +681,9 @@ func applyPlanNaive(sourceDir string, plan *ModPlan) error {
 			}
 			s := string(data)
 			if !strings.Contains(s, op.Find) {
+				continue
+			}
+			if isListenPortFind(op.Find) && skipNumericTableVendorPath(rel) {
 				continue
 			}
 			// Guard: never smash github.com/frida/ clone URLs (e.g. Find="/frida/" legacy ops).

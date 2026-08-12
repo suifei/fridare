@@ -19,6 +19,25 @@
 
 **服务端和客户端必须成对、同一 magic。** 不要用官方 pip 的 `frida` 去连这批 server。
 
+### 重要：本批没有改监听端口（仍是 27042）
+
+这批预编译包 **没有把默认监听端口当成交付项改掉**。请按官方默认 **27042** 启动和连接。
+
+| 项 | 本批约定 |
+|----|----------|
+| 默认端口 | **27042**（与官方 Frida 相同） |
+| 启动 | 必须带 `-l 0.0.0.0:27042`，不要用不带 `-l` 的方式去猜编译进二进制的默认值 |
+| 连接 | `127.0.0.1:27042` / `frida -H 127.0.0.1:27042` |
+| 为何没改 | 现代 Frida 把端口编成 `DEFAULT_CONTROL_PORT` 整数，不是可扫的 ASCII `27042`；全树替换数字会误伤 brotli/capstone 等表 |
+
+**若你要换端口**，不要指望本 zip 里的 server 已经换成别的数：
+
+1. 用 GUI **「frida 魔改」**（静态 hex）或 **「iOS DEB 魔改 / 打包」** 再打一遍，在端口栏填你的新端口；或启动时自己写 `-l 0.0.0.0:<新端口>`（最稳，不改文件也能换）。
+2. **连接时必须用你改过 / 指定的端口**，不要再写 27042。
+3. 客户端同样写新端口：`add_remote_device("127.0.0.1:<新端口>")` 或 `frida -H 127.0.0.1:<新端口>`。
+
+后续源码重编译会把 `DEFAULT_CONTROL_PORT` 当成必改项（仅当 GUI 里端口 ≠ 27042，且只改 frida-core，避免误伤第三方数字表）。**本 Release 的现成二进制仍按 27042 用。**
+
 ---
 
 ## 2. 下载清单
@@ -109,6 +128,7 @@ frida -H 127.0.0.1:27042 -n <进程名>
 |------|------|------|
 | `UNKNOWN_METHOD` | 只用了官方 frida，或只改了 `re.frida.` 没改 `/re/frida/` | 装 catalog 里 **同一 magic** 的 host wheel |
 | 连上但 enumerate 失败 | server / client magic 不一致 | 成对使用 `kxmwp` 包 |
+| 连不上 / connection refused | 端口写错，或没加 `-l` 却假设默认已改 | **本批端口仍是 27042**；若你静态改过端口，连**新端口** |
 | Android 秒退 | 权限 / SELinux / 未 root | 用 `/data/local/tmp` + root |
 | Windows 杀软拦截 | 未签名自定义 server | 加白名单 |
 
@@ -124,6 +144,7 @@ frida -H 127.0.0.1:27042 -n <进程名>
         │  magic=kxmwp
         │  re.frida. → re.kxmwp. ；/re/frida/ → /re/kxmwp/ ；frida:rpc → kxmwp:rpc
         │  basename：frida-server → kxmwp-server …
+        │  监听端口：本批交付仍按 27042（未作为产品改端口）
         ▼
  Docker：fridare/frida-builder
         │  configure --host=<triplet> --enable-server --enable-gadget --enable-inject

@@ -10,7 +10,7 @@
 | 改 server/agent/gadget 文件名与 meson 目标 | 连字符 basename：`frida-server`→`{magic}-server` 等 | `DefaultModOps` L1 |
 | 改 RPC 通道名 | `frida:rpc`→`{magic}:rpc` | `DefaultModOps` L2 |
 | 改线程/循环名 | `gum-js-loop`、`frida-main-loop`、`pool-frida` | `DefaultModOps` L2 |
-| 改默认端口 | `27042`→配置端口 | `DefaultModOps` L2 |
+| 改默认端口 | `DEFAULT_CONTROL_PORT = 27042`→配置端口（仅 frida-core；默认 27042 则跳过） | `ListenPortSourceOps` / L2 |
 | 编出可部署 android/linux server | Docker 内 `configure --host=… && make` | orchestrator build |
 | 主机侧 tools 对齐 | 多平台 `frida` wheel + `frida-tools` 写 catalog | `BuildPatchedFridaToolsWheels` |
 

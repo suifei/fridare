@@ -61,8 +61,8 @@ func DefaultStripLayers() []StripLayer {
 		{
 			ID: LayerRPCThreadPort, Mode: StripModeAuto,
 			Title:       "RPC / 线程 / 端口",
-			Description: "frida:rpc、gum-js-loop、frida-main-loop、pool-frida、默认端口 27042。保持客户端需对齐 magic:rpc。",
-			Patterns:    []string{"frida:rpc", "gum-js-loop", "frida-main-loop", "pool-frida", "27042"},
+			Description: "frida:rpc、gum-js-loop、frida-main-loop、pool-frida；监听端口只改 frida-core 的 DEFAULT_CONTROL_PORT=27042（禁止全树裸数字、禁止把用户端口当 find）。",
+			Patterns:    []string{"frida:rpc", "gum-js-loop", "frida-main-loop", "pool-frida", "DEFAULT_CONTROL_PORT", "27042"},
 		},
 		{
 			ID: LayerGResourceGetter, Mode: StripModeAuto,
@@ -134,7 +134,7 @@ func SafeDirectionManifest(magic string, port int) DirectionManifest {
 		magic = "frida"
 	}
 	if port <= 0 {
-		port = 27042
+		port = OfficialListenPort
 	}
 	var layers []StripLayer
 	for _, L := range DefaultStripLayers() {
@@ -166,7 +166,7 @@ func DeepDirectionManifest(magic string, port int) DirectionManifest {
 		magic = "frida"
 	}
 	if port <= 0 {
-		port = 27042
+		port = OfficialListenPort
 	}
 	layers := append([]StripLayer{}, DefaultStripLayers()...)
 	layers = append(layers, DeepDirectionLayers()...)
@@ -248,7 +248,7 @@ func ClassifyPattern(pattern string) (StripLayerID, StripMode) {
 	switch {
 	case strings.HasPrefix(p, "get_frida_"):
 		return LayerGResourceGetter, StripModeAuto
-	case p == "frida:rpc" || p == "gum-js-loop" || p == "frida-main-loop" || p == "pool-frida" || p == "27042":
+	case p == "frida:rpc" || p == "gum-js-loop" || p == "frida-main-loop" || p == "pool-frida" || p == "27042" || p == "DEFAULT_CONTROL_PORT":
 		return LayerRPCThreadPort, StripModeAuto
 	case p == "frida-server" || p == "frida-agent" || p == "frida-gadget" || p == "frida-helper":
 		return LayerProductBasename, StripModeAuto
@@ -290,6 +290,7 @@ func ScanFridaMarkers(sourceDir, magic string) (ScanReport, error) {
 		"get_frida_agent", "get_frida_helper", "get_frida_gadget", "get_frida_server",
 		"namespace Frida.Agent", "namespace Frida.Gadget", "Frida.Agent.",
 		"frida:rpc", "gum-js-loop", "frida-main-loop", "pool-frida",
+		"DEFAULT_CONTROL_PORT", "27042",
 		"frida_agent_main", "frida-server", "frida-agent", "frida-gadget", "frida-helper",
 		"re.frida.",
 	}
@@ -353,7 +354,7 @@ func ScanFridaMarkers(sourceDir, magic string) (ScanReport, error) {
 		}
 		return rep.Hits[i].Path < rep.Hits[j].Path
 	})
-	rep.AutoOps = len(DefaultModOps(magic, 27042))
+	rep.AutoOps = len(DefaultModOps(magic, OfficialListenPort))
 	return rep, nil
 }
 
@@ -367,7 +368,7 @@ func OpsFromDirectionManifest(m DirectionManifest) []ModOp {
 	}
 	port := m.Port
 	if port <= 0 {
-		port = 27042
+		port = OfficialListenPort
 	}
 	return OpsForProfile(m.Profile, magic, port)
 }
@@ -376,7 +377,7 @@ func OpsFromDirectionManifest(m DirectionManifest) []ModOp {
 func DirectionGoalsPrompt(m DirectionManifest) string {
 	var b strings.Builder
 	b.WriteString("\n## 魔改方向清单（Fridare Strip Directions）\n")
-	b.WriteString(fmt.Sprintf("profile=%s magic=%s\n", m.Profile, m.Magic))
+	b.WriteString(fmt.Sprintf("profile=%s magic=%s port=%d\n", m.Profile, m.Magic, NormalizeListenPort(m.Port)))
 	if m.AgentGoals != "" {
 		b.WriteString("目标: " + m.AgentGoals + "\n")
 	}
@@ -389,6 +390,7 @@ func DirectionGoalsPrompt(m DirectionManifest) string {
 	b.WriteString("- mode=post_build：不要改源码 ABI；编译后由导出管线补丁\n")
 	b.WriteString("- mode=forbidden：禁止写入可执行 replace（会破坏 valac/link）\n")
 	b.WriteString("- mode=ai_explore：仅当用户 profile=explore 时可选；写出补丁理由与回滚点\n")
+	b.WriteString("- 监听端口：只改 DEFAULT_CONTROL_PORT；find 必须是 27042；禁止全树裸数字；禁止把用户端口当原文\n")
 	return b.String()
 }
 

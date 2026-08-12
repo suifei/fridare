@@ -224,7 +224,8 @@ func (s *StubAgent) ApplyMods(ctx context.Context, cfg JobConfig, plan *ModPlan,
 //
 // Strategy (validated against Frida 17.x valac):
 //   - Hyphen basenames (frida-server/agent/…) → {magic}-… so meson targets + assets match.
-//   - Runtime markers (frida:rpc, gum-js-loop, port) → magic equivalents.
+//   - Runtime markers (frida:rpc, gum-js-loop) → magic equivalents.
+//   - Listen port: surgical DEFAULT_CONTROL_PORT (see ListenPortSourceOps; never **/* 27042).
 //   - Do NOT rename Vala namespaces (Frida.Agent → X.Agent breaks parent-type lookup;
 //     injecting `using Frida` then makes Error ambiguous with GLib.Error).
 //   - Do NOT rename underscore C prefixes (frida_agent_*) in source: valac still emits
@@ -238,9 +239,9 @@ func DefaultModOps(magicName string, port int) []ModOp {
 		magicName = "frida"
 	}
 	if port <= 0 {
-		port = 27042
+		port = OfficialListenPort
 	}
-	return []ModOp{
+	ops := []ModOp{
 		// --- product basenames (hyphen) — meson targets + asset files ---
 		{Path: "**/*", Operation: "replace", Description: "frida-server basename", Find: "frida-server", Replace: magicName + "-server"},
 		{Path: "**/*", Operation: "replace", Description: "frida-helper basename", Find: "frida-helper", Replace: magicName + "-helper"},
@@ -257,8 +258,9 @@ func DefaultModOps(magicName string, port int) []ModOp {
 		{Path: "**/*", Operation: "replace", Description: "gum-js-loop thread", Find: "gum-js-loop", Replace: magicName + "-js-loop"},
 		{Path: "**/*", Operation: "replace", Description: "frida-main-loop", Find: "frida-main-loop", Replace: magicName + "-main-loop"},
 		{Path: "**/*", Operation: "replace", Description: "pool-frida", Find: "pool-frida", Replace: "pool-" + magicName},
-		{Path: "**/*", Operation: "replace", Description: fmt.Sprintf("listen port → %d", port), Find: "27042", Replace: fmt.Sprintf("%d", port)},
 	}
+	// Listen port is first-class: DEFAULT_CONTROL_PORT + frida-core ASCII (never **/* 27042).
+	return append(ops, ListenPortSourceOps(port)...)
 }
 
 // RenameArtifactBasenames renames collected binary basenames frida-* → {magic}-* after make.
@@ -987,7 +989,14 @@ func ArtifactDeployTips(artifactDir string, cfg JobConfig) string {
 	b.WriteString("====================\n\n")
 	b.WriteString(fmt.Sprintf("Frida 版本: %s\n", cfg.FridaVersion))
 	b.WriteString(fmt.Sprintf("魔改名称: %s\n", cfg.MagicName))
-	b.WriteString(fmt.Sprintf("端口: %d\n", cfg.ListenPort))
+	listen := NormalizeListenPort(cfg.ListenPort)
+	b.WriteString(fmt.Sprintf("端口: %d", listen))
+	if listen == OfficialListenPort {
+		b.WriteString("（官方默认 27042，未改 DEFAULT_CONTROL_PORT）")
+	} else {
+		b.WriteString("（已按配置改 DEFAULT_CONTROL_PORT；连接必须用此端口）")
+	}
+	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("魔改强度: %s\n", strings.TrimSpace(cfg.DirectionProfile)))
 	b.WriteString(fmt.Sprintf("目标: %s\n", strings.Join(cfg.TargetIDs, ", ")))
 	b.WriteString(fmt.Sprintf("产物目录: %s\n\n", artifactDir))
@@ -1005,8 +1014,9 @@ func ArtifactDeployTips(artifactDir string, cfg JobConfig) string {
 	b.WriteString("1. 部署 binaries 下 *server* 到设备并 chmod +x 运行\n")
 	b.WriteString("2. 本机客户端: 先装 python/host/<你的OS-arch>/frida-*.whl，再装 python/frida_tools-*.whl\n")
 	b.WriteString("   （详见 python/INSTALL.txt；PROTOCOL-SYNC.json 为协议交叉核对结果）\n")
-	b.WriteString("3. 端口不一致时客户端加 -p <port>\n")
-	b.WriteString("4. GUI 源码重编译页可浏览历史 catalog，无需重新编译\n\n")
+	b.WriteString(fmt.Sprintf("3. 启动请显式 -l 0.0.0.0:%d ；连接必须用同一端口（frida -H host:%d）\n", listen, listen))
+	b.WriteString("4. 事后改端口：用 GUI「frida 魔改 / iOS DEB 魔改」静态再打，或启动参数 -l；连你改过的端口\n")
+	b.WriteString("5. GUI 源码重编译页可浏览历史 catalog，无需重新编译\n\n")
 	b.WriteString("双技术路线:\n- 静态补丁: 无需 Docker，见「frida 魔改」\n- 源码重编译: 本目录产物\n")
 	return b.String()
 }

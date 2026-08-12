@@ -196,6 +196,7 @@ func (rt *RebuildTab) setupUI() {
 	})
 
 	rt.portEntry = widget.NewEntry()
+	rt.portEntry.SetPlaceHolder("官方 27042；改了才动 DEFAULT_CONTROL_PORT")
 	if rt.config.DefaultPort > 0 {
 		rt.portEntry.SetText(strconv.Itoa(rt.config.DefaultPort))
 	} else {
