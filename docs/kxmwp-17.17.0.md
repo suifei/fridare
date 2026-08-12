@@ -19,24 +19,32 @@
 
 **服务端和客户端必须成对、同一 magic。** 不要用官方 pip 的 `frida` 去连这批 server。
 
-### 重要：本批没有改监听端口（仍是 27042）
+### 监听端口：启动时指定即可（默认改不改都无所谓）
 
-这批预编译包 **没有把默认监听端口当成交付项改掉**。请按官方默认 **27042** 启动和连接。
+`frida-server`（本包里是 `kxmwp-server`）**启动时可以指定监听 IP 和端口**（`-l host:port`）。  
+二进制里的默认端口改没改，对实际使用影响不大：**启动带端口，客户机连同一个端口** 就行。
 
-| 项 | 本批约定 |
-|----|----------|
-| 默认端口 | **27042**（与官方 Frida 相同） |
-| 启动 | 必须带 `-l 0.0.0.0:27042`，不要用不带 `-l` 的方式去猜编译进二进制的默认值 |
-| 连接 | `127.0.0.1:27042` / `frida -H 127.0.0.1:27042` |
-| 为何没改 | 现代 Frida 把端口编成 `DEFAULT_CONTROL_PORT` 整数，不是可扫的 ASCII `27042`；全树替换数字会误伤 brotli/capstone 等表 |
+本批预编译包 **没有改** 官方默认 **27042**。没改也没关系。
 
-**若你要换端口**，不要指望本 zip 里的 server 已经换成别的数：
+| 做法 | 说明 |
+|------|------|
+| **推荐：启动参数** | `kxmwp-server -l 0.0.0.0:<你的端口>`，客户端写同一个端口。想避开常见扫描就不要用 27042 |
+| 可选：改二进制默认值 | 源码重编译 / 静态「frida 魔改 / iOS DEB」可以改 `DEFAULT_CONTROL_PORT`；不改也能用 |
+| 连接 | 必须和启动时的端口一致：`frida -H 127.0.0.1:<你的端口>` |
 
-1. 用 GUI **「frida 魔改」**（静态 hex）或 **「iOS DEB 魔改 / 打包」** 再打一遍，在端口栏填你的新端口；或启动时自己写 `-l 0.0.0.0:<新端口>`（最稳，不改文件也能换）。
-2. **连接时必须用你改过 / 指定的端口**，不要再写 27042。
-3. 客户端同样写新端口：`add_remote_device("127.0.0.1:<新端口>")` 或 `frida -H 127.0.0.1:<新端口>`。
+示例（自定义端口 `28888`，任意换成你自己的）：
 
-后续源码重编译会把 `DEFAULT_CONTROL_PORT` 当成必改项（仅当 GUI 里端口 ≠ 27042，且只改 frida-core，避免误伤第三方数字表）。**本 Release 的现成二进制仍按 27042 用。**
+```powershell
+.\kxmwp-server.exe -l 0.0.0.0:28888
+# 客户机
+frida -H 127.0.0.1:28888 -n <进程名>
+```
+
+Android 还要把转发端口对齐：
+
+```bash
+adb forward tcp:28888 tcp:28888
+```
 
 ---
 
@@ -86,32 +94,36 @@ Linux / macOS 把 `pip` 换成 `bin/pip`。
 
 ### 3.2 启动服务端
 
+始终带 `-l`，端口自定。下面用 `28888` 举例（可改成任意未被占用的端口）。本包默认仍是 27042，**不改默认也可以**，只要启动和连接写同一个数。
+
 **Windows（本机或目标机）：**
 
 ```powershell
-.\kxmwp-server.exe -l 0.0.0.0:27042
+.\kxmwp-server.exe -l 0.0.0.0:28888
 ```
 
 **Linux：**
 
 ```bash
 chmod +x kxmwp-server
-./kxmwp-server -l 0.0.0.0:27042
+./kxmwp-server -l 0.0.0.0:28888
 ```
 
 **Android：**
 
 ```bash
 adb push kxmwp-server /data/local/tmp/
-adb shell "chmod 755 /data/local/tmp/kxmwp-server && /data/local/tmp/kxmwp-server -l 0.0.0.0:27042"
-adb forward tcp:27042 tcp:27042
+adb shell "chmod 755 /data/local/tmp/kxmwp-server && /data/local/tmp/kxmwp-server -l 0.0.0.0:28888"
+adb forward tcp:28888 tcp:28888
 ```
 
 ### 3.3 连接
 
+客户机必须写 **启动时同一个端口**（这里是 28888）：
+
 ```python
 import frida
-d = frida.get_device_manager().add_remote_device("127.0.0.1:27042")
+d = frida.get_device_manager().add_remote_device("127.0.0.1:28888")
 print(d.query_system_parameters())
 print(len(d.enumerate_processes()))
 ```
@@ -119,7 +131,7 @@ print(len(d.enumerate_processes()))
 或：
 
 ```bash
-frida -H 127.0.0.1:27042 -n <进程名>
+frida -H 127.0.0.1:28888 -n <进程名>
 ```
 
 ### 3.4 常见坑
@@ -128,7 +140,7 @@ frida -H 127.0.0.1:27042 -n <进程名>
 |------|------|------|
 | `UNKNOWN_METHOD` | 只用了官方 frida，或只改了 `re.frida.` 没改 `/re/frida/` | 装 catalog 里 **同一 magic** 的 host wheel |
 | 连上但 enumerate 失败 | server / client magic 不一致 | 成对使用 `kxmwp` 包 |
-| 连不上 / connection refused | 端口写错，或没加 `-l` 却假设默认已改 | **本批端口仍是 27042**；若你静态改过端口，连**新端口** |
+| 连不上 / connection refused | 客户端端口和 server `-l` 不一致 | 两边写同一个端口；不要假设一定是 27042 |
 | Android 秒退 | 权限 / SELinux / 未 root | 用 `/data/local/tmp` + root |
 | Windows 杀软拦截 | 未签名自定义 server | 加白名单 |
 
@@ -144,7 +156,7 @@ frida -H 127.0.0.1:27042 -n <进程名>
         │  magic=kxmwp
         │  re.frida. → re.kxmwp. ；/re/frida/ → /re/kxmwp/ ；frida:rpc → kxmwp:rpc
         │  basename：frida-server → kxmwp-server …
-        │  监听端口：本批交付仍按 27042（未作为产品改端口）
+        │  监听端口：本批未改二进制默认 27042（启动用 -l 指定即可）
         ▼
  Docker：fridare/frida-builder
         │  configure --host=<triplet> --enable-server --enable-gadget --enable-inject

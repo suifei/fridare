@@ -992,9 +992,9 @@ func ArtifactDeployTips(artifactDir string, cfg JobConfig) string {
 	listen := NormalizeListenPort(cfg.ListenPort)
 	b.WriteString(fmt.Sprintf("端口: %d", listen))
 	if listen == OfficialListenPort {
-		b.WriteString("（官方默认 27042，未改 DEFAULT_CONTROL_PORT）")
+		b.WriteString("（官方默认 27042；改不改默认值都行，启动用 -l 指定即可）")
 	} else {
-		b.WriteString("（已按配置改 DEFAULT_CONTROL_PORT；连接必须用此端口）")
+		b.WriteString("（已按配置改 DEFAULT_CONTROL_PORT；仍建议启动带 -l，客户端写同一端口）")
 	}
 	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("魔改强度: %s\n", strings.TrimSpace(cfg.DirectionProfile)))
@@ -1014,8 +1014,9 @@ func ArtifactDeployTips(artifactDir string, cfg JobConfig) string {
 	b.WriteString("1. 部署 binaries 下 *server* 到设备并 chmod +x 运行\n")
 	b.WriteString("2. 本机客户端: 先装 python/host/<你的OS-arch>/frida-*.whl，再装 python/frida_tools-*.whl\n")
 	b.WriteString("   （详见 python/INSTALL.txt；PROTOCOL-SYNC.json 为协议交叉核对结果）\n")
-	b.WriteString(fmt.Sprintf("3. 启动请显式 -l 0.0.0.0:%d ；连接必须用同一端口（frida -H host:%d）\n", listen, listen))
-	b.WriteString("4. 事后改端口：用 GUI「frida 魔改 / iOS DEB 魔改」静态再打，或启动参数 -l；连你改过的端口\n")
+	b.WriteString("3. 启动带 -l 指定 IP:端口（可不用 27042）；客户机必须写同一个端口（frida -H host:port）\n")
+	b.WriteString(fmt.Sprintf("   例: %s-server -l 0.0.0.0:%d  →  frida -H 127.0.0.1:%d\n", cfg.MagicName, listen, listen))
+	b.WriteString("4. 默认端口改不改都无所谓；要换端口优先用 -l，不必先改二进制\n")
 	b.WriteString("5. GUI 源码重编译页可浏览历史 catalog，无需重新编译\n\n")
 	b.WriteString("双技术路线:\n- 静态补丁: 无需 Docker，见「frida 魔改」\n- 源码重编译: 本目录产物\n")
 	return b.String()
@@ -1041,7 +1042,7 @@ func ToolsPatchGuidance(magicName string, port int) string {
 或 GUI「源码重编译」→ 产物目录浏览 → 打开对应 version/platform/magic。
 
 备选: 「🛠️ frida-tools 魔改」标签就地改 site-packages（用 full 协议面；勿全局替换 frida 字符串）。
-- magic: %s  端口: %d
+- magic: %s  配置端口: %d（启动仍可用 -l 另指定；客户机连启动时的端口）
 `, magicName, magicName, pas, magicName, port)
 }
 
