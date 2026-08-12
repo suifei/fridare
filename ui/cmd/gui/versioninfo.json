@@ -3,13 +3,13 @@
                           "FileVersion":  {
                                               "Major":  4,
                                               "Minor":  0,
-                                              "Patch":  5,
+                                              "Patch":  6,
                                               "Build":  0
                                           },
                           "ProductVersion":  {
                                                  "Major":  4,
                                                  "Minor":  0,
-                                                 "Patch":  5,
+                                                 "Patch":  6,
                                                  "Build":  0
                                              },
                           "FileFlagsMask":  "3f",
@@ -22,14 +22,14 @@
                            "Comments":  "Frida 魔改与 Docker 源码重编译（https://github.com/suifei/fridare）",
                            "CompanyName":  "suifei",
                            "FileDescription":  "Fridare — Frida 魔改与源码重编译工具",
-                           "FileVersion":  "4.0.5.0",
+                           "FileVersion":  "4.0.6.0",
                            "InternalName":  "fridare-gui",
                            "LegalCopyright":  "Copyright (c) suifei",
                            "LegalTrademarks":  "",
                            "OriginalFilename":  "fridare-gui.exe",
                            "PrivateBuild":  "",
                            "ProductName":  "Fridare",
-                           "ProductVersion":  "4.0.5.0",
+                           "ProductVersion":  "4.0.6.0",
                            "SpecialBuild":  ""
                        },
     "VarFileInfo":  {

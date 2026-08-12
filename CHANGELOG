@@ -2,12 +2,12 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
-## Unreleased
+## v4.0.6 - 2026-08-13
 
 ### Added
 - **Frida 17.17.0 deep 预编译产物**（magic=`kxmwp`）：Windows / Linux / Android server + 多平台 host wheels  
-  - Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.0>（**不是** latest GUI；当前 GUI 仍为 v4.0.5）  
-  - 说明：[docs/kxmwp-17.17.0.md](docs/kxmwp-17.17.0.md)
+  - 产物 Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.0>（独立 tag，不是 GUI latest）  
+  - 说明：[docs/kxmwp-17.17.0.md](docs/kxmwp-17.17.0.md)（已打进本版 zip 的 `docs/`）
 - Builder 镜像 **toolchain-v4**：预装 `gcc-aarch64-linux-gnu`（linux-arm64 交叉）
 - 源码魔改监听端口：`ListenPortSourceOps` 只改 `DEFAULT_CONTROL_PORT`（默认 27042 则跳过；禁止全树裸数字）
 
@@ -19,6 +19,7 @@
 
 ### Changed
 - 监听端口：**改不改二进制默认值都行**；启动用 `-l IP:端口`，客户机连同一端口即可
+- 安装包内附 `docs/dual-track.md`、`docs/kxmwp-17.17.0.md`、CHANGELOG
 
 ## v4.0.5 - 2026-08-12
 
