@@ -260,6 +260,7 @@ func buildReplacements(fridaNewName string, format ExecutableFormat) []Replaceme
 					{Old: []byte("frida-server-main-loop"), New: []byte(fridaNewName + "-server-main-loop")},
 					{Old: []byte("frida-main-loop"), New: []byte(fridaNewName + "-main-loop")},
 					{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
+					{Old: []byte("re.frida."), New: []byte("re." + fridaNewName + ".")},
 					{Old: []byte("frida-agent.dylib"), New: []byte(fridaNewName + "-agent.dylib")},
 					{Old: []byte("/usr/lib/frida/"), New: []byte("/usr/lib/" + fridaNewName + "/")},
 					{Old: []byte("gum-"), New: []byte(fridaNewName[:3] + "-")},
@@ -270,6 +271,7 @@ func buildReplacements(fridaNewName string, format ExecutableFormat) []Replaceme
 				SectionName:      "__const",
 				Items: []*Replacement{
 					{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
+					{Old: []byte("re.frida."), New: []byte("re." + fridaNewName + ".")},
 				},
 			},
 		}
@@ -282,6 +284,7 @@ func buildReplacements(fridaNewName string, format ExecutableFormat) []Replaceme
 					{Old: []byte("frida_server_"), New: []byte(fridaNewName + "_server_")},
 					{Old: []byte("frida-main-loop"), New: []byte(fridaNewName + "-main-loop")},
 					{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
+					{Old: []byte("re.frida."), New: []byte("re." + fridaNewName + ".")},
 					{Old: []byte("frida-agent-<arch>.so"), New: []byte(fridaNewName + "-agent-<arch>.so")},
 					{Old: []byte("frida-agent-arm.so"), New: []byte(fridaNewName + "-agent-arm.so")},
 					{Old: []byte("frida-agent-arm64.so"), New: []byte(fridaNewName + "-agent-arm64.so")},
@@ -295,6 +298,7 @@ func buildReplacements(fridaNewName string, format ExecutableFormat) []Replaceme
 				SectionName:      ".text",
 				Items: []*Replacement{
 					{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
+					{Old: []byte("re.frida."), New: []byte("re." + fridaNewName + ".")},
 					{Old: []byte("gum-"), New: []byte(fridaNewName[:3] + "-")},
 				},
 			},
@@ -312,6 +316,7 @@ func buildReplacements(fridaNewName string, format ExecutableFormat) []Replaceme
 					{Old: []byte("gum-"), New: []byte(fridaNewName[:3] + "-")},
 					{Old: []byte("frida-thread"), New: []byte(fridaNewName + "-thread")},
 					{Old: []byte("frida:rpc"), New: []byte(fridaNewName + ":rpc")},
+					{Old: []byte("re.frida."), New: []byte("re." + fridaNewName + ".")},
 					{Old: []byte("frida-agent"), New: []byte(fridaNewName + "-agent")},
 				},
 			},

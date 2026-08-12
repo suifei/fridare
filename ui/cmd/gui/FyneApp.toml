@@ -1,0 +1,14 @@
+Website = "https://github.com/suifei/fridare"
+
+[Details]
+  Icon = "../../../logo/AppIcon.ico"
+  Name = "Fridare GUI"
+  ID = "com.suifei.fridare"
+  Version = "4.0.4"
+  Build = 1
+
+[LinuxAndBSD]
+  GenericName = "Frida Toolkit"
+  Categories = ["Development"]
+  Comment = "Frida 魔改与源码重编译工具"
+  Keywords = ["frida", "security", "reverse"]

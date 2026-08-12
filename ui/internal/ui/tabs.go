@@ -1,12 +1,16 @@
 package ui
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"fridare-gui/internal/assets"
 	"fridare-gui/internal/config"
 	"fridare-gui/internal/core"
+	"fridare-gui/internal/rebuild"
 	"fridare-gui/internal/utils"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +21,7 @@ import (
 	"unicode"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
@@ -1347,7 +1352,8 @@ func (tt *ToolsTab) patchPythonFiles(magicName, port string) error {
 		return fmt.Errorf("读取文件 core.py 失败: %v", err)
 	}
 
-	contentStr, n, err := core.PatchCorePyRPC(string(content), magicName)
+	// full=true: 与魔改 server 同步 — frida:rpc + re.frida.* + Frida.* API
+	contentStr, n, err := core.PatchClientProtocolSurface(string(content), magicName, true)
 	if err != nil {
 		return err
 	}
@@ -1355,14 +1361,14 @@ func (tt *ToolsTab) patchPythonFiles(magicName, port string) error {
 		if err := os.WriteFile(filePath, []byte(contentStr), 0644); err != nil {
 			return fmt.Errorf("写入文件 core.py 失败: %v", err)
 		}
-		tt.addLog(fmt.Sprintf("INFO: 替换 'frida:rpc' -> '%s:rpc' 在文件 core.py (%d 处)", magicName, n))
+		tt.addLog(fmt.Sprintf("INFO: 客户端协议面已同步 magic=%s（rpc/re.frida./Frida.*）共 %d 处 → core.py", magicName, n))
 		tt.addLog("SUCCESS: 已魔改Python文件: core.py")
 	} else {
-		tt.addLog("INFO: core.py 中未找到 frida:rpc，可能已魔改或版本结构不同")
+		tt.addLog("INFO: core.py 中未找到可替换协议标记，可能已魔改或版本结构不同")
 	}
 
-	// 明确跳过 __init__.py / _frida.py 的裸字符串替换
-	tt.addLog("INFO: 已跳过 __init__.py 全局替换（避免破坏 import _frida）")
+	// 明确跳过 __init__.py 全局 bare "frida" 替换（避免破坏 import _frida）
+	tt.addLog("INFO: 已跳过 __init__.py 全局替换（避免破坏 import _frida）；协议/API 已按前缀同步")
 	return nil
 }
 
@@ -1680,6 +1686,22 @@ type SettingsTab struct {
 	downloadDirEntry         *FixedWidthEntry
 	concurrentDownloadsEntry *FixedWidthEntry
 
+	// OpenAI 兼容端点（AI agent / 源码重编译）
+	openaiBaseEntry       *FixedWidthEntry
+	openaiKeyEntry        *FixedWidthEntry
+	openaiModelEntry      *FixedWidthEntry
+	openaiHelpLabel       *widget.Label
+	openaiAgentProxyChk   *widget.Check
+	openaiProbeBtn        *widget.Button
+	openaiProbeResult     *widget.Label
+
+	// 源码重编译相关
+	rebuildDiskEntry       *FixedWidthEntry
+	rebuildImageEntry      *FixedWidthEntry
+	rebuildMirrorEntry     *FixedWidthEntry
+	rebuildPullDirectChk   *widget.Check
+	rebuildUseGrokChk      *widget.Check
+
 	// 操作按钮
 	saveBtn   *widget.Button
 	resetBtn  *widget.Button
@@ -1738,6 +1760,33 @@ func (st *SettingsTab) RefreshConfigDisplay() {
 	}
 	if st.noShowNoticeCheck != nil {
 		st.noShowNoticeCheck.SetChecked(st.config.NoShowNotice)
+	}
+	if st.openaiBaseEntry != nil {
+		st.openaiBaseEntry.SetText(st.config.OpenAIBaseURL)
+	}
+	if st.openaiKeyEntry != nil {
+		st.openaiKeyEntry.SetText(st.config.OpenAIAPIKey)
+	}
+	if st.openaiModelEntry != nil {
+		st.openaiModelEntry.SetText(st.config.OpenAIModel)
+	}
+	if st.rebuildDiskEntry != nil {
+		st.rebuildDiskEntry.SetText(fmt.Sprintf("%.0f", st.config.RebuildMinDiskGB))
+	}
+	if st.rebuildImageEntry != nil {
+		st.rebuildImageEntry.SetText(st.config.RebuildDockerImage)
+	}
+	if st.rebuildMirrorEntry != nil {
+		st.rebuildMirrorEntry.SetText(st.config.RebuildDockerMirror)
+	}
+	if st.rebuildPullDirectChk != nil {
+		st.rebuildPullDirectChk.SetChecked(st.config.RebuildDockerPullDirect)
+	}
+	if st.rebuildUseGrokChk != nil {
+		st.rebuildUseGrokChk.SetChecked(st.config.RebuildUseLocalGrok)
+	}
+	if st.openaiAgentProxyChk != nil {
+		st.openaiAgentProxyChk.SetChecked(st.config.RebuildAgentUseGUIProxy)
 	}
 }
 
@@ -1809,6 +1858,7 @@ func (st *SettingsTab) setupUI() {
 	// 添加说明标签
 	autoConfirmLabel := widget.NewLabel("(启用后将跳过确认对话框，直接执行魔改操作)")
 	autoConfirmLabel.TextStyle = fyne.TextStyle{Italic: true}
+	autoConfirmLabel.Importance = widget.LowImportance
 
 	randomNameBtn := widget.NewButton("随机", st.generateRandomMagicName)
 
@@ -1882,6 +1932,88 @@ func (st *SettingsTab) setupUI() {
 		widget.NewLabel("说明: 并发下载数影响同时下载的文件数量，过大可能导致网络堵塞"),
 	))
 
+	// OpenAI 兼容端点 — 驱动源码重编译 AI agent（可选功能）
+	st.openaiBaseEntry = fixedWidthEntry(320, "https://claudegpt.org/v1")
+	st.openaiBaseEntry.SetText(st.config.OpenAIBaseURL)
+	st.openaiKeyEntry = fixedWidthEntry(280, "API Key")
+	st.openaiKeyEntry.SetText(st.config.OpenAIAPIKey)
+	st.openaiKeyEntry.Password = true
+	st.openaiModelEntry = fixedWidthEntry(160, "模型名（可选）")
+	st.openaiModelEntry.SetText(st.config.OpenAIModel)
+
+	st.openaiHelpLabel = widget.NewLabel(config.OpenAIRecommendedHelp())
+	st.openaiHelpLabel.Wrapping = fyne.TextWrapWord
+	applyRecommendBtn := widget.NewButton("填入推荐端点", func() {
+		st.openaiBaseEntry.SetText("https://claudegpt.org/v1")
+		st.updateStatus("已填入推荐 API 端点 https://claudegpt.org/v1")
+	})
+	openSiteBtn := widget.NewButton("打开推荐站点", func() {
+		if u, err := url.Parse("https://claudegpt.org/"); err == nil {
+			_ = fyne.CurrentApp().OpenURL(u)
+		}
+	})
+	st.openaiAgentProxyChk = widget.NewCheck("OpenAI 端点走 GUI 代理出口（默认不走）", nil)
+	st.openaiAgentProxyChk.SetChecked(st.config.RebuildAgentUseGUIProxy)
+	st.openaiProbeResult = widget.NewLabel("端点探测：未测试")
+	st.openaiProbeResult.Wrapping = fyne.TextWrapWord
+	st.openaiProbeBtn = widget.NewButton("测试端点连接", st.testOpenAIEndpoint)
+
+	// QQ 群二维码：内嵌图片直接显示（非文本链接）
+	qqQR := canvas.NewImageFromResource(assets.QQGroupQR)
+	qqQR.FillMode = canvas.ImageFillContain
+	qqQR.SetMinSize(fyne.NewSize(160, 160))
+	qqTitle := widget.NewLabel("QQ 群 " + assets.QQGroupNumber)
+	qqTitle.TextStyle = fyne.TextStyle{Bold: true}
+	qqHint := widget.NewLabel("扫码入群申请体验额度")
+	qqHint.Importance = widget.MediumImportance
+	qqPanel := container.NewVBox(
+		qqTitle,
+		qqHint,
+		container.NewCenter(qqQR),
+	)
+
+	openaiLeft := container.NewVBox(
+		container.NewHBox(widget.NewLabel("API 端点:"), st.openaiBaseEntry, applyRecommendBtn),
+		container.NewHBox(widget.NewLabel("API Key:"), st.openaiKeyEntry),
+		container.NewHBox(widget.NewLabel("模型:"), st.openaiModelEntry),
+		st.openaiAgentProxyChk,
+		container.NewHBox(st.openaiProbeBtn, openSiteBtn),
+		st.openaiProbeResult,
+		st.openaiHelpLabel,
+	)
+	openaiConfigSection := widget.NewCard("🤖 OpenAI 兼容端点（AI Agent）", "源码重编译可选；静态魔改路径不需要；端点默认不走代理",
+		container.NewBorder(nil, nil, nil, qqPanel, openaiLeft))
+
+	// 源码重编译资源阈值 + 国内 Docker 镜像源
+	st.rebuildDiskEntry = fixedWidthEntry(80, "GB")
+	st.rebuildDiskEntry.SetText(fmt.Sprintf("%.0f", st.config.RebuildMinDiskGB))
+	st.rebuildImageEntry = fixedWidthEntry(220, "本地 builder 标签")
+	st.rebuildImageEntry.SetText(st.config.RebuildDockerImage)
+	st.rebuildMirrorEntry = fixedWidthEntry(180, "docker.1ms.run")
+	st.rebuildMirrorEntry.SetText(st.config.RebuildDockerMirror)
+	st.rebuildPullDirectChk = widget.NewCheck("镜像源直连（不走代理；docker.1ms.run 必开）", nil)
+	st.rebuildPullDirectChk.SetChecked(st.config.RebuildDockerPullDirect)
+	st.rebuildUseGrokChk = widget.NewCheck("优先使用本机 grok-build（端点仍用上方 OpenAI 配置）", nil)
+	st.rebuildUseGrokChk.SetChecked(st.config.RebuildUseLocalGrok)
+	fillMirrorBtn := widget.NewButton("填入 1ms.run", func() {
+		st.rebuildMirrorEntry.SetText("docker.1ms.run")
+		st.rebuildPullDirectChk.SetChecked(true)
+		st.updateStatus("已填入 docker.1ms.run，并启用镜像直连")
+	})
+	mirrorHelp := widget.NewLabel("Hub 失败时: ubuntu:22.04 → docker.1ms.run/library/ubuntu:22.04；容器内 git 仍可用上方代理")
+	mirrorHelp.Wrapping = fyne.TextWrapWord
+	mirrorHelp.Importance = widget.MediumImportance
+
+	rebuildConfigSection := widget.NewCard("🧬 源码重编译 / Docker（可选）", "不强制装 Docker；镜像源默认 docker.1ms.run",
+		container.NewVBox(
+			container.NewHBox(widget.NewLabel("磁盘阈值(GB):"), st.rebuildDiskEntry),
+			container.NewHBox(widget.NewLabel("本地镜像名:"), st.rebuildImageEntry),
+			container.NewHBox(widget.NewLabel("Hub 镜像源:"), st.rebuildMirrorEntry, fillMirrorBtn),
+			st.rebuildPullDirectChk,
+			st.rebuildUseGrokChk,
+			mirrorHelp,
+		))
+
 	// 操作按钮区域
 	st.saveBtn = widget.NewButton("💾 保存设置", st.saveSettings)
 	st.saveBtn.Importance = widget.HighImportance
@@ -1900,11 +2032,13 @@ func (st *SettingsTab) setupUI() {
 		globalConfigSection,
 		networkConfigSection,
 		fridaConfigSection,
+		openaiConfigSection,
 	)
 
 	rightColumn := container.NewVBox(
 		uiConfigSection,
 		downloadConfigSection,
+		rebuildConfigSection,
 		actionSection,
 	)
 
@@ -2053,6 +2187,39 @@ func (st *SettingsTab) validateAndUpdateConfig() error {
 		return fmt.Errorf("并发下载数必须在1-10范围内")
 	}
 
+	// OpenAI / 源码重编译
+	if st.openaiBaseEntry != nil {
+		st.config.OpenAIBaseURL = strings.TrimSpace(st.openaiBaseEntry.Text)
+	}
+	if st.openaiKeyEntry != nil {
+		st.config.OpenAIAPIKey = strings.TrimSpace(st.openaiKeyEntry.Text)
+	}
+	if st.openaiModelEntry != nil {
+		st.config.OpenAIModel = strings.TrimSpace(st.openaiModelEntry.Text)
+	}
+	if st.rebuildDiskEntry != nil {
+		if gb, err := strconv.ParseFloat(strings.TrimSpace(st.rebuildDiskEntry.Text), 64); err == nil && gb > 0 {
+			st.config.RebuildMinDiskGB = gb
+		} else {
+			return fmt.Errorf("源码重编译磁盘阈值必须是正数 GB")
+		}
+	}
+	if st.rebuildImageEntry != nil {
+		st.config.RebuildDockerImage = strings.TrimSpace(st.rebuildImageEntry.Text)
+	}
+	if st.rebuildMirrorEntry != nil {
+		st.config.RebuildDockerMirror = strings.TrimSpace(st.rebuildMirrorEntry.Text)
+	}
+	if st.rebuildPullDirectChk != nil {
+		st.config.RebuildDockerPullDirect = st.rebuildPullDirectChk.Checked
+	}
+	if st.rebuildUseGrokChk != nil {
+		st.config.RebuildUseLocalGrok = st.rebuildUseGrokChk.Checked
+	}
+	if st.openaiAgentProxyChk != nil {
+		st.config.RebuildAgentUseGUIProxy = st.openaiAgentProxyChk.Checked
+	}
+
 	return nil
 }
 
@@ -2088,6 +2255,84 @@ func (st *SettingsTab) loadConfigToUI() {
 	st.noShowNoticeCheck.SetChecked(st.config.NoShowNotice)
 	st.downloadDirEntry.SetText(st.config.DownloadDir)
 	st.concurrentDownloadsEntry.SetText(fmt.Sprintf("%d", st.config.ConcurrentDownloads))
+	if st.openaiBaseEntry != nil {
+		st.openaiBaseEntry.SetText(st.config.OpenAIBaseURL)
+	}
+	if st.openaiKeyEntry != nil {
+		st.openaiKeyEntry.SetText(st.config.OpenAIAPIKey)
+	}
+	if st.openaiModelEntry != nil {
+		st.openaiModelEntry.SetText(st.config.OpenAIModel)
+	}
+	if st.rebuildDiskEntry != nil {
+		st.rebuildDiskEntry.SetText(fmt.Sprintf("%.0f", st.config.RebuildMinDiskGB))
+	}
+	if st.rebuildImageEntry != nil {
+		st.rebuildImageEntry.SetText(st.config.RebuildDockerImage)
+	}
+	if st.rebuildMirrorEntry != nil {
+		st.rebuildMirrorEntry.SetText(st.config.RebuildDockerMirror)
+	}
+	if st.rebuildPullDirectChk != nil {
+		st.rebuildPullDirectChk.SetChecked(st.config.RebuildDockerPullDirect)
+	}
+	if st.rebuildUseGrokChk != nil {
+		st.rebuildUseGrokChk.SetChecked(st.config.RebuildUseLocalGrok)
+	}
+	if st.openaiAgentProxyChk != nil {
+		st.openaiAgentProxyChk.SetChecked(st.config.RebuildAgentUseGUIProxy)
+	}
+}
+
+// testOpenAIEndpoint runs a real HTTP probe against the configured OpenAI-compatible API.
+func (st *SettingsTab) testOpenAIEndpoint() {
+	base := ""
+	key := ""
+	model := ""
+	if st.openaiBaseEntry != nil {
+		base = strings.TrimSpace(st.openaiBaseEntry.Text)
+	}
+	if st.openaiKeyEntry != nil {
+		key = strings.TrimSpace(st.openaiKeyEntry.Text)
+	}
+	if st.openaiModelEntry != nil {
+		model = strings.TrimSpace(st.openaiModelEntry.Text)
+	}
+	useProxy := st.openaiAgentProxyChk != nil && st.openaiAgentProxyChk.Checked
+	proxy := ""
+	if st.proxyEntry != nil {
+		proxy = strings.TrimSpace(st.proxyEntry.Text)
+	} else {
+		proxy = st.config.Proxy
+	}
+	if st.openaiProbeResult != nil {
+		st.openaiProbeResult.SetText("端点探测：进行中…")
+	}
+	st.updateStatus("正在测试 OpenAI 端点…")
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		res := rebuild.ProbeOpenAIEndpoint(ctx, rebuild.OpenAIProbeOptions{
+			BaseURL:     base,
+			APIKey:      key,
+			Model:       model,
+			UseGUIProxy: useProxy,
+			Proxy:       proxy,
+			Timeout:     25 * time.Second,
+		})
+		detail := rebuild.RedactSecret(res.Detail, key)
+		msg := fmt.Sprintf("端点探测：ok=%v HTTP %d %s\n%s", res.OK, res.StatusCode, res.Method, detail)
+		fyne.Do(func() {
+			if st.openaiProbeResult != nil {
+				st.openaiProbeResult.SetText(msg)
+			}
+			if res.OK {
+				st.updateStatus("OpenAI 端点连接成功")
+			} else {
+				st.updateStatus("OpenAI 端点连接失败（见探测结果）")
+			}
+		})
+	}()
 }
 
 // importSettings 导入配置
@@ -2575,6 +2820,57 @@ func NewHelpTab() *HelpTab {
 func (ht *HelpTab) setupHelpData() {
 	ht.helpSections = []HelpSection{
 		{
+			Title: "双技术路线",
+			Icon:  "🧬",
+			Content: `# 双技术路线说明
+
+Fridare 提供两条**独立**的 Frida 魔改技术线。默认路径不依赖 Docker / AI。
+
+## 路线 A — 静态二进制补丁（默认）
+
+对应标签：**frida 魔改** / **frida-tools 魔改** / **DEB 魔改与打包**。
+
+- 输入：官方 release 预编译二进制
+- 手段：hex / 特征字符串替换（hexreplace）
+- 依赖：**无需 Docker**、无需编译工具链
+- 速度：秒级
+- 局限：只能改二进制中已有的可见特征
+- 协议：服务端与 frida-tools 需成对魔改（含 rpc 等）
+
+## 路线 B — 源码重编译 + 魔改（可选）
+
+对应标签：**源码重编译**。
+
+行业参考：strongR-frida、phantom-frida、官方 Frida configure/make 多宿主构建。
+
+**编译仅在 Docker/Linux 内执行**（Host 不装 Frida 工具链）：
+
+1. 探测 Docker / 磁盘 / 代理 / grok-build / OpenAI 端点  
+2. 步骤① 基础镜像（工具链）  
+3. 浅克隆：` + "`git clone --depth=1 --branch <版本>`" + `  
+4. AI / 朴素源码魔改（Host 改挂载树，不编译）  
+5. 容器内 ` + "`configure --host=… && make`" + `  
+6. 导出 catalog：binaries + **已协议同步的 host wheel** + PROTOCOL-SYNC  
+
+**deep（默认）**：服务端+客户端同步  
+` + "re.frida.* / /re/frida/（DBus 对象路径）/ frida:rpc / Frida.* API → magic；缺对象路径会 UNKNOWN_METHOD。须用 catalog 内 wheel，勿用官方 pip。\n" + `
+
+### 系统不予置
+
+- **不强制**安装 Docker / grok-build  
+- 未启用源码魔改时，下载与静态补丁路径完全不受影响  
+- 启用时才要求上游代理、磁盘空间与 OpenAI 兼容端点  
+
+### OpenAI 推荐
+
+- 站点：https://claudegpt.org/  
+- API：https://claudegpt.org/v1  
+- QQ 群 **555354813** 可申请体验额度  
+- **二维码请在「设置」页 OpenAI 区域直接扫码**（软件内嵌显示）
+
+完整说明见仓库 ` + "`docs/dual-track.md`" + `。`,
+		},
+		{
 			Title: "快速开始",
 			Icon:  "🚀",
 			Content: `# 快速开始指南
@@ -2585,7 +2881,8 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 
 ### 主要功能
 - **Frida 下载管理**：自动下载最新版本的 Frida 组件
-- **二进制文件魔改**：修改 Frida 特征以绕过检测
+- **二进制文件魔改**：修改 Frida 特征以绕过检测（默认静态路径）
+- **源码重编译魔改**（可选）：Docker + AI agent 重编译任意官方版本
 - **DEB 包处理**：创建和修改 iOS DEB 安装包  
 - **Python 环境集成**：自动检测和配置 Python 环境
 - **frida-tools 魔改**：修改 frida-tools 避免被检测
@@ -2593,10 +2890,10 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 ### 快速上手步骤
 1. **配置环境**：在"设置"页面配置工作目录和网络代理
 2. **下载 Frida**：使用"下载"功能获取所需版本
-3. **执行魔改**：使用相应功能页面进行文件修改
+3. **执行魔改**：使用「frida 魔改」等静态路径；需要源码级时再打开「源码重编译」
 4. **部署使用**：将处理后的文件部署到目标设备
 
-> 💡 **提示**：首次使用建议先查看"设置"页面进行基本配置。`,
+> 💡 **提示**：首次使用建议先查看"设置"页面进行基本配置。源码重编译为可选增强，见「双技术路线」。`,
 		},
 		{
 			Title: "下载功能",
@@ -2639,12 +2936,51 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 - 定期清理不需要的旧版本文件`,
 		},
 		{
+			Title: "源码重编译",
+			Icon:  "🐳",
+			Content: `# 源码重编译 + AI 魔改（可选）
+
+## 何时使用
+当静态二进制补丁不够用、需要源码级标识/行为修改，或要针对任意官方 Frida 版本从源码产出时。
+
+## 编译隔离
+**configure / make / 交叉工具链只在 Docker（Linux）内跑**，Host 只跑 GUI、AI 改文件与 docker 客户端。界面提示「编译仅 Docker/Linux」。
+
+## 前置条件（启用时才检查）
+- **上游代理**（必填门禁）
+- **磁盘**：建议 ≥ 40GB 空闲
+- **Docker** 引擎（不强制安装；未装则本功能不可用，其余标签仍可用）
+- **OpenAI 兼容端点** + API Key（设置页；推荐 claudegpt.org）
+- **grok-build / grok**（若本机已有可勾选使用；端点始终用 GUI 配置）
+
+## 操作步骤
+1. 设置页配置代理、Docker 镜像源与 OpenAI  
+2. 打开「🧬 源码重编译」，勾选启用  
+3. 「检查依赖」确认环境  
+4. 步骤① 基础镜像（可单独跑）；步骤② 魔改+编译  
+5. 默认 profile=**deep**；或点「一键深度定制（①+② deep）」  
+6. 填写官方版本（depth=1）、5 字母 magic、目标平台、对话目标  
+7. 完成后到 **catalog** 产物目录：安装 ` + "`python/host/.../frida-*.whl`" + `（已含协议同步）+ frida_tools  
+
+## deep 协议面（须成对）
+` + "- re.frida.* → re.{magic}.*\n- /re/frida/ → /re/{magic}/（对象路径；缺则 UNKNOWN_METHOD）\n- frida:rpc → {magic}:rpc\n- \"Frida. → \"{Magic}.\n" + `产物含 PROTOCOL-SYNC.json 交叉核对结果。
+
+## 编译目标
+支持选择 Android / iOS / Windows / macOS 等常见架构。  
+**诚实限制**：iOS/macOS 官方工具链偏 Apple 宿主；Linux Docker 上可能仅能完整交叉编译 Android/Linux/Windows 子集。
+
+## 产物
+` + "`catalog/{version}/{platform}/{magic}/`" + `（binaries + python/host wheels + INSTALL.txt + PROTOCOL-SYNC）。  
+工作区 artifacts 另有 README-DEPLOY.txt。`,
+		},
+		{
 			Title: "Frida 魔改",
 			Icon:  "🔧",
 			Content: `# Frida 二进制魔改详解
 
 ## 功能目的
-通过修改 Frida 二进制文件的特征字符串，绕过应用的 Frida 检测机制。
+通过修改 Frida 二进制文件的特征字符串，绕过应用的 Frida 检测机制。  
+这是 **路线 A（静态补丁）** 的核心能力，**不需要 Docker**。
 
 ## 魔改原理
 ### 特征字符串替换

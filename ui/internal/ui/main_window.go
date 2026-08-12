@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"fridare-gui/internal/appmeta"
 	"fridare-gui/internal/assets"
 	"fridare-gui/internal/config"
 	"fridare-gui/internal/core"
@@ -23,56 +24,6 @@ const (
 	WindowMinWidth  = 1200
 	WindowMinHeight = 800
 )
-
-// LogEntry 自定义日志组件 - 模拟终端样式
-type LogEntry struct {
-	*widget.RichText
-	logContent string
-}
-
-// NewLogEntry 创建新的日志组件
-func NewLogEntry() *LogEntry {
-	richText := widget.NewRichText()
-	richText.Wrapping = fyne.TextWrapWord
-	richText.Scroll = container.ScrollBoth
-
-	log := &LogEntry{
-		RichText:   richText,
-		logContent: "",
-	}
-
-	// 设置初始样式和背景提示
-	log.updateContent()
-
-	return log
-}
-
-// updateContent 更新内容并设置样式
-func (l *LogEntry) updateContent() {
-	if l.logContent == "" {
-		l.logContent = "📋 日志输出区域 (模拟终端样式)\n"
-	}
-
-	// 使用代码块样式来模拟终端外观
-	l.RichText.ParseMarkdown("```\n" + l.logContent + "\n```")
-}
-
-// SetLogText 设置日志文本
-func (l *LogEntry) SetLogText(text string) {
-	l.logContent = text
-	l.updateContent()
-}
-
-// AppendLogText 追加日志文本
-func (l *LogEntry) AppendLogText(text string) {
-	l.logContent += text
-	l.updateContent()
-}
-
-// String 获取当前文本内容
-func (l *LogEntry) String() string {
-	return l.logContent
-}
 
 // MainWindow 主窗口结构
 type MainWindow struct {
@@ -99,6 +50,7 @@ type MainWindow struct {
 	packageTab  *PackageTab
 	createTab   *CreateTab // 新增创建标签页
 	toolsTab    *ToolsTab
+	rebuildTab  *RebuildTab // 可选：Docker+AI 源码重编译
 	settingsTab *SettingsTab
 	helpTab     *HelpTab     // 新增帮助标签页
 	analysisTab *AnalysisTab // 新增分析标签页
@@ -109,7 +61,9 @@ func NewMainWindow(app fyne.App, cfg *config.Config) *MainWindow {
 	// 创建窗口
 	window := app.NewWindow("Fridare GUI - Frida 魔改工具")
 	window.SetMaster()
-	window.SetIcon(assets.AppIcon) // 设置窗口图标
+	// Windows 标题栏需要 PNG；ICO 的 StaticResource 往往无法作为窗体图标
+	window.SetIcon(assets.AppIconPNG)
+	app.SetIcon(assets.AppIconPNG)
 
 	// 设置窗口大小
 	window.Resize(fyne.NewSize(float32(cfg.WindowWidth), float32(cfg.WindowHeight)))
@@ -132,11 +86,14 @@ func NewMainWindow(app fyne.App, cfg *config.Config) *MainWindow {
 		config: cfg,
 	}
 
+	// 先应用紧凑主题，再构建控件（字号/间距立即生效）
+	mw.applyTheme()
+
 	// 初始化UI
 	mw.setupUI()
 
-	// 应用主题
-	mw.applyTheme()
+	// 再次确保窗体图标（部分驱动在 SetContent 后才吃 icon）
+	mw.window.SetIcon(assets.AppIconPNG)
 
 	// 显示通知
 	mw.showNoticeAsync()
@@ -156,6 +113,7 @@ func (mw *MainWindow) setupUI() {
 	mw.createTab = NewCreateTab(mw.app, mw.config, mw.updateStatus, mw.addLog) // 新增创建标签页
 	mw.toolsTab = NewToolsTab(mw.config, mw.updateStatus)
 	mw.toolsTab.SetLogFunction(mw.addLog) // 设置日志函数
+	mw.rebuildTab = NewRebuildTab(mw.app, mw.config, mw.updateStatus, mw.addLog, mw.window)
 	mw.settingsTab = NewSettingsTab(mw.config, mw.updateStatus, mw.applyTheme, mw.window)
 	mw.helpTab = NewHelpTab()                                                      // 新增帮助标签页
 	mw.analysisTab = NewAnalysisTab(mw.app, mw.config, mw.updateStatus, mw.addLog) // 新增分析标签页
@@ -171,6 +129,9 @@ func (mw *MainWindow) setupUI() {
 		container.NewScroll(mw.createTab.Content()))) // 新增创建标签页
 	mw.tabContainer.Append(container.NewTabItem("🛠️ frida-tools 魔改",
 		container.NewScroll(mw.toolsTab.Content())))
+	// 可选源码重编译：三栏布局自带内部滚动，不再包一层全页 Scroll（否则 Agent 对话被压到视口外）
+	mw.tabContainer.Append(container.NewTabItem("🧬 源码重编译",
+		mw.rebuildTab.Content()))
 	mw.tabContainer.Append(container.NewTabItem("🔬 文件分析",
 		container.NewScroll(mw.analysisTab.Content()))) // 新增分析标签页
 	mw.tabContainer.Append(container.NewTabItem("⚙️ 设置",
@@ -182,6 +143,9 @@ func (mw *MainWindow) setupUI() {
 		// 如果当前标签是设置标签页，则刷新配置显示
 		if tab.Text == "⚙️ 设置" {
 			mw.settingsTab.RefreshConfigDisplay()
+		}
+		if tab.Text == "🧬 源码重编译" {
+			mw.rebuildTab.Refresh()
 		}
 	}
 
@@ -206,14 +170,14 @@ func (mw *MainWindow) setupUI() {
 
 // createToolbar 创建工具栏
 func (mw *MainWindow) createToolbar() *fyne.Container {
-	// Logo图标 - 使用canvas.Image并设置固定大小
-	logoImage := canvas.NewImageFromResource(assets.AppIcon)
-	logoImage.FillMode = canvas.ImageFillOriginal
-	logoImage.Resize(fyne.NewSize(64, 64))
-	logoImage.SetMinSize(fyne.NewSize(64, 64))
+	// Logo — 紧凑尺寸，避免占掉纵向版面
+	logoImage := canvas.NewImageFromResource(assets.AppIconPNG)
+	logoImage.FillMode = canvas.ImageFillContain
+	logoImage.SetMinSize(fyne.NewSize(28, 28))
+	logoImage.Resize(fyne.NewSize(28, 28))
 
 	// 应用标题
-	titleLabel := widget.NewLabel("Fridare GUI - Frida 魔改工具")
+	titleLabel := widget.NewLabel("Fridare GUI")
 	titleLabel.TextStyle = fyne.TextStyle{Bold: true}
 
 	// 代理配置 - 使用固定宽度的Entry，参考download_tab的实现
@@ -342,38 +306,31 @@ func (mw *MainWindow) saveConfig() {
 	}
 }
 
-// applyTheme 应用主题
+// applyTheme 应用主题（含字号/间距美化的 FridareTheme）
 func (mw *MainWindow) applyTheme() {
-	switch mw.config.Theme {
-	case "dark":
-		mw.app.Settings().SetTheme(theme.DarkTheme())
-	case "light":
-		mw.app.Settings().SetTheme(theme.LightTheme())
-	default:
-		// auto - 使用系统默认
-		mw.app.Settings().SetTheme(theme.DefaultTheme())
+	mode := mw.config.Theme
+	if mode == "" {
+		mode = "auto"
 	}
+	mw.app.Settings().SetTheme(NewFridareTheme(mode))
 }
 
 // showAbout 显示关于对话框
 func (mw *MainWindow) showAbout() {
-	// 创建简单的对话框内容
-	content := widget.NewLabel(`Fridare GUI v4.0.3
-
-Frida 重打包和修补工具的图形界面版本
-
-特性: 下载发行版, 二进制修补, DEB包生成, 工具集成
-
-作者: suifei@gmail.com
-项目: https://github.com/suifei/fridare`)
-
-	content.Alignment = fyne.TextAlignCenter
+	content := widget.NewRichTextFromMarkdown(
+		"# Fridare GUI v" + appmeta.Version + "\n\n" +
+			appmeta.GUIDescription + "\n\n" +
+			"**特性**\n" +
+			"- 下载发行版 / 静态二进制魔改 / DEB 打包\n" +
+			"- frida-tools 魔改\n" +
+			"- 可选 Docker 源码重编译（Host: Windows / macOS / Linux）\n\n" +
+			"**作者** suifei@gmail.com\n\n" +
+			"**项目** " + appmeta.ProjectURL + "\n",
+	)
 	content.Wrapping = fyne.TextWrapWord
-
-	// 创建对话框
-	dialog := dialog.NewCustom("关于 Fridare GUI", "确定", content, mw.window)
-	dialog.Resize(fyne.NewSize(400, 250))
-	dialog.Show()
+	scroll := container.NewScroll(content)
+	scroll.SetMinSize(fyne.NewSize(420, 280))
+	dialog.NewCustom("关于 Fridare GUI", "确定", scroll, mw.window).Show()
 }
 
 // showNotice 显示通知对话框
@@ -450,13 +407,14 @@ type StatusUpdater func(message string)
 
 // createBottomArea 创建底部区域
 func (mw *MainWindow) createBottomArea() *fyne.Container {
-	// 创建状态栏
+	// 创建状态栏（说明性 caption 层级）
 	mw.statusBar = widget.NewLabel("等待操作...")
 	mw.statusBar.TextStyle = fyne.TextStyle{Italic: true}
+	mw.statusBar.Importance = widget.MediumImportance
 
-	// 创建日志区域 - 使用自定义日志组件，黑色背景绿色文字
+	// 高对比日志（非灰色 code block）
 	mw.logText = NewLogEntry()
-	mw.logText.Resize(fyne.NewSize(0, 60)) // 设置高度
+	mw.logText.SetMinHeight(88)
 
 	// 创建日志控制按钮
 	clearBtn := widget.NewButton("清空", func() {
@@ -475,17 +433,13 @@ func (mw *MainWindow) createBottomArea() *fyne.Container {
 		historyBtn,
 	)
 
-	// 创建带滚动的日志区域
-	logScroll := container.NewScroll(mw.logText)
-	logScroll.SetMinSize(fyne.NewSize(0, 60))
-
 	// 组装底部区域
 	bottomArea := container.NewBorder(
-		logControls, // top
-		nil,         // bottom
-		nil,         // left
-		nil,         // right
-		logScroll,   // center
+		logControls,                 // top
+		nil,                         // bottom
+		nil,                         // left
+		nil,                         // right
+		mw.logText.CanvasObject(),   // center — 高对比 LogView
 	)
 
 	return bottomArea
@@ -619,5 +573,10 @@ func (mw *MainWindow) updateTabsGlobalConfig() {
 	// 更新ToolsTab
 	if mw.toolsTab != nil {
 		mw.toolsTab.UpdateGlobalConfig(mw.config.MagicName, mw.config.DefaultPort)
+	}
+
+	// 更新源码重编译标签
+	if mw.rebuildTab != nil {
+		mw.rebuildTab.UpdateGlobalConfig(mw.config.MagicName, mw.config.DefaultPort)
 	}
 }

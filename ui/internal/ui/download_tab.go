@@ -14,6 +14,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -32,9 +33,20 @@ func NewFixedWidthEntry(width float32) *FixedWidthEntry {
 	return entry
 }
 
-// MinSize 返回固定的最小尺寸
+// MinSize 返回固定宽度 + 紧凑行高
 func (e *FixedWidthEntry) MinSize() fyne.Size {
-	return fyne.NewSize(e.fixedWidth, 35)
+	h := float32(28)
+	if th := fyne.CurrentApp(); th != nil && th.Settings() != nil && th.Settings().Theme() != nil {
+		h = th.Settings().Theme().Size(theme.SizeNameText) +
+			th.Settings().Theme().Size(theme.SizeNameInnerPadding)*2 + 2
+		if h < 26 {
+			h = 26
+		}
+		if h > 32 {
+			h = 32
+		}
+	}
+	return fyne.NewSize(e.fixedWidth, h)
 }
 
 // FixedWidthSelect 固定宽度的Select组件
@@ -53,27 +65,38 @@ func NewFixedWidthSelect(options []string, width float32) *FixedWidthSelect {
 	return sel
 }
 
-// MinSize 返回固定的最小尺寸
+// MinSize 返回固定宽度 + 紧凑行高
 func (s *FixedWidthSelect) MinSize() fyne.Size {
-	return fyne.NewSize(s.fixedWidth, 35)
+	h := float32(28)
+	if th := fyne.CurrentApp(); th != nil && th.Settings() != nil && th.Settings().Theme() != nil {
+		h = th.Settings().Theme().Size(theme.SizeNameText) +
+			th.Settings().Theme().Size(theme.SizeNameInnerPadding)*2 + 2
+		if h < 26 {
+			h = 26
+		}
+		if h > 32 {
+			h = 32
+		}
+	}
+	return fyne.NewSize(s.fixedWidth, h)
 }
 
-// 创建标准字体大小的标签
+// 创建标准字体大小的标签（正文层级）
 func newStandardLabel(text string) *widget.Label {
 	label := widget.NewLabel(text)
-	// 设置标准文本样式
 	label.TextStyle = fyne.TextStyle{}
 	return label
 }
 
-// 创建小号字体的标签（用于详细信息）
+// 创建小号字体的标签（说明 / 辅助信息）
 func newSmallLabel(text string) *widget.Label {
 	label := widget.NewLabel(text)
-	label.TextStyle = fyne.TextStyle{}
+	label.TextStyle = fyne.TextStyle{Italic: true}
+	label.Importance = widget.MediumImportance
 	return label
 }
 
-// 创建粗体标签（用于文件名）
+// 创建粗体标签（强调 / 文件名）
 func newBoldLabel(text string) *widget.Label {
 	label := widget.NewLabel(text)
 	label.TextStyle = fyne.TextStyle{Bold: true}

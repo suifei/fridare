@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fridare-gui/internal/appmeta"
 	"fridare-gui/internal/assets"
 	"fridare-gui/internal/config"
 	"fridare-gui/internal/ui"
@@ -10,25 +11,22 @@ import (
 	"fyne.io/fyne/v2/app"
 )
 
-const (
-	AppID   = "com.suifei.fridare"
-	AppName = "Fridare GUI"
-	Version = "4.0.3"
-)
+// Windows PE icon + FileVersion/ProductName come from resource_windows_*.syso
+// (generated via ui/scripts/gen-winres.ps1 from versioninfo.json + logo/AppIcon.ico).
 
 func main() {
-	// 设置应用元数据
+	// 设置应用元数据（Fyne 运行时 + macOS/Linux 打包）
 	app.SetMetadata(fyne.AppMetadata{
-		ID:      AppID,
-		Name:    AppName,
-		Version: Version,
+		ID:      appmeta.GUIAppID,
+		Name:    appmeta.GUIAppName,
+		Version: appmeta.Version,
 	})
 
 	// 创建应用程序
-	myApp := app.NewWithID(AppID)
+	myApp := app.NewWithID(appmeta.GUIAppID)
 
-	// 设置应用程序图标
-	myApp.SetIcon(assets.AppIcon)
+	// 窗口/标题栏用 PNG；PE 文件图标由 .syso 提供
+	myApp.SetIcon(assets.AppIconPNG)
 
 	// 加载配置
 	cfg, err := config.LoadConfig()

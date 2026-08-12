@@ -25,6 +25,63 @@ func TestValidateMagicName(t *testing.T) {
 	}
 }
 
+func TestPatchClientProtocolSurface_FullSync(t *testing.T) {
+	src := `ch = "frida:rpc"
+iface = "re.frida.HostSession17"
+path = "/re/frida/HostSession"
+api = "Frida.version"
+import _frida
+`
+	out, n, err := PatchClientProtocolSurface(src, "abcde", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n < 4 {
+		t.Fatalf("n=%d out=%s", n, out)
+	}
+	if !strings.Contains(out, "abcde:rpc") || !strings.Contains(out, "re.abcde.HostSession17") ||
+		!strings.Contains(out, "/re/abcde/HostSession") || !strings.Contains(out, "Abcde.version") {
+		t.Fatalf("%s", out)
+	}
+	if strings.Contains(out, "/re/frida/") {
+		t.Fatalf("object path not rewritten: %s", out)
+	}
+	if !strings.Contains(out, "import _frida") {
+		t.Fatal("must not break _frida import")
+	}
+	// rpc-only mode leaves protocol
+	out2, _, err := PatchClientProtocolSurface(src, "abcde", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out2, "re.frida.HostSession17") || !strings.Contains(out2, "Frida.version") ||
+		!strings.Contains(out2, "/re/frida/HostSession") {
+		t.Fatalf("rpc-only should keep protocol/API/path: %s", out2)
+	}
+}
+
+func TestClientProtocolBinaryPairs_SameLength(t *testing.T) {
+	pairs, err := ClientProtocolBinaryPairs("abcde")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hasPath bool
+	for _, p := range pairs {
+		if len(p[0]) != len(p[1]) {
+			t.Fatalf("%q vs %q", p[0], p[1])
+		}
+		if string(p[0]) == "/re/frida/" {
+			hasPath = true
+			if string(p[1]) != "/re/abcde/" {
+				t.Fatalf("path pair: %q", p[1])
+			}
+		}
+	}
+	if !hasPath {
+		t.Fatal("missing /re/frida/ object-path pair")
+	}
+}
+
 func TestPatchCorePyRPC_ReplacesChannelOnly(t *testing.T) {
 	src := `
 def _rpc():

@@ -1,11 +1,16 @@
 # Multi-platform release builder for Fridare.
+# Formal output root: dist/release-v{Version}/
 # Tools (create/patch/hexreplace): pure Go, CGO_ENABLED=0 (fully static).
-# GUI (Fyne): requires CGO + OpenGL; built for host Windows only.
+# GUI (Fyne): requires CGO + OpenGL; built for host Windows only (windows-amd64).
 #
-# Usage: powershell -File scripts\build-release.ps1 [-Version 4.0.3]
+# Usage:
+#   powershell -File scripts\build-release.ps1 -Version 4.0.4
+#   powershell -File scripts\build-release.ps1 -Version 4.0.4 -Only windows-amd64
 
 param(
-    [string]$Version = "4.0.3"
+    [string]$Version = "4.0.4",
+    # Optional: build only one platform dir name, e.g. windows-amd64
+    [string]$Only = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,9 +20,13 @@ $UiDir = Join-Path $Root "ui"
 $HexDir = Join-Path $Root "hexreplace"
 
 Write-Host "=== Fridare release build v$Version ===" -ForegroundColor Cyan
-Write-Host "Output: $OutRoot"
+Write-Host "Formal output: $OutRoot"
+if ($Only) { Write-Host "Only platform: $Only" -ForegroundColor Yellow }
 
-if (Test-Path $OutRoot) { Remove-Item -Recurse -Force $OutRoot }
+# When building a single platform, only wipe that subdir + zip (keep other arches)
+if (-not $Only) {
+    if (Test-Path $OutRoot) { Remove-Item -Recurse -Force $OutRoot }
+}
 New-Item -ItemType Directory -Force -Path $OutRoot | Out-Null
 
 $ToolTargets = @(
@@ -28,6 +37,12 @@ $ToolTargets = @(
     @{ GOOS = "darwin";  GOARCH = "amd64"; Ext = "";     Dir = "darwin-amd64" },
     @{ GOOS = "darwin";  GOARCH = "arm64"; Ext = "";     Dir = "darwin-arm64" }
 )
+if ($Only) {
+    $ToolTargets = @($ToolTargets | Where-Object { $_.Dir -eq $Only })
+    if ($ToolTargets.Count -eq 0) {
+        throw "Unknown -Only platform '$Only'. Use e.g. windows-amd64"
+    }
+}
 
 $Ldflags = "-s -w -trimpath"
 # Note: -trimpath is a go build flag, not ldflag
@@ -44,6 +59,10 @@ function Build-StaticTool {
 
     Push-Location $UiDir
     try {
+        # Windows PE: embed icon + version (syso only linked for windows/amd64 typically)
+        if ($GOOS -eq "windows" -and $GOARCH -eq "amd64") {
+            & powershell -NoProfile -File (Join-Path $UiDir "scripts\gen-winres.ps1") 2>$null
+        }
         $create = Join-Path $OutDir "fridare-create$Ext"
         $patch  = Join-Path $OutDir "fridare-patch$Ext"
         Write-Host "  [static] fridare-create $GOOS/$GOARCH"
@@ -80,10 +99,14 @@ function Build-WindowsGui {
     New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
     Push-Location $UiDir
     try {
+        # Embed PE icon + FileVersion/ProductName via goversioninfo .syso
+        Write-Host "  [winres] generate icon/version resources"
+        & powershell -NoProfile -File (Join-Path $UiDir "scripts\gen-winres.ps1")
         $gui = Join-Path $OutDir "fridare-gui.exe"
         Write-Host "  [cgo] fridare-gui windows/amd64"
         & go build -trimpath -ldflags "-s -w -H windowsgui" -o $gui ./cmd/gui
         if ($LASTEXITCODE -ne 0) { throw "gui failed" }
+        # Also stamp create/patch with version+icon when building windows-amd64 tools next to GUI
     } finally {
         Pop-Location
     }
@@ -121,9 +144,10 @@ Release: https://github.com/suifei/fridare/releases/tag/v$Version
     [System.IO.File]::WriteAllBytes($Path, $ascii)
 }
 
-# --- build all tool platforms ---
+# --- build selected tool platforms ---
 foreach ($t in $ToolTargets) {
     $dir = Join-Path $OutRoot $t.Dir
+    if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
     Write-Host "Building tools $($t.Dir)..." -ForegroundColor Yellow
     Build-StaticTool -GOOS $t.GOOS -GOARCH $t.GOARCH -OutDir $dir -Ext $t.Ext
 

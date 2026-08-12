@@ -22,16 +22,17 @@ rm -f build/fridare-create build/fridare-create.exe
 rm -f build/fridare-patch build/fridare-patch.exe
 
 build_native() {
-    echo "构建本机应用程序..."
+    echo "构建本机应用程序 (OS=$(uname -s)/$(uname -m))..."
+    echo "说明: 源码重编译功能依赖 Docker；编译隔离在 Linux 容器内，Host 可为 macOS/Windows/Linux。"
     if command -v fyne >/dev/null 2>&1; then
-        # fyne build 输出路径相对 src
-        fyne build --src cmd/gui -o ../../build/fridare-gui
+        # FyneApp.toml provides Name/Version/Icon for macOS .app / Linux desktop
+        ( cd cmd/gui && fyne build -o ../../build/fridare-gui )
     else
         echo "未找到 fyne CLI，使用 go build（建议: go install fyne.io/fyne/v2/cmd/fyne@latest）"
-        go build -o build/fridare-gui ./cmd/gui
+        go build -ldflags "-s -w" -o build/fridare-gui ./cmd/gui
     fi
-    go build -o build/fridare-create ./cmd/create
-    go build -o build/fridare-patch ./cmd/patch
+    go build -ldflags "-s -w" -o build/fridare-create ./cmd/create
+    go build -ldflags "-s -w" -o build/fridare-patch ./cmd/patch
 }
 
 build_windows_cross() {
@@ -48,13 +49,10 @@ build_windows_cross() {
     export CC=x86_64-w64-mingw32-gcc
     export CXX=x86_64-w64-mingw32-g++
 
-    if command -v fyne >/dev/null 2>&1; then
-        fyne build --src cmd/gui -o ../../build/fridare-gui.exe
-    else
-        go build -ldflags "-H windowsgui" -o build/fridare-gui.exe ./cmd/gui
-    fi
-    go build -o build/fridare-create.exe ./cmd/create
-    go build -o build/fridare-patch.exe ./cmd/patch
+    # Always -H windowsgui (fyne build alone may leave Console subsystem → black console)
+    go build -trimpath -ldflags "-s -w -H windowsgui" -o build/fridare-gui.exe ./cmd/gui
+    go build -ldflags "-s -w" -o build/fridare-create.exe ./cmd/create
+    go build -ldflags "-s -w" -o build/fridare-patch.exe ./cmd/patch
 }
 
 case "$TARGET" in
