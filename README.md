@@ -19,7 +19,7 @@
 ![Github top language](https://img.shields.io/github/languages/top/suifei/fridare)
 ![Github tag](https://img.shields.io/github/v/tag/suifei/fridare)
 [![GitHub followers](https://img.shields.io/github/followers/suifei.svg?style=social&label=Follow&maxAge=2592000)](https://github.com/suifei?tab=followers)
-[![Twitter Follow](https://img.shields.io/twitter/follow/csuifei?style=social)](https://twitter.com/csuifei)
+[![Twitter Follow](https://img.shields.io/twitter/follow/suiflynn?style=social)](https://twitter.com/suiflynn)
 
 Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改工具：改名称、端口与协议面标识，降低常见环境检测命中率。提供 **命令行 + 跨平台 GUI**，并支持 **静态补丁** 与 **Docker 源码重编译** 双技术路线。
 
@@ -30,7 +30,7 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 | v4.0.3 | CLI 多平台静态链接（win/linux/darwin × amd64/arm64）+ Windows GUI 预编译 | [v4.0.3](https://github.com/suifei/fridare/releases/tag/v4.0.3) |
 | v4.0.0 | Fyne GUI + Windows 原生 deb 魔改 | [v4.0.0](https://github.com/suifei/fridare/releases) |
 
-**文档**：[双技术路线](docs/dual-track.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
+**文档**：[双技术路线](docs/dual-track.md) · [17.17.0 deep 产物 kxmwp（用法 / GUI 自建 / 为何无 iOS）](docs/kxmwp-17.17.0.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
 
 ### 双技术路线（v4.0.4）
 

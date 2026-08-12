@@ -114,6 +114,23 @@ GUI 与 Docker **客户端**在 Windows、macOS、Linux 上均可使用：
 
 静态路线（hexreplace / frida-tools 标签）同样按 full 协议面同步替换，服务端二进制与 tools 成对使用。
 
+### 为什么 Docker 路线编不了 iOS / macOS
+
+这两个平台在目标列表里标成 **Docker 不友好**，不是漏做，而是 **工具链限制**：
+
+| 平台 | 需要什么 | Linux Docker 里通常怎样 |
+|------|----------|-------------------------|
+| iOS（arm64 / arm64e / simulator） | Xcode + iOS SDK（Apple 官方） | 没有合法完整 iOS SDK，交叉编译基本做不了完整 frida-server / agent 产品链 |
+| macOS（arm64 / x86_64） | macOS SDK + Apple 工具链 | 同样依赖 Apple 侧环境，不能指望 Ubuntu 容器里的 MinGW/NDK |
+
+| 路径 | 可行性 | 说明 |
+|------|--------|------|
+| GitHub Actions `macos-*` runner | 可行 | 可装 Xcode，跑 `configure --host=macos-*` / `ios-*`；与 Linux Docker 交叉不是一条路 |
+| Linux Docker 交叉编 iOS/macOS | 基本不可行 | 与 `DockerFriendly: false` 一致 |
+| 本机 macOS + Fridare GUI/CLI | 最稳产品路径 | Host 改源码，本机 Apple 工具链编译 |
+
+iOS 日常仍可用 **路线 A** 静态魔改官方 deb。预编译 deep 产物说明见 [kxmwp-17.17.0.md](./kxmwp-17.17.0.md)。
+
 ### GUI 两步流程
 
 | 步骤 | 做什么 | 是否要 AI |
