@@ -2,6 +2,24 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## Unreleased
+
+### Added
+- **Frida 17.17.0 deep 预编译产物**（magic=`kxmwp`）：Windows / Linux / Android server + 多平台 host wheels  
+  - Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.0>（**不是** latest GUI；当前 GUI 仍为 v4.0.5）  
+  - 说明：[docs/kxmwp-17.17.0.md](docs/kxmwp-17.17.0.md)
+- Builder 镜像 **toolchain-v4**：预装 `gcc-aarch64-linux-gnu`（linux-arm64 交叉）
+- 源码魔改监听端口：`ListenPortSourceOps` 只改 `DEFAULT_CONTROL_PORT`（默认 27042 则跳过；禁止全树裸数字）
+
+### Fixed
+- `linux-arm64` 的 `--host` 改为 `aarch64-linux-gnu`（裸 `linux-arm64` 会 no C compiler）
+- MinGW DNS stub **只写入 meson cross file**（禁止全局 `CFLAGS=-include`，避免 windows-x86 弄坏本机 cc）
+- 原生 Linux 编译强制 `--enable-server`（meson auto 会关掉 server）
+- deep 魔改后 `--disable-frida-python`；`generate.py` 容忍空 enum
+
+### Changed
+- 监听端口：**改不改二进制默认值都行**；启动用 `-l IP:端口`，客户机连同一端口即可
+
 ## v4.0.5 - 2026-08-12
 
 ### Fixed

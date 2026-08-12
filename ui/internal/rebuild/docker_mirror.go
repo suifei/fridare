@@ -77,8 +77,8 @@ func hasForeignRegistry(image string) bool {
 // Bootstrap uses this to decide whether an existing local image is stale.
 // v2: Node.js 20 + Go 1.24 + NDK r29 (Frida 17.x requires node>=18; Go powers Compiler backend).
 const (
-	// v3: + mingw-w64 for windows-x86_64 cross builds inside Linux Docker
-	BuilderImageFeatureTag = "toolchain-v3-ndk29-node20-go124-mingw"
+	// v4: + aarch64-linux-gnu cross GCC for linux-arm64 (v3 had mingw only)
+	BuilderImageFeatureTag = "toolchain-v4-ndk29-node20-go124-mingw-aarch64"
 	BuilderImageNDKPath    = "/opt/android-ndk-r29"
 	// Official tarball URLs installed at docker-build time (not per job).
 	BuilderImageNodeVersion = "20.18.1"
@@ -89,7 +89,7 @@ const (
 
 // DockerfileSkeletonForMirror returns a full Frida builder image definition.
 // ALL heavy toolchain deps are installed HERE (docker build):
-//   apt tools, Node.js ≥18, Go ≥1.24, Android NDK r29.
+//   apt tools, Node.js ≥18, Go ≥1.24, Android NDK r29, MinGW, aarch64 cross GCC.
 // Later AI-mod / compile jobs only VERIFY the environment and let Frida
 // fetch version-specific subprojects — never re-download NDK/Node/Go each job.
 func DockerfileSkeletonForMirror(mirror string) string {
@@ -131,6 +131,8 @@ ARG http_proxy=
 ARG https_proxy=
 %s
 # --- apt host tools (Ubuntu packages; NOT nodejs from apt — too old on 22.04) ---
+# mingw-w64: windows-x86_64 / windows-x86 cross
+# gcc-aarch64-linux-gnu: linux-arm64 cross (Frida host=linux-arm64 needs aarch64-linux-gnu-gcc)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential git curl ca-certificates xz-utils unzip \
     python3 python3-pip python3-setuptools python3-venv \
@@ -138,7 +140,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-dev flex bison \
     cmake \
     mingw-w64 g++-mingw-w64 \
- && rm -rf /var/lib/apt/lists/*
+    gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+ && rm -rf /var/lib/apt/lists/* \
+ && command -v aarch64-linux-gnu-gcc >/dev/null \
+ && aarch64-linux-gnu-gcc --version | head -1
 # Helper: apply optional build-time proxy without set -u explosions
 # --- Node.js %s (Frida needs >=18; Ubuntu 22.04 apt is v12) ---
 RUN set -ex; \
@@ -184,10 +189,10 @@ CMD ["bash"]
 }
 
 // ImageHasBuilderFeaturesShell returns a one-liner to verify the image was built
-// with the expected toolchain (NDK + Node + Go). Exit 0 if OK.
+// with the expected toolchain (NDK + Node + Go + aarch64 cross). Exit 0 if OK.
 func ImageHasBuilderFeaturesShell() string {
 	return fmt.Sprintf(
-		`set -e; test -f /etc/fridare-builder-features; grep -q %s /etc/fridare-builder-features; test -d "$ANDROID_NDK_ROOT" -o -d %s; command -v node >/dev/null; node -e "const M=process.versions.node.split('.')[0]|0; if(M<18) process.exit(1)"; command -v go >/dev/null; echo OK`,
+		`set -e; test -f /etc/fridare-builder-features; grep -q %s /etc/fridare-builder-features; test -d "$ANDROID_NDK_ROOT" -o -d %s; command -v node >/dev/null; node -e "const M=process.versions.node.split('.')[0]|0; if(M<18) process.exit(1)"; command -v go >/dev/null; command -v aarch64-linux-gnu-gcc >/dev/null || { echo '[fridare] aarch64-linux-gnu-gcc missing (linux-arm64)'; exit 1; }; echo OK`,
 		shellQuote(BuilderImageFeatureTag), shellQuote(BuilderImageNDKPath),
 	)
 }

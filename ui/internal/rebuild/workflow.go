@@ -288,11 +288,33 @@ func NeedsAndroidNDK(targetIDs []string) bool {
 	return false
 }
 
+// NeedsLinuxArm64Cross reports whether any target needs aarch64-linux-gnu-gcc
+// (Frida linux-arm64 product on an amd64 Linux Docker builder).
+func NeedsLinuxArm64Cross(targetIDs []string) bool {
+	for _, id := range targetIDs {
+		t, err := TargetByID(id)
+		if err != nil {
+			continue
+		}
+		if t.ID == "linux-arm64" || t.Host == "linux-arm64" || t.Host == "aarch64-linux-gnu" ||
+			strings.HasPrefix(t.Host, "aarch64-linux-") {
+			return true
+		}
+	}
+	return false
+}
+
 // VerifyBuildEnvShell checks image-provided toolchain only.
-// Heavy deps (NDK / Node ≥18 / Go ≥1.24 / apt tools) MUST be baked in Dockerfile.
+// Heavy deps (NDK / Node ≥18 / Go ≥1.24 / apt tools / aarch64 cross) MUST be baked in Dockerfile.
 // AI agent + compile stages never download toolchains — only confirm env, then
 // Frida configure may fetch version-specific subprojects.
+// When needArm64Cross is true, require aarch64-linux-gnu-gcc (linux-arm64 product builds).
 func VerifyBuildEnvShell(needNDK bool) string {
+	return VerifyBuildEnvShellEx(needNDK, false)
+}
+
+// VerifyBuildEnvShellEx is VerifyBuildEnvShell with optional linux-arm64 cross-compiler check.
+func VerifyBuildEnvShellEx(needNDK, needArm64Cross bool) string {
 	var b strings.Builder
 	b.WriteString("echo '[fridare] verify build environment (toolchain must be preinstalled in image)'\n")
 	b.WriteString("command -v git >/dev/null && command -v make >/dev/null && command -v python3 >/dev/null || { echo '[fridare] missing basic tools in image — rebuild fridare/frida-builder' >&2; exit 1; }\n")
@@ -302,6 +324,10 @@ func VerifyBuildEnvShell(needNDK bool) string {
 	b.WriteString("command -v npm >/dev/null || { echo '[fridare] npm missing in image' >&2; exit 1; }\n")
 	// Go is recommended (Compiler backend); warn if absent
 	b.WriteString("if command -v go >/dev/null; then echo \"[fridare] go OK: $(go version)\"; else echo '[fridare] WARN: go not found (Compiler backend may be disabled)' >&2; fi\n")
+	if needArm64Cross {
+		b.WriteString("command -v aarch64-linux-gnu-gcc >/dev/null || { echo '[fridare] aarch64-linux-gnu-gcc missing — rebuild fridare/frida-builder (Dockerfile installs gcc-aarch64-linux-gnu for linux-arm64)' >&2; exit 1; }\n")
+		b.WriteString("echo \"[fridare] aarch64 cross OK: $(aarch64-linux-gnu-gcc --version | head -1)\"\n")
+	}
 	b.WriteString("echo \"[fridare] features=$(cat /etc/fridare-builder-features 2>/dev/null || echo none)\"\n")
 	b.WriteString("echo \"[fridare] node=$(node -v) npm=$(npm -v)\"\n")
 	if !needNDK {
@@ -345,9 +371,17 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir string) (string
 	b.WriteString(fmt.Sprintf("if [ ! -f %s/configure ] && [ ! -x %s/configure ]; then echo '[fridare] ERROR: no configure in source; listing:' >&2; ls -la %s | head -50; exit 127; fi\n",
 		shellQuote(srcDir), shellQuote(srcDir), shellQuote(srcDir)))
 	b.WriteString(fmt.Sprintf("chmod +x %s/configure 2>/dev/null || true\n", shellQuote(srcDir)))
-	// Verify image toolchain (NDK baked at docker build); do not re-download every job
-	b.WriteString(VerifyBuildEnvShell(NeedsAndroidNDK(targetIDs)))
+	// Verify image toolchain (NDK / aarch64 cross baked at docker build); do not re-download every job
+	b.WriteString(VerifyBuildEnvShellEx(NeedsAndroidNDK(targetIDs), NeedsLinuxArm64Cross(targetIDs)))
 	b.WriteString("\n")
+	// linux-arm64: ensure cross CC is visible to Frida configure/meson
+	// (host triplet aarch64-linux-gnu OR explicit CC= both work; set both for robustness)
+	if NeedsLinuxArm64Cross(targetIDs) {
+		b.WriteString("export CC=\"${CC:-aarch64-linux-gnu-gcc}\"\n")
+		b.WriteString("export CXX=\"${CXX:-aarch64-linux-gnu-g++}\"\n")
+		b.WriteString("export CC_FOR_linux_arm64=\"${CC_FOR_linux_arm64:-aarch64-linux-gnu-gcc}\"\n")
+		b.WriteString("export CXX_FOR_linux_arm64=\"${CXX_FOR_linux_arm64:-aarch64-linux-gnu-g++}\"\n")
+	}
 	for _, id := range targetIDs {
 		t, err := TargetByID(id)
 		if err != nil {
@@ -365,7 +399,8 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir string) (string
 		// MinGW Windows cross: no official sdk-*-mingw prebuild → --without-prebuilds=sdk:host.
 		// Pre-seed meson wraps so git fetch is reliable under proxy; strip CRLF shebangs.
 		extraCfg := ""
-		if strings.Contains(t.Host, "mingw") {
+		isMinGW := strings.Contains(t.Host, "mingw")
+		if isMinGW {
 			extraCfg = " --without-prebuilds=sdk:host"
 			b.WriteString(fmt.Sprintf(
 				"command -v %s-gcc >/dev/null || { echo '[fridare] ERROR: missing MinGW %s-gcc (install mingw-w64 in builder image)' >&2; exit 1; }\n",
@@ -373,13 +408,31 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir string) (string
 			// Seed wrap-git deps under frida-core/gum (libffi etc.) before configure.
 			// Script is staged by StageSeedMinGWWraps into /work (see orchestrator).
 			b.WriteString(SeedMinGWWrapsShellSnippet(srcDir))
+			// Do NOT export CFLAGS/CPPFLAGS=-include (pollutes native build-machine cc with
+			// Windows __stdcall headers → "compiler for language c not specified for build machine"
+			// especially on i686 MinGW). Inject only into the meson *cross* file after configure.
 		}
 		b.WriteString(fmt.Sprintf(
 			"find %s -type f \\( -name '*.py' -o -name 'configure' -o -name '*.sh' \\) -print0 2>/dev/null | xargs -0 -r sed -i 's/\\r$//' || true\n",
 			shellQuote(srcDir)))
-		// Export NDK for configure subprocess; From /work/build-<id>, source is ../frida
-		b.WriteString(fmt.Sprintf("( export ANDROID_NDK_ROOT=\"${ANDROID_NDK_ROOT:-}\"; cd %s && ../%s/configure --host=%s%s && make ) || { echo '[fridare] configure/make failed for %s exit=$?' >&2; exit 1; }\n",
-			shellQuote(buildDir), shellQuote(srcBase), shellQuote(t.Host), extraCfg, shellQuote(t.ID)))
+		// Always request server/gadget/inject: native host builds disable them under meson auto
+		// (disable_auto_if(!cross)). Skip frida-python: deep magic renames break GIR bindgen namespaces.
+		productOpts := " --enable-server --enable-gadget --enable-inject --disable-frida-python"
+		// Export NDK for configure subprocess; From /work/build-<id>, source is ../frida.
+		// MinGW: clear CFLAGS pollution for configure; patch cross-file; then make.
+		if isMinGW {
+			b.WriteString(fmt.Sprintf(
+				"( export ANDROID_NDK_ROOT=\"${ANDROID_NDK_ROOT:-}\"; "+
+					"export CFLAGS=\"$(echo \"${CFLAGS:-}\" | sed -E 's/-include[[:space:]]+[^[:space:]]+//g')\"; "+
+					"export CPPFLAGS=\"$(echo \"${CPPFLAGS:-}\" | sed -E 's/-include[[:space:]]+[^[:space:]]+//g')\"; "+
+					"cd %s && ../%s/configure --host=%s%s%s && %s && make ) || { echo '[fridare] configure/make failed for %s exit=$?' >&2; exit 1; }\n",
+				shellQuote(buildDir), shellQuote(srcBase), shellQuote(t.Host), extraCfg, productOpts,
+				MinGWCrossFileDNSIncludeShell(MinGWDNSStubHeaderFileName),
+				shellQuote(t.ID)))
+		} else {
+			b.WriteString(fmt.Sprintf("( export ANDROID_NDK_ROOT=\"${ANDROID_NDK_ROOT:-}\"; cd %s && ../%s/configure --host=%s%s%s && make ) || { echo '[fridare] configure/make failed for %s exit=$?' >&2; exit 1; }\n",
+				shellQuote(buildDir), shellQuote(srcBase), shellQuote(t.Host), extraCfg, productOpts, shellQuote(t.ID)))
+		}
 		b.WriteString(fmt.Sprintf("mkdir -p %s/%s\n", shellQuote(artifactDir), shellQuote(t.ID)))
 		// Only copy non-empty product blobs (skip 0-byte meson stubs)
 		b.WriteString(fmt.Sprintf("find %s -type f -size +1k \\( -name 'frida-server*' -o -name 'frida-agent*' -o -name 'frida-gadget*' -o -name '*-server' -o -name '*-agent*.so' -o -name '*-gadget*.so' \\) -exec cp -a {} %s/%s/ \\; 2>/dev/null || true\n",

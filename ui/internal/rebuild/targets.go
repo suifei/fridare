@@ -42,7 +42,9 @@ func SupportedBuildTargets() []BuildTarget {
 
 		// Linux (bonus, often used as host)
 		{ID: "linux-x86_64", Label: "Linux x86_64", Host: "linux-x86_64", Platform: "linux", Arch: "x86_64", DockerFriendly: true, Notes: "Docker 原生友好"},
-		{ID: "linux-arm64", Label: "Linux arm64", Host: "linux-arm64", Platform: "linux", Arch: "arm64", DockerFriendly: true, Notes: "交叉或原生，视镜像架构"},
+		// Host must be the GNU triplet so Frida releng resolve_gcc_binaries finds aarch64-linux-gnu-gcc.
+		// Bare "linux-arm64" leaves machine.triplet=nil → "no C compiler found" without CC= override.
+		{ID: "linux-arm64", Label: "Linux arm64", Host: "aarch64-linux-gnu", Platform: "linux", Arch: "arm64", DockerFriendly: true, Notes: "Docker amd64 交叉：Host=aarch64-linux-gnu；镜像 v4+ 预装 gcc-aarch64-linux-gnu"},
 	}
 }
 

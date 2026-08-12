@@ -64,6 +64,48 @@ func TestBuildOnlyPipelineScript_MinGWStagesSeedInvocation(t *testing.T) {
 	if !strings.Contains(script, "--without-prebuilds=sdk:host") {
 		t.Fatal("mingw without-prebuilds missing")
 	}
+	// Must not pollute native CFLAGS with -include (breaks windows-x86 build-machine cc)
+	if strings.Contains(script, `export CFLAGS="${CFLAGS:-} -include`) ||
+		strings.Contains(script, "export CFLAGS=\"${CFLAGS:-} -include") {
+		t.Fatal("must not export CFLAGS=-include for MinGW (pollutes build machine)")
+	}
+	if !strings.Contains(script, "frida-*-mingw.txt") && !strings.Contains(script, "MinGW cross-file") {
+		// cross-file patch must appear
+		if !strings.Contains(script, "fridare-mingw-dns.h") || !strings.Contains(script, "cross-file") {
+			// accept python patch of mingw txt
+			if !strings.Contains(script, "mingw.txt") {
+				t.Fatal("must patch MinGW cross file for DNS include")
+			}
+		}
+	}
+	if !strings.Contains(script, MinGWDNSStubHeaderFileName) {
+		t.Fatal("DNS header must be referenced for MinGW cross compile")
+	}
+}
+
+func TestBuildOnlyPipelineScript_WindowsX86UsesMinGW(t *testing.T) {
+	script, err := BuildOnlyPipelineScript(PipelineScriptOptions{
+		SourceDir: "frida", ArtifactDir: "artifacts", TargetIDs: []string{"windows-x86"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(script, "--host=i686-w64-mingw32") {
+		t.Fatal(script)
+	}
+	if !strings.Contains(script, "i686-w64-mingw32-gcc") {
+		t.Fatal("must check i686 mingw gcc present")
+	}
+}
+
+func TestMinGWCrossFileDNSIncludeShell(t *testing.T) {
+	sh := MinGWCrossFileDNSIncludeShell("")
+	if !strings.Contains(sh, MinGWDNSStubHeaderFileName) {
+		t.Fatal(sh)
+	}
+	if !strings.Contains(sh, "frida-*-mingw.txt") && !strings.Contains(sh, "mingw.txt") {
+		t.Fatal("must target mingw cross files", sh)
+	}
 }
 
 func TestSkipBroadModCandidate_Shared(t *testing.T) {

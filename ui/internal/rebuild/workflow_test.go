@@ -178,6 +178,9 @@ func TestBuildOnlyPipelineScript_DockerOnlyMake(t *testing.T) {
 	if !strings.Contains(script, "configure --host=android-arm64") {
 		t.Fatal(script)
 	}
+	if !strings.Contains(script, "--enable-server") || !strings.Contains(script, "--disable-frida-python") {
+		t.Fatalf("product opts missing in configure: %s", script)
+	}
 	if !strings.Contains(script, "make") {
 		t.Fatal(script)
 	}
@@ -215,6 +218,31 @@ func TestNeedsAndroidNDK(t *testing.T) {
 	}
 	if NeedsAndroidNDK([]string{"linux-x86_64"}) {
 		t.Fatal("linux host should not force NDK")
+	}
+}
+
+func TestNeedsLinuxArm64Cross(t *testing.T) {
+	if !NeedsLinuxArm64Cross([]string{"linux-arm64"}) {
+		t.Fatal("linux-arm64 needs aarch64 cross")
+	}
+	if NeedsLinuxArm64Cross([]string{"linux-x86_64", "android-arm64"}) {
+		t.Fatal("other targets should not force aarch64 host cross")
+	}
+	sh := VerifyBuildEnvShellEx(false, true)
+	if !strings.Contains(sh, "aarch64-linux-gnu-gcc") {
+		t.Fatal(sh)
+	}
+	script, err := BuildOnlyPipelineScript(PipelineScriptOptions{
+		SourceDir: "frida", ArtifactDir: "artifacts", TargetIDs: []string{"linux-arm64"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(script, "aarch64-linux-gnu-gcc") {
+		t.Fatal("linux-arm64 pipeline must verify aarch64 cross compiler")
+	}
+	if !strings.Contains(script, "--host=aarch64-linux-gnu") {
+		t.Fatal("linux-arm64 must configure with GNU triplet host, not bare linux-arm64")
 	}
 }
 

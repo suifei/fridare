@@ -87,12 +87,17 @@ GUI 与 Docker **客户端**在 Windows、macOS、Linux 上均可使用：
 
 **原则**：重依赖只在 `docker build` 时安装一次；AI agent 魔改阶段只做环境确认，再按 Frida 版本拉 subprojects，不在编译任务里现装 NDK/Node/Go。
 
-`fridare/frida-builder` 在 **docker build** 时预装：
+`fridare/frida-builder` 在 **docker build** 时预装（feature **`toolchain-v4-ndk29-node20-go124-mingw-aarch64`**）：
 
 - apt：git / make / python3 / ninja / glib / cmake / flex / bison 等  
 - **Node.js 20**（Frida 硬性要求 ≥18；Ubuntu 22.04 自带 apt node 太旧）  
 - **Go 1.24**（Compiler backend / ESBuild）  
-- **Android NDK r29** → `/opt/android-ndk-r29`（`ANDROID_NDK_ROOT`）
+- **Android NDK r29** → `/opt/android-ndk-r29`（`ANDROID_NDK_ROOT`）  
+- **mingw-w64**（Windows x86 / x86_64 交叉）  
+- **gcc-aarch64-linux-gnu**（Linux arm64 交叉；`--host=aarch64-linux-gnu`）
+
+编译约定：`--enable-server --enable-gadget --enable-inject --disable-frida-python`。  
+MinGW DNS 类型桩只注入 meson **cross file**，不要设全局 `CFLAGS=-include`。
 
 **国内 Hub 镜像源**默认 `docker.1ms.run`（设置页与「源码重编译」页均可改；pull/build 默认直连、不走 GUI 代理）。
 

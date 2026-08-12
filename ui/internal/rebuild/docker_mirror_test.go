@@ -51,6 +51,12 @@ func TestDockerfileSkeletonForMirror(t *testing.T) {
 	if !strings.Contains(df, "ANDROID_NDK_ROOT") || !strings.Contains(df, "android-ndk-r29-linux.zip") {
 		t.Fatal("Dockerfile must preinstall NDK r29")
 	}
+	if !strings.Contains(df, "gcc-aarch64-linux-gnu") || !strings.Contains(df, "g++-aarch64-linux-gnu") {
+		t.Fatal("Dockerfile must preinstall aarch64 cross GCC for linux-arm64")
+	}
+	if !strings.Contains(df, "mingw-w64") {
+		t.Fatal("Dockerfile must preinstall mingw-w64")
+	}
 	if !strings.Contains(df, "node-v20") && !strings.Contains(df, "nodejs.org") {
 		t.Fatal("Dockerfile must preinstall Node.js 20 (not apt node 12)")
 	}

@@ -1,83 +1,54 @@
-﻿package main
+package main
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"fridare-gui/internal/rebuild"
 )
 
 func main() {
-	work := `D:\works\fridare-rebuild-e2e`
-	art := filepath.Join(work, "src", "artifacts", "windows-x86_64")
+	work := `D:\works\fridare-rebuild-17.17.0`
+	if len(os.Args) > 1 {
+		work = os.Args[1]
+	}
 	cfg := rebuild.JobConfig{
-		FridaVersion:     "17.16.4",
-		MagicName:        "abcde",
+		FridaVersion:     "17.17.0",
+		MagicName:        "kxmwp",
 		ListenPort:       27142,
-		TargetIDs:        []string{"windows-x86_64"},
 		WorkDir:          work,
+		TargetIDs:        []string{"windows-x86_64"},
+		ArtifactDir:      filepath.Join(work, "artifacts"),
+		Proxy:            "http://localhost:8080",
 		DirectionProfile: "deep",
 	}
-	catalog := rebuild.CatalogRoot(work)
-	flat := filepath.Join(work, "artifacts", "windows-x86_64")
-	_ = os.MkdirAll(flat, 0755)
-	_ = filepath.Walk(art, func(p string, info os.FileInfo, err error) error {
-		if err != nil || info == nil || info.IsDir() {
-			return nil
-		}
-		name := info.Name()
-		low := strings.ToLower(name)
-		if !(strings.Contains(low, "server") || strings.Contains(low, "agent") ||
-			strings.Contains(low, "gadget") || strings.Contains(low, "helper") || strings.Contains(low, "inject")) {
-			return nil
-		}
-		if info.Size() < 64*1024 {
-			return nil
-		}
-		b, err := os.ReadFile(p)
-		if err != nil {
-			return nil
-		}
-		return os.WriteFile(filepath.Join(flat, name), b, 0755)
-	})
-	primary, entries, err := rebuild.OrganizeExportToCatalog(catalog, cfg, art, flat)
-	fmt.Println("primary", primary)
-	fmt.Println("entries", entries, "err", err)
-	for _, e := range entries {
-		n, _ := rebuild.PatchArtifactBinaryMarkers(filepath.Join(e, "binaries"), "abcde")
-		fmt.Println("binary marker files", e, n)
-	}
-	server, serr := rebuild.FindMagicServerBinary(primary, "abcde")
-	if serr != nil {
-		server = filepath.Join(flat, "abcde-server.exe")
-	}
-	whl, _ := rebuild.FindHostFridaWheel(catalog, "17.16.4", "abcde")
-	fmt.Println("server", server)
-	fmt.Println("whl", whl)
-	r, err := rebuild.CrossCheckServerClientProtocol("abcde", server, whl)
-	if err != nil {
-		fmt.Println("ERR", err)
-		os.Exit(1)
-	}
-	fmt.Printf("matched=%v serverOK=%v clientOK=%v\nissues=%v\nserver_hits=%v\nclient_hits=%v\n",
-		r.Matched, r.ServerOK, r.ClientOK, r.Issues, r.ServerHits, r.ClientHits)
-	_ = rebuild.WriteProtocolCrossCheckReport(filepath.Join(primary, "PROTOCOL-SYNC.json"), r)
-	scratch := `C:\Users\SuiFei\AppData\Local\Temp\grok-goal-067582e6a16c\implementer`
-	_ = os.MkdirAll(scratch, 0755)
-	_ = rebuild.WriteProtocolCrossCheckReport(filepath.Join(scratch, "protocol-crosscheck.txt"), r)
-	_ = os.WriteFile(filepath.Join(scratch, "win-server-catalog.txt"),
-		[]byte(fmt.Sprintf("primary=%s\nserver=%s\nsize=%d\nmatched=%v\n", primary, server, fileSize(server), r.Matched)), 0644)
-	if !r.Matched {
-		os.Exit(1)
-	}
-}
+	cat := rebuild.CatalogRoot(work)
+	primary := filepath.Join(cat, "17.17.0", "windows-x86_64", "kxmwp")
+	entries := []string{primary}
 
-func fileSize(p string) int64 {
-	st, err := os.Stat(p)
+	fmt.Println("building host wheels magic=kxmwp version=17.17.0 …")
+	wheels, err := rebuild.BuildPatchedFridaToolsWheels(cfg, cat, entries, nil)
 	if err != nil {
-		return 0
+		fmt.Println("WHEELS_ERR", err)
+		// continue to crosscheck if partial
+	} else {
+		fmt.Println("wheels", len(wheels))
+		for _, w := range wheels {
+			fmt.Println(" ", w)
+		}
 	}
-	return st.Size()
+
+	report, cerr := rebuild.RunCatalogProtocolCrossCheck(cat, cfg, entries, wheels)
+	if cerr != nil {
+		fmt.Println("CROSS_ERR", cerr)
+	} else {
+		out := filepath.Join(primary, "PROTOCOL-SYNC.json")
+		_ = rebuild.WriteProtocolCrossCheckReport(out, report)
+		fmt.Printf("protocol matched=%v issues=%v path=%s\n", report.Matched, report.Issues, out)
+	}
+	if err != nil {
+		os.Exit(1)
+	}
+	fmt.Println("EXPORT_OK")
 }

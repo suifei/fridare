@@ -1,9 +1,24 @@
 ﻿package main
+
 import (
-  "os"
-  "fridare-gui/internal/rebuild"
+	"fmt"
+	"os"
+
+	"fridare-gui/internal/rebuild"
 )
+
 func main() {
-  df := rebuild.DockerfileSkeletonForMirror("docker.1ms.run")
-  os.WriteFile(os.Args[1], []byte(df), 0644)
+	path := "Dockerfile"
+	if len(os.Args) > 1 {
+		path = os.Args[1]
+	}
+	mirror := ""
+	if len(os.Args) > 2 {
+		mirror = os.Args[2]
+	}
+	body := rebuild.DockerfileSkeletonForMirror(mirror)
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		panic(err)
+	}
+	fmt.Println("wrote", path, "features", rebuild.BuilderImageFeatureTag)
 }
