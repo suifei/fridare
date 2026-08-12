@@ -3,13 +3,13 @@
                           "FileVersion":  {
                                               "Major":  4,
                                               "Minor":  0,
-                                              "Patch":  4,
+                                              "Patch":  5,
                                               "Build":  0
                                           },
                           "ProductVersion":  {
                                                  "Major":  4,
                                                  "Minor":  0,
-                                                 "Patch":  4,
+                                                 "Patch":  5,
                                                  "Build":  0
                                              },
                           "FileFlagsMask":  "3f",
@@ -22,12 +22,12 @@
                            "Comments":  "Fridare create — https://github.com/suifei/fridare",
                            "CompanyName":  "suifei",
                            "FileDescription":  "Fridare — iOS DEB 打包工具",
-                           "FileVersion":  "4.0.4.0",
+                           "FileVersion":  "4.0.5.0",
                            "InternalName":  "fridare-create",
                            "LegalCopyright":  "Copyright (c) suifei",
                            "OriginalFilename":  "fridare-create.exe",
                            "ProductName":  "Fridare",
-                           "ProductVersion":  "4.0.4.0"
+                           "ProductVersion":  "4.0.5.0"
                        },
     "VarFileInfo":  {
                         "Translation":  {

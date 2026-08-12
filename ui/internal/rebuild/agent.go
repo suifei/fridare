@@ -184,40 +184,17 @@ func GrokInvokeArgs(binary, promptFile, workDir string) []string {
 // real source tree into concrete file-level operations (only files that actually
 // contain the Find string). Writes DirectionManifest + optional strip scan JSON.
 // This is the deterministic baseline used when AI is unavailable or for AI refine.
+//
+// Performance: broad globs (**/*) are resolved in a single tree walk (not one walk
+// per op). Large Frida monorepos (100k+ files under subprojects) otherwise spend
+// many minutes and are prone to host job-object kills during e2e runs.
 func PlanModsFromTree(sourceDir string, cfg JobConfig, branch string) (*ModPlan, error) {
 	dirMan := directionManifestForConfig(cfg)
 	baseline := OpsFromDirectionManifest(dirMan)
 	var concrete []ModOp
 	if sourceDir != "" {
 		if st, err := os.Stat(sourceDir); err == nil && st.IsDir() {
-			for _, op := range baseline {
-				if op.Find == "" {
-					continue
-				}
-				matches, err := matchOpPaths(sourceDir, op)
-				if err != nil {
-					continue
-				}
-				for _, rel := range matches {
-					// skip Fridare bookkeeping files (may contain pattern strings as metadata)
-					base := filepath.Base(rel)
-					if strings.HasPrefix(base, "fridare-") {
-						continue
-					}
-					full := filepath.Join(sourceDir, filepath.FromSlash(rel))
-					data, err := os.ReadFile(full)
-					if err != nil || !strings.Contains(string(data), op.Find) {
-						continue
-					}
-					concrete = append(concrete, ModOp{
-						Path:        rel,
-						Operation:   op.Operation,
-						Description: op.Description,
-						Find:        op.Find,
-						Replace:     op.Replace,
-					})
-				}
-			}
+			concrete = expandOpsAgainstTree(sourceDir, baseline)
 		}
 	}
 	ops := concrete
@@ -245,6 +222,131 @@ func PlanModsFromTree(sourceDir string, cfg JobConfig, branch string) (*ModPlan,
 		Version:    cfg.FridaVersion,
 		Operations: ops,
 	}, nil
+}
+
+// expandOpsAgainstTree turns baseline ops into concrete per-file ops.
+// Concrete paths are checked directly; glob ops share one Walk of sourceDir.
+func expandOpsAgainstTree(sourceDir string, baseline []ModOp) []ModOp {
+	var concrete []ModOp
+	var globOps []ModOp
+	for _, op := range baseline {
+		if op.Find == "" {
+			continue
+		}
+		pat := strings.TrimSpace(op.Path)
+		if pat == "" {
+			pat = "**/*"
+		}
+		pat = filepath.ToSlash(pat)
+		if !strings.ContainsAny(pat, "*?[") {
+			rel := pat
+			base := filepath.Base(rel)
+			if strings.HasPrefix(base, "fridare-") {
+				continue
+			}
+			full := filepath.Join(sourceDir, filepath.FromSlash(rel))
+			data, err := os.ReadFile(full)
+			if err != nil || !strings.Contains(string(data), op.Find) {
+				continue
+			}
+			concrete = append(concrete, ModOp{
+				Path: rel, Operation: op.Operation, Description: op.Description,
+				Find: op.Find, Replace: op.Replace,
+			})
+			continue
+		}
+		op.Path = pat
+		globOps = append(globOps, op)
+	}
+	if len(globOps) == 0 {
+		return concrete
+	}
+	// One walk for all globs: read each candidate file once, test all Finds.
+	_ = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			if shouldSkipModDir(info.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.Size() > 8*1024*1024 {
+			return nil
+		}
+		rel, err := filepath.Rel(sourceDir, path)
+		if err != nil {
+			return nil
+		}
+		relSlash := filepath.ToSlash(rel)
+		base := filepath.Base(relSlash)
+		if strings.HasPrefix(base, "fridare-") {
+			return nil
+		}
+		// Quick filter: only consider if any glob matches path
+		var hits []ModOp
+		for _, op := range globOps {
+			if matchGlob(op.Path, relSlash) {
+				if isBroadModGlob(op.Path) && skipBroadModCandidate(relSlash) {
+					continue
+				}
+				hits = append(hits, op)
+			}
+		}
+		if len(hits) == 0 {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil || isLikelyBinary(data) {
+			return nil
+		}
+		s := string(data)
+		for _, op := range hits {
+			if !strings.Contains(s, op.Find) {
+				continue
+			}
+			concrete = append(concrete, ModOp{
+				Path: relSlash, Operation: op.Operation, Description: op.Description,
+				Find: op.Find, Replace: op.Replace,
+			})
+		}
+		return nil
+	})
+	return concrete
+}
+
+// shouldSkipModDir returns true for directories that must not be walked during
+// source-mod planning/apply (VCS, deps, non-core language bindings, tests).
+func shouldSkipModDir(base string) bool {
+	switch base {
+	case ".git", "node_modules", "build", ".deps", "deps", "releng", ".github",
+		"frida-clr", "frida-go", "frida-node", "frida-qml", "frida-swift",
+		"frida-python", "frida-tools",
+		"test", "tests", "examples", "docs":
+		return true
+	}
+	if strings.HasPrefix(base, "build-") {
+		return true
+	}
+	return false
+}
+
+// isBroadModGlob is true for tree-wide patterns that should skip binary-like files.
+func isBroadModGlob(pat string) bool {
+	return pat == "**/*" || pat == "**" || strings.HasSuffix(pat, "/**") || strings.Contains(pat, "/**/*")
+}
+
+// skipBroadModCandidate rejects paths that must not be planned under broad **/* globs.
+// Shared by expandOpsAgainstTree and matchOpPaths so plan vs apply stay aligned.
+func skipBroadModCandidate(relSlash string) bool {
+	ext := strings.ToLower(filepath.Ext(relSlash))
+	switch ext {
+	case ".o", ".a", ".so", ".dll", ".exe", ".obj", ".png", ".jpg", ".jpeg",
+		".zip", ".gz", ".tgz", ".7z", ".bin", ".pyc", ".pyo", ".wasm":
+		return true
+	}
+	return false
 }
 
 // PlanMods implements AgentDriver.
@@ -671,16 +773,7 @@ func matchOpPaths(sourceDir string, op ModOp) ([]string, error) {
 			return nil
 		}
 		if info.IsDir() {
-			base := info.Name()
-			// Skip VCS, build outputs, and huge non-core subprojects (speeds Windows bind mounts)
-			switch base {
-			case ".git", "node_modules", "build", ".deps", "deps",
-				"frida-clr", "frida-go", "frida-node", "frida-qml", "frida-swift",
-				"frida-python", "frida-tools", // host Python tools packaged separately
-				"test", "tests", "examples", "docs":
-				return filepath.SkipDir
-			}
-			if strings.HasPrefix(base, "build-") {
+			if shouldSkipModDir(info.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -691,15 +784,8 @@ func matchOpPaths(sourceDir string, op ModOp) ([]string, error) {
 		}
 		relSlash := filepath.ToSlash(rel)
 		if matchGlob(pat, relSlash) {
-			// Prefer text-like files when pattern is broad **/*
-			if pat == "**/*" || strings.HasSuffix(pat, "/**") || strings.Contains(pat, "/**/*") {
-				ext := strings.ToLower(filepath.Ext(relSlash))
-				if ext != "" && !textFileExts[ext] {
-					// still allow extensionless and common source without map entry if small
-					if ext == ".o" || ext == ".a" || ext == ".so" || ext == ".dll" || ext == ".exe" || ext == ".png" || ext == ".jpg" {
-						return nil
-					}
-				}
+			if isBroadModGlob(pat) && skipBroadModCandidate(relSlash) {
+				return nil
 			}
 			out = append(out, relSlash)
 		}

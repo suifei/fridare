@@ -4,11 +4,11 @@
 # GUI (Fyne): requires CGO + OpenGL; built for host Windows only (windows-amd64).
 #
 # Usage:
-#   powershell -File scripts\build-release.ps1 -Version 4.0.4
-#   powershell -File scripts\build-release.ps1 -Version 4.0.4 -Only windows-amd64
+#   powershell -File scripts\build-release.ps1 -Version 4.0.5
+#   powershell -File scripts\build-release.ps1 -Version 4.0.5 -Only windows-amd64
 
 param(
-    [string]$Version = "4.0.4",
+    [string]$Version = "4.0.5",
     # Optional: build only one platform dir name, e.g. windows-amd64
     [string]$Only = ""
 )

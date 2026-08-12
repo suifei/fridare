@@ -21,13 +21,32 @@
 [![GitHub followers](https://img.shields.io/github/followers/suifei.svg?style=social&label=Follow&maxAge=2592000)](https://github.com/suifei?tab=followers)
 [![Twitter Follow](https://img.shields.io/twitter/follow/csuifei?style=social)](https://twitter.com/csuifei)
 
-Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida-server 的自动化魔改工具。它允许用户更改名称和端口，以增强安全性和灵活性。免除了很多越狱检测frida的情况。
+Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改工具：改名称、端口与协议面标识，降低常见环境检测命中率。提供 **命令行 + 跨平台 GUI**，并支持 **静态补丁** 与 **Docker 源码重编译** 双技术路线。
 
-🎉 **v4.0.4**：CLI 工具多平台 **静态链接** 预编译（Windows/Linux/macOS × amd64/arm64）；Windows GUI 预编译包见 [Releases](https://github.com/suifei/fridare/releases)。
+| 版本 | 要点 | 下载 |
+|------|------|------|
+| **v4.0.5**（当前） | seed 脚本 Docker stage 修复；plan 扫描加速；README/CHANGELOG 精装；MinGW wrap 失败清理 | [Releases](https://github.com/suifei/fridare/releases/tag/v4.0.5) |
+| v4.0.4 | **双技术路线**：默认 hex 静态魔改 + 可选 Docker **深度源码重编译**；Windows MinGW server；服务端/客户端协议同步（`re.{magic}.` · `/re/{magic}/` · `{magic}:rpc`）；内置 AI Agent；OpenAI 端点探测；代理默认不走 | [v4.0.4](https://github.com/suifei/fridare/releases/tag/v4.0.4) |
+| v4.0.3 | CLI 多平台静态链接（win/linux/darwin × amd64/arm64）+ Windows GUI 预编译 | [v4.0.3](https://github.com/suifei/fridare/releases/tag/v4.0.3) |
+| v4.0.0 | Fyne GUI + Windows 原生 deb 魔改 | [v4.0.0](https://github.com/suifei/fridare/releases) |
 
-✨ **双模式支持**：既保留了强大的命令行界面，又新增了用户友好的图形界面，满足不同用户的使用习惯。
+**文档**：[双技术路线](docs/dual-track.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
 
-**[Windows 下使用](win/README.md)|[Android 文档](docs/android.md)|[iOS 文档](docs/ios.md)|[frida-tools 文档](docs/patch-tools.md)|[安装指北](docs/install.md)|[CHANGELOG](CHANGELOG)**
+### 双技术路线（v4.0.4）
+
+| 路线 | GUI | 依赖 | 速度 | 适用 |
+|------|-----|------|------|------|
+| **A · 静态补丁（默认）** | `frida 魔改` / `frida-tools 魔改` / iOS DEB | 无 Docker | 秒级 | 日常改名、改端口、对齐 tools |
+| **B · 源码重编译（可选）** | `源码重编译` · **一键深度定制** | **仅 Docker/Linux 内编译**（Host 不装 Frida 工具链） | 小时级 | 深度隐藏、协议面同步、Windows MinGW server |
+
+**深度魔改（deep）要点**：魔改名固定 **5 位小写 a-z**；server 与 host client wheel **必须成对**（同一 magic）；对象路径含 `/re/{magic}/`，避免只改 `re.frida.` 导致 UNKNOWN_METHOD。详细说明见 **[docs/dual-track.md](docs/dual-track.md)**。
+
+```text
+GUI：打开「源码重编译」→ 选 deep →「一键深度定制（①+② deep）」
+Host：只跑 GUI / AI 改挂载源码 / docker 客户端
+Docker：clone · configure · make（含 MinGW windows-x86_64）
+产物：catalog/<ver>/<target>/<magic>/binaries/*-server.exe + python/host wheels + PROTOCOL-SYNC
+```
 
 ### 写给 Windows 用户（`.cmd` / `.bat` 小坑）
 
@@ -44,37 +63,45 @@ Fridare 是一个用于 iOS frida 插件、Android,linux,Windows 等平台 frida
 
 ## 特性
 
-- **🎉 全新GUI版本**：基于 Fyne 框架的现代化图形用户界面
-- **🖥️ 跨平台支持**：Windows、macOS、Linux 原生GUI应用
-- **📱 直观操作**：可视化的 Frida 服务器修改和配置管理
-- **📊 实时反馈**：图形化日志显示和进度条展示
-- **🔧 Windows deb包支持**：在Windows平台下直接修改和创建deb包，无需Linux环境
-- 自动下载并修改指定版本的 frida-server 
-- 随机生成新的 frida-server 名称
-- 自定义 frida-server 端口
-- 支持 arm 和 arm64 架构
-- 二进制替换修改
-   - frida-server
-   - frida-agent.dylib
-   - frida-tools
-- 生成可直接安装的修改版 .deb 包
-- 一体化命令行界面，提供多种功能
-- 配置文件支持，可保存用户设置
-- 自动检查和安装依赖
-- 下载特定 Frida 模块
-- 列出可用 Frida 版本和模块
-- 支持 Conda 环境
-- 支持 macho, elf, pe 文件格式
-- 支持 Windows,Linux,MacOS,Android,IOS 的patch
-- 支持自更新
+### v4.x 核心能力
 
-欢迎使用新的一键安装功能快速开始使用 Fridare！
+| 能力 | 说明 |
+|------|------|
+| **双技术路线** | 静态 hex 补丁（默认）+ Docker 源码重编译（可选 deep） |
+| **协议面同步** | `re.{magic}.` · `/re/{magic}/` · `{magic}:rpc` · `Frida.*` API 面，server↔client 成对 |
+| **GUI（Fyne）** | 下载 / 魔改 / tools / DEB / **源码重编译** / 设置；一键深度定制 |
+| **内置 AI Agent** | OpenAI 兼容端点；「测试端点连接」；**端点默认不走 GUI 代理**（可开） |
+| **Docker-only 编译** | Host 永不执行 configure/make；MinGW 交叉产出 Windows server |
+| **多平台发布** | CLI 静态链接 6 架构；Windows GUI 预编译（[Releases](https://github.com/suifei/fridare/releases)） |
+| **Windows deb** | 本机解压/改包/重打包，无需 WSL |
+| **魔改名契约** | 全链路 **5 位小写 a-z**（与 hexreplace 一致） |
+
+### 经典能力（CLI + GUI 共用）
+
+- 自动下载并修改指定版本 frida-server / agent / gadget  
+- 自定义名称与端口；arm / arm64 等架构  
+- 二进制替换：frida-server、frida-agent、frida-tools  
+- 修改版 `.deb` 打包；Conda / 多 Python 环境  
+- macho / elf / pe；Windows · Linux · macOS · Android · iOS  
+- 配置文件、依赖检查、模块列表与自更新  
+
+欢迎使用一键安装快速上手：
 
 ```shell
- curl -s https://raw.githubusercontent.com/suifei/fridare/main/fridare.sh | bash -s install
+curl -s https://raw.githubusercontent.com/suifei/fridare/main/fridare.sh | bash -s install
 ```
 
-## 🎉 全新GUI版本 v4.0.0 - 2025-01-02
+## 🎉 GUI 与 v4 大版本（摘要）
+
+### v4.0.4 — 双轨深度魔改 · Docker · Agent（2026-08）
+
+- 源码重编译标签默认 **deep**；一键深度 = 开发魔改 + Docker 编译  
+- Windows `x86_64-w64-mingw32` server 产物 + host wheel **PROTOCOL-SYNC**  
+- MinGW wrap 预种子脚本自动 stage 进容器 `/work`  
+- OpenAI 端点真实 HTTP 探测；代理出口开关默认关  
+- 详见 [docs/dual-track.md](docs/dual-track.md) 与 [CHANGELOG](CHANGELOG)
+
+### v4.0.0 — 图形界面发布（2025-01-02）
 
 ### 重大更新：图形用户界面发布
 
@@ -88,9 +115,11 @@ Fridare 现在提供了基于 Fyne 框架的现代化图形用户界面，让 Fr
 - **⚙️ 可视化配置**：图形化的配置管理界面
 - **🔧 多工具集成**：包含创建、修补、GUI三个独立工具
 
-#### 📦 构建GUI版本
+#### 📦 本机构建 GUI
 
-**Windows（推荐 PowerShell / CMD，无需 bash）：**
+依赖：**Go 1.21+**；GUI 需要 **CGO + 本机 C 编译器**（Windows 上 MinGW/gcc 在 `PATH`）。CLI 工具可 `CGO_ENABLED=0` 纯静态构建。
+
+**Windows（推荐 PowerShell，无需 bash）：**
 ```powershell
 cd ui
 .\build.ps1
@@ -101,22 +130,25 @@ cd ui
 ```bash
 cd ui
 ./build.sh
-# 交叉编译 Windows: ./build.sh windows
+# 交叉编译 Windows GUI: ./build.sh windows   # 仍需目标侧图形依赖，一般建议本机构建
 ```
 
-构建完成后将生成三个可执行文件：
-- `fridare-gui` / `fridare-gui.exe` - 主GUI应用程序
-- `fridare-create` / `fridare-create.exe` - 创建工具 
-- `fridare-patch` / `fridare-patch.exe` - 补丁工具
+产物（`ui/build/`）：
 
-#### 🖥️ 运行GUI应用
+| 文件 | 说明 |
+|------|------|
+| `fridare-gui.exe` / `fridare-gui` | 主 GUI（Windows 为 `-H windowsgui`，无黑框控制台） |
+| `fridare-create.exe` / `fridare-create` | 创建 / 打包工具 |
+| `fridare-patch.exe` / `fridare-patch` | 补丁工具 |
 
-```bash
-./build/fridare-gui.exe   # Windows
-./build/fridare-gui       # Linux/macOS
+#### 🖥️ 运行
+
+```powershell
+.\build\fridare-gui.exe          # Windows
+./build/fridare-gui              # Linux / macOS
 ```
 
-GUI版本保持了与命令行版本完全相同的功能，同时提供了更加友好的用户体验。无论您是新手还是专家，都可以轻松使用图形界面来修改和配置 Frida 服务器。
+预编译包请直接下 [Releases](https://github.com/suifei/fridare/releases)（无需本地装 Go）。
 
 ### 📸 GUI版本截图
 
@@ -378,36 +410,31 @@ cd fridare
 ./fridare.sh help
 ```
 
-### 方式二：GUI版本（推荐）
+### 方式二：GUI 版本（推荐）
 
-#### 构建GUI应用
+**最快**：直接下载 [Releases](https://github.com/suifei/fridare/releases) 中的 Windows GUI 包，无需本机 Go。
 
-1. 确保已安装依赖：
-```shell
-# 安装 Go (如果尚未安装)
-# 安装 Fyne 依赖
-go install fyne.io/fyne/v2/cmd/fyne@latest
-```
+**本机构建**（开发 / 魔改 GUI 源码时）：
 
-2. 构建GUI应用：
-```shell
+| 系统 | 依赖 | 命令 |
+|------|------|------|
+| Windows | Go 1.21+、**MinGW gcc 在 PATH**（如 `C:\msys64\mingw64\bin`） | `cd ui` → `.\build.ps1` |
+| Linux / macOS | Go + CGO 图形依赖 | `cd ui` → `./build.sh` |
+
+```powershell
+# Windows 示例：把 MSYS2 MinGW 放进当前会话 PATH 后构建
+$env:Path = "C:\msys64\mingw64\bin;" + $env:Path
 cd ui
-./build.sh
+.\build.ps1
+.\build\fridare-gui.exe
 ```
 
-3. 运行GUI应用：
-```shell
-./build/fridare-gui.exe
-```
+#### GUI 特色
 
-#### GUI版本特色
-
-- 🎨 **直观界面**：现代化的图形用户界面，操作简单直观
-- 📁 **文件拖拽**：支持拖拽文件到应用中进行处理
-- 📊 **实时反馈**：可视化进度条和彩色日志输出
-- ⚙️ **配置管理**：图形化配置界面，设置一目了然
-- 🔧 **工具集成**：集成创建、修补、GUI多个工具于一体
-- 🗂️ **Windows deb包支持**：在Windows下原生处理deb包，无需Linux环境
+- 直观界面 · 拖拽文件 · 实时日志 / 进度  
+- **双技术路线**：静态魔改标签 + **源码重编译 / 一键深度**  
+- 设置页：OpenAI 端点探测、代理出口开关  
+- Windows 原生 deb 处理，无需 WSL
 
 ## 使用方法
 Fridare 提供了多个命令来满足不同的需求：
@@ -599,17 +626,24 @@ fridare.sh 脚本自动化了整个过程：
 
 # Fridare
 
-Fridare is a modification tool designed for customizing Frida-server, specifically for jailbroken iOS devices. It allows users to change names and ports, enhancing security and flexibility. It eliminates many jailbreak detection scenarios for Frida.
+Fridare automates Frida customization on **iOS / Android / Linux / Windows**: rename binaries, change ports, and align protocol fingerprints. Ships **CLI + cross-platform GUI**, with two tracks:
 
-🎉 **v4.0.0 Major Update**: Brand new cross-platform GUI version based on Fyne framework, providing a modern graphical user interface that makes Frida server modification more intuitive and convenient!
+| Track | What | Needs |
+|-------|------|--------|
+| **A · Static patch (default)** | hex/string replace on official binaries + tools | No Docker |
+| **B · Source rebuild (optional)** | AI/host edits + **Docker-only** `configure/make` (incl. MinGW Windows server) | Docker |
 
-✨ **Dual Mode Support**: Retains the powerful command-line interface while introducing a user-friendly graphical interface to meet different user preferences.
+**v4.0.4**: deep profile (`re.{magic}.`, `/re/{magic}/`, `{magic}:rpc`), PROTOCOL-SYNC host wheels, one-click deep GUI, OpenAI probe (proxy **off** by default). See [docs/dual-track.md](docs/dual-track.md) and [Releases](https://github.com/suifei/fridare/releases/tag/v4.0.5).
 
-[CHANGELOG](CHANGELOG)
+[CHANGELOG](CHANGELOG) · Chinese docs above · [Windows notes](win/README.md)
 
-## Features
+## Features (English summary)
 
-Here's the English version of the changelog:
+- Dual-track Frida mods · Fyne GUI · Windows native deb · multi-arch static CLI  
+- Magic name: **exactly 5 lowercase a–z** end-to-end  
+- Optional local rebuild: `cd ui && ./build.sh` or `.\build.ps1` (CGO for GUI)
+
+### Historical English changelog notes
 
 ## [v3.1.4] - 2024-07-18
 

@@ -861,6 +861,10 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	if werr := os.WriteFile(buildScriptPath, []byte(WriteScriptUnixLF(buildOnly)), 0755); werr != nil {
 		return werr
 	}
+	// Stage MinGW wrap seeder next to build-only.sh so container sees /work/seed-mingw-wraps.sh
+	if serr := StageSeedMinGWWraps(srcHost); serr != nil {
+		return fmt.Errorf("stage MinGW seed script: %w", serr)
+	}
 	// Policy marker for host-side readers
 	policy := CompileIsolationPolicy + "\nHost client OS: " + HostPlatformLabel() + "\n"
 	_ = os.WriteFile(filepath.Join(srcHost, "COMPILE-IN-DOCKER-ONLY.txt"), []byte(WriteScriptUnixLF(policy)), 0644)

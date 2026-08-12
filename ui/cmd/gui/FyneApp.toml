@@ -4,7 +4,7 @@ Website = "https://github.com/suifei/fridare"
   Icon = "../../../logo/AppIcon.ico"
   Name = "Fridare GUI"
   ID = "com.suifei.fridare"
-  Version = "4.0.4"
+  Version = "4.0.5"
   Build = 1
 
 [LinuxAndBSD]

@@ -294,7 +294,13 @@ func ScanFridaMarkers(sourceDir, magic string) (ScanReport, error) {
 		"re.frida.",
 	}
 	err := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info == nil || info.IsDir() {
+		if err != nil || info == nil {
+			return nil
+		}
+		if info.IsDir() {
+			if shouldSkipModDir(info.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		// skip huge / binary
@@ -308,10 +314,6 @@ func ScanFridaMarkers(sourceDir, magic string) (ScanReport, error) {
 			return nil
 		}
 		if !textFileExts[ext] && base != "meson.build" && base != "makefile" {
-			return nil
-		}
-		// skip .git
-		if strings.Contains(path, string(filepath.Separator)+".git"+string(filepath.Separator)) {
 			return nil
 		}
 		data, err := os.ReadFile(path)

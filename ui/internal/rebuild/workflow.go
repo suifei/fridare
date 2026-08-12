@@ -359,6 +359,8 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir string) (string
 		if !t.DockerFriendly {
 			b.WriteString(fmt.Sprintf("echo '[fridare] WARNING: target %s may require Apple host toolchain: %s'\n", t.ID, t.Notes))
 		}
+		// Wipe prior out-of-tree build so reconfigure is not blocked by "Already configured".
+		b.WriteString(fmt.Sprintf("rm -rf %s\n", shellQuote(buildDir)))
 		b.WriteString(fmt.Sprintf("mkdir -p %s\n", shellQuote(buildDir)))
 		// MinGW Windows cross: no official sdk-*-mingw prebuild → --without-prebuilds=sdk:host.
 		// Pre-seed meson wraps so git fetch is reliable under proxy; strip CRLF shebangs.
@@ -369,10 +371,8 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir string) (string
 				"command -v %s-gcc >/dev/null || { echo '[fridare] ERROR: missing MinGW %s-gcc (install mingw-w64 in builder image)' >&2; exit 1; }\n",
 				t.Host, t.Host))
 			// Seed wrap-git deps under frida-core/gum (libffi etc.) before configure.
-			b.WriteString(fmt.Sprintf(
-				"if [ -x %s/../seed-mingw-wraps.sh ]; then bash %s/../seed-mingw-wraps.sh %s; "+
-					"elif [ -f /work/seed-mingw-wraps.sh ]; then bash /work/seed-mingw-wraps.sh %s; fi\n",
-				shellQuote(srcDir), shellQuote(srcDir), shellQuote(srcDir), shellQuote(srcDir)))
+			// Script is staged by StageSeedMinGWWraps into /work (see orchestrator).
+			b.WriteString(SeedMinGWWrapsShellSnippet(srcDir))
 		}
 		b.WriteString(fmt.Sprintf(
 			"find %s -type f \\( -name '*.py' -o -name 'configure' -o -name '*.sh' \\) -print0 2>/dev/null | xargs -0 -r sed -i 's/\\r$//' || true\n",

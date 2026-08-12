@@ -2,6 +2,46 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## v4.0.5 - 2026-08-12
+
+### Fixed
+- MinGW `seed-mingw-wraps.sh` 嵌入并 stage 到 Docker `/work`（此前调用路径为空操作）
+- wrap clone/checkout 失败清理半成品目录，避免永久钉死错误 revision
+- seed 探测使用 `-f`（Windows bind mount 常无 +x）
+
+### Improved
+- PlanMods 单次 Walk 扫描加速；plan/apply 共享 broad 文件过滤
+- README / 文档：v4 双技术路线与构建说明精装
+
+### Notes
+- 功能面继承 v4.0.4（deep / PROTOCOL-SYNC / Agent / 代理默认关）
+## v4.0.4 - 2026-08-12
+
+### Added
+- **双技术路线产品化**：默认静态 hex 补丁 + 可选 Docker 源码重编译（GUI「源码重编译」）
+  - 文档：[docs/dual-track.md](docs/dual-track.md)
+  - 深度 profile：ProtocolAPI + 对象路径 `/re/{magic}/`，与 server 同步
+  - **一键深度定制**：默认 deep · JobModeFull（Host 魔改 → Docker 编译）
+- **Windows MinGW 源码产物**：`windows-x86_64` / `x86_64-w64-mingw32`；catalog 导出 `*-server.exe` 与 host wheels
+- **PROTOCOL-SYNC**：server ↔ client 协议交叉校验（`re.{magic}.` · `/re/{magic}/` · `{magic}:rpc`）
+- **内置 AI Agent**：grok CLI 现代参数（`--prompt-file`）；OpenAI 兼容端点 **真实 HTTP 探测**（设置「测试端点连接」）
+- **代理开关**：OpenAI 端点是否走 GUI 代理，**默认不走**
+- MinGW wrap 预种子：`seed-mingw-wraps.sh` 嵌入并 **stage 到 Docker `/work`**；失败清理半成品目录
+- Plan 扫描单次 Walk 加速；`shouldSkipModDir` / `skipBroadModCandidate` 对齐 plan/apply
+
+### Fixed
+- 禁止裸 `/frida/` 路径替换砸坏 `github.com/frida/*` wraps / go.mod（`RepairFridaGitWraps`）
+- Grok invoke 兼容新版 CLI（弃用失效的 `-f`）
+- Windows `versioninfo.json` 无 BOM（goversioninfo 兼容）
+- 编译脚本 LF-only；bind mount 下 seed 使用 `-f` 而非依赖 `+x`
+
+### Changed
+- 编译 **仅在 Docker/Linux**；Host 不装完整 Frida 工具链
+- 魔改名契约维持 **5 位 a-z** 全链路
+
+### Notes
+- 全量 MinGW make 仍为小时级；预编译 GUI/CLI 见 Releases，无需本地 Docker 即可用静态路线
+
 ## v4.0.3 - 2026-07-29
 
 ### Added
