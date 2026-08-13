@@ -134,6 +134,8 @@ type JobConfig struct {
 	DisableStealthMarkers bool
 	// BuildID participates in stealth seed (magic|BuildID). Empty → "0".
 	BuildID string
+	// CloneRef is the official git tag/branch to clone. Empty → EffectiveCloneRef(FridaVersion).
+	CloneRef string
 }
 
 // EffectiveMode returns Mode or JobModeFull when unset.
@@ -723,7 +725,8 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	}
 
 	// --- clone (Step 2: develop — Docker-first; bind-mount so agent can edit on host) ---
-	notify(StageClone, 0.25, fmt.Sprintf("步骤② Docker 内浅克隆 Frida %s (--depth=1)…", cfg.FridaVersion), nil)
+	cloneRef := EffectiveCloneRef(cfg)
+	notify(StageClone, 0.25, fmt.Sprintf("步骤② Docker 内浅克隆 Frida %s (--depth=1, clone=%s)…", cfg.FridaVersion, cloneRef), nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -741,7 +744,7 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	if !cfg.DryRun {
 		if _, statErr := os.Stat(filepath.Join(cloneDest, ".git")); statErr != nil {
 			_ = os.RemoveAll(cloneDest)
-			cloneSh, clErr := DockerCloneShell(cfg.FridaVersion, "frida")
+			cloneSh, clErr := DockerCloneShell(cloneRef, "frida")
 			if clErr != nil {
 				return clErr
 			}
@@ -1109,7 +1112,7 @@ func hostGitShallowClone(ctx context.Context, runner Runner, cfg JobConfig, dest
 	if runner == nil {
 		runner = ExecRunner{}
 	}
-	args, err := ShallowCloneArgs(CloneSpec{Version: cfg.FridaVersion, DestDir: dest})
+	args, err := ShallowCloneArgs(CloneSpec{Version: EffectiveCloneRef(cfg), DestDir: dest})
 	if err != nil {
 		return err
 	}

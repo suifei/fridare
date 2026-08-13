@@ -63,6 +63,7 @@ func TestShippedSourceContainsOpenAIRecommendedStrings(t *testing.T) {
 				"seededJunkChk",
 				"stealthMarkersChk",
 				"FormatStealthJobSummary",
+				"ApplyGUIRebuildStealthDefaults",
 				"不是免杀",
 				"行为识别",
 				"行为隐身",

@@ -538,7 +538,7 @@ func (rt *RebuildTab) baseJobConfig(mode rebuild.JobMode) rebuild.JobConfig {
 		profile = strings.TrimSpace(rt.profileSelect.Selected)
 	}
 	dirFile := filepath.Join(work, "fridare-directions.json")
-	return rebuild.JobConfig{
+	cfg := rebuild.JobConfig{
 		FridaVersion:     version,
 		TargetIDs:        rt.selectedTargets(),
 		MagicName:        magic,
@@ -559,14 +559,16 @@ func (rt *RebuildTab) baseJobConfig(mode rebuild.JobMode) rebuild.JobConfig {
 		Mode:             mode,
 		ArchiveImage:     archive,
 		DryRun:           false,
-		DirectionProfile:      profile,
-		StripSymbols:          rt.stripSymbolsChk == nil || rt.stripSymbolsChk.Checked,
-		DisableSymbolStrip:    rt.stripSymbolsChk != nil && !rt.stripSymbolsChk.Checked,
-		DisableJunk:           rt.seededJunkChk != nil && !rt.seededJunkChk.Checked,
-		DisableStealthMarkers: rt.stealthMarkersChk != nil && !rt.stealthMarkersChk.Checked,
-		RandomAgentPrefix:     rt.randomAgentChk != nil && rt.randomAgentChk.Checked,
-		DirectionFile:         dirFile,
+		DirectionProfile: profile,
+		DirectionFile:    dirFile,
 	}
+	rebuild.ApplyGUIRebuildStealthDefaults(&cfg)
+	cfg.StripSymbols = rt.stripSymbolsChk == nil || rt.stripSymbolsChk.Checked
+	cfg.DisableSymbolStrip = rt.stripSymbolsChk != nil && !rt.stripSymbolsChk.Checked
+	cfg.DisableJunk = rt.seededJunkChk != nil && !rt.seededJunkChk.Checked
+	cfg.DisableStealthMarkers = rt.stealthMarkersChk != nil && !rt.stealthMarkersChk.Checked
+	cfg.RandomAgentPrefix = rt.randomAgentChk != nil && rt.randomAgentChk.Checked
+	return cfg
 }
 
 func (rt *RebuildTab) refreshImageStatus() {

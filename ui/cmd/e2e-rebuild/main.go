@@ -69,7 +69,7 @@ func main() {
 		TargetIDs:        targets,
 		MagicName:        *magic,
 		ListenPort:       *port,
-		Goals:            "e2e one-shot deep: server+client sync re.frida./Frida./rpc + basename/idents + post-build markers + host wheels",
+		Goals:            "GUI rebuild path: deep + stealth defaults (strip/junk/markers)",
 		WorkDir:          workDir,
 		ArtifactDir:      arts,
 		Proxy:            *proxy,
@@ -77,19 +77,19 @@ func main() {
 		OpenAIAPIKey:     envOr("OPENAI_API_KEY", "e2e-no-key"),
 		DockerImage:      *image,
 		DockerMirror:     *mirror,
-		DockerPullDirect: true,
 		UseExistingGrok:  *agent,
-		AgentUseGUIProxy: true,
-		MinDiskGB:        3,
+		AgentUseGUIProxy: false,
 		DryRun:           *dry,
 		Mode:             jobMode,
 		DirectionProfile: *profile,
 		DirectionFile:    dirFile,
 	}
+	rebuild.ApplyGUIRebuildStealthDefaults(&cfg)
 
-	fmt.Printf("=== Fridare e2e rebuild (one-shot entry) ===\n")
-	fmt.Printf("version=%s targets=%v magic=%s mode=%s profile=%s agent=%v\n",
-		cfg.FridaVersion, cfg.TargetIDs, cfg.MagicName, jobMode, cfg.DirectionProfile, *agent)
+	fmt.Printf("=== Fridare e2e rebuild (GUI JobConfig + Orchestrator) ===\n")
+	fmt.Printf("version=%s clone=%s targets=%v magic=%s mode=%s profile=%s agent=%v\n",
+		cfg.FridaVersion, rebuild.EffectiveCloneRef(cfg), cfg.TargetIDs, cfg.MagicName, jobMode, cfg.DirectionProfile, *agent)
+	fmt.Println(rebuild.FormatStealthJobSummary(cfg))
 	fmt.Printf("work=%s\nproxy=%s mirror=%s dry=%v\n", workDir, cfg.Proxy, cfg.DockerMirror, cfg.DryRun)
 	fmt.Printf("directions=%s timeout=%s\n\n", dirFile, *timeout)
 
