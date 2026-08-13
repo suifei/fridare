@@ -34,6 +34,28 @@ func TestInjectSeededJunk_ReplacesBlock(t *testing.T) {
 	}
 }
 
+func TestInjectSeededJunk_DoesNotSwallowTrailingCode(t *testing.T) {
+	src := "void foo(void) {}\n"
+	once := InjectSeededJunk(src, "s1")
+	withTail := once + "\n#if 0\nvoid leftover(void) {}\n#endif\n"
+	twice := InjectSeededJunk(withTail, "s2")
+	if !strings.Contains(twice, "void leftover(void)") {
+		t.Fatalf("trailing TU must survive re-inject: %s", twice)
+	}
+	if strings.Count(twice, fridareJunkMarker) != 1 {
+		t.Fatalf("should still be one junk block: %s", twice)
+	}
+	if !strings.Contains(twice, "__attribute__((used, noinline))") {
+		t.Fatal("junk must keep used+noinline so strip cannot drop folded immediates")
+	}
+	if !strings.Contains(twice, "__attribute__((constructor, used, noinline))") {
+		t.Fatal("junk must keep a noinline constructor root so strip cannot drop folded immediates")
+	}
+	if !strings.Contains(twice, "_words[2]") {
+		t.Fatal("junk must emit rodata words that survive strip")
+	}
+}
+
 func TestApplySeededJunkToInjectionTUs(t *testing.T) {
 	root := t.TempDir()
 	on := filepath.Join(root, "subprojects", "frida-gum", "gum", "backend-linux", "gumprocess-linux.c")

@@ -2,6 +2,22 @@
 所有值得注意的更改都将记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)，并且本项目遵循 [语义化版本](https://semver.org/spec/v2.0.0.html)。
 
+## Unreleased
+
+### Added
+- 源码 stealth：SELinux `frida_file`/`frida_memfd`（仅引号）、`/frida-zymbiote-`、注入 TU 花指令（constructor + used）
+- 产物 `StripProductBinary`：ELF dynsym + 全文 `frida_` / `_frida_` 同长度改写
+- 预编译 r2：见 [kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1)
+
+### Fixed
+- 禁止裸替换 `linjector` / `frida_file`（会砸 meson 与 libc-shim 标识符）
+- 随机 agent 前缀只改 dump so，不动 `.version`
+- MinGW DNS stub 不用 `wchar_t`（可在任何 include 顺序下 -include）
+- per-TU ninja 补丁只改当前 `build.ninja`（禁止扫全部 build-*）
+- 花指令重注入用第一个 `#endif`，避免吞掉后面的预处理块
+- 仅 `used` 会被 `--gc-sections` 丢掉；改为 constructor 作 GC 根
+- 产物补丁补 `frida-zymbiote` / `_frida_`（Vala 残留）
+
 ## v4.0.6 - 2026-08-13
 
 ### Added

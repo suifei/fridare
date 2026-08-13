@@ -42,7 +42,7 @@ typedef void (__stdcall *PDNS_SERVICE_BROWSE_CALLBACK)(void *pQueryContext, void
 typedef struct _DNS_SERVICE_BROWSE_REQUEST {
   unsigned long Version;
   unsigned long InterfaceIndex;
-  const wchar_t *QueryName;
+  const unsigned short *QueryName; /* wchar_t */
   union {
     PDNS_SERVICE_BROWSE_CALLBACK pBrowseCallback;
     DNS_QUERY_COMPLETION_ROUTINE pBrowseCallbackV2;

@@ -98,7 +98,7 @@ GUI 与 Docker **客户端**在 Windows、macOS、Linux 上均可使用：
 
 编译约定：`--enable-server --enable-gadget --enable-inject --disable-frida-python`。  
 MinGW DNS 类型桩只注入 meson **cross file**，不要设全局 `CFLAGS=-include`。  
-产物可选 **去符号**（ELF dynsym `frida_` 同长度改写）。`abi` 标识符重命名只作用于注入白名单（gum process / linjector / agent-glue）。注入相关 `.c` 可插入种子花指令，ninja **按文件**加 `-DFRIDARE_JUNK_SEED`，禁止全局 CFLAGS。
+产物可选 **去符号**（ELF dynsym + 全文 `frida_` / `_frida_` 同长度改写）。`abi` 标识符重命名只作用于注入白名单（gum process / linjector / agent-glue）。注入相关 `.c` 插入种子花指令时必须带 **constructor + used**（仅 `used` 会被 `--gc-sections` 丢掉）；ninja **只补当前 `build.ninja`**，禁止全局 CFLAGS。去掉字样 **不是** 免杀。
 
 **国内 Hub 镜像源**默认 `docker.1ms.run`（设置页与「源码重编译」页均可改；pull/build 默认直连、不走 GUI 代理）。
 

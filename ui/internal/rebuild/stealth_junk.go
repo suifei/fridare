@@ -35,11 +35,14 @@ func SeededJunkC(seed string) string {
 	if len(tag) > 16 {
 		tag = tag[:16]
 	}
+	id := sanitizeJunkIdent(tag)
 	return fmt.Sprintf(`%sseed=%s */
 #if 1
-static volatile unsigned fridare_junk_%s(unsigned x) {
-  unsigned k = 0x%08xu;
-  unsigned m = 0x%08xu;
+/* noinline + volatile: a constant call is otherwise folded; strip then drops .debug copies */
+static unsigned fridare_junk_%s(unsigned x) __attribute__((used, noinline));
+static unsigned fridare_junk_%s(unsigned x) {
+  volatile unsigned k = 0x%08xu;
+  volatile unsigned m = 0x%08xu;
   if ((x ^ k) == m) {
     k ^= 0x11111111u;
   } else if (x == k) {
@@ -49,8 +52,16 @@ static volatile unsigned fridare_junk_%s(unsigned x) {
   }
   return k ^ x ^ m;
 }
+static const unsigned fridare_junk_%s_words[2] = { 0x%08xu, 0x%08xu };
+static void fridare_junk_%s_keep(void) __attribute__((constructor, used, noinline));
+static void fridare_junk_%s_keep(void) {
+  volatile unsigned arg = 1u;
+  volatile unsigned v = fridare_junk_%s(arg);
+  v ^= fridare_junk_%s_words[0] ^ fridare_junk_%s_words[1];
+  (void)v;
+}
 #endif
-`, fridareJunkMarker, tag, sanitizeJunkIdent(tag), a, b)
+`, fridareJunkMarker, tag, id, id, a, b, id, a, b, id, id, id, id, id)
 }
 
 func sanitizeJunkIdent(s string) string {
@@ -72,9 +83,10 @@ func sanitizeJunkIdent(s string) string {
 func InjectSeededJunk(content, seed string) string {
 	block := SeededJunkC(seed)
 	if i := strings.Index(content, fridareJunkMarker); i >= 0 {
-		// replace existing block through last #endif after marker
+		// Replace only this block: first #endif after the marker (never LastIndex —
+		// that would swallow later preprocessor closes if anything follows the junk).
 		rest := content[i:]
-		end := strings.LastIndex(rest, "#endif")
+		end := strings.Index(rest, "#endif")
 		if end >= 0 {
 			end += len("#endif")
 			if end < len(rest) && rest[end] == '\n' {

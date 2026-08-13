@@ -330,6 +330,10 @@ func PatchArtifactBinaryMarkers(dir, magic string) (int, error) {
 		{[]byte("frida_helper"), []byte(magic + "_helper")},
 		{[]byte("frida_agent"), []byte(magic + "_agent")},
 		{[]byte("frida_gadget"), []byte(magic + "_gadget")},
+		// Stealth markers (same length when magic is 5 letters)
+		{[]byte("frida-zymbiote"), []byte(magic + "-zymbiote")},
+		{[]byte("u:object_r:frida"), []byte("u:object_r:" + magic)},
+		{[]byte("_frida_"), []byte("_" + magic + "_")},
 	}
 	// Server+client protocol surface (same length when magic is 5 letters)
 	if proto, err := core.ClientProtocolBinaryPairs(magic); err == nil {

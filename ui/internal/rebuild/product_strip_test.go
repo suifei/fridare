@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -141,6 +142,21 @@ func TestStripProductBinary_RewritesDynsymExport(t *testing.T) {
 	}
 	if !foundNew {
 		t.Fatalf("new export missing: %+v", syms)
+	}
+}
+
+func TestRewriteFridaExportCStrings_LeadingUnderscoreAndInterior(t *testing.T) {
+	data := []byte("X_frida_device_do_close\x00on_frida_thread\x00frida_agent\x00keep")
+	n := rewriteFridaExportCStrings(data, "abcde")
+	if n < 2 {
+		t.Fatalf("rewrites=%d data=%q", n, data)
+	}
+	s := string(data)
+	if strings.Contains(s, "_frida_") || strings.Contains(s, "\x00frida_agent") {
+		t.Fatalf("old prefix remains: %q", data)
+	}
+	if !strings.Contains(s, "_abcde_device_do_close") || !strings.Contains(s, "on_abcde_thread") || !strings.Contains(s, "abcde_agent") {
+		t.Fatalf("new prefix missing: %q", data)
 	}
 }
 

@@ -70,6 +70,9 @@ func StripProductBinaryBytes(data []byte, magic string) ([]byte, StripResult, er
 	if bytes.HasPrefix(out, []byte("\x7fELF")) {
 		res.Format = "elf"
 		n, dbg := stripELFInPlace(out, magic)
+		// Always also rewrite leftover identifier strings (Vala `_frida_*`,
+		// rodata). Dynsym-only pass leaves those in the file.
+		n += rewriteFridaExportCStrings(out, magic)
 		res.ExportsRewritten = n
 		res.DebugStripped = dbg
 	} else if len(out) > 64 && out[0] == 'M' && out[1] == 'Z' {
@@ -112,9 +115,15 @@ func rewriteFridaExportCStrings(data []byte, magic string) int {
 	if magic == "" || len(magic) != 5 {
 		return 0
 	}
-	old := []byte("frida_")
-	neu := []byte(magic + "_")
-	if len(old) != len(neu) {
+	n := rewriteIdentPrefix(data, []byte("frida_"), []byte(magic+"_"))
+	// Vala emits `_frida_*` and `*_on_frida_thread`; previous byte is `_` so
+	// the ident-start pass skips them.
+	n += rewriteSameLen(data, []byte("_frida_"), []byte("_"+magic+"_"))
+	return n
+}
+
+func rewriteIdentPrefix(data, old, neu []byte) int {
+	if len(old) != len(neu) || len(old) == 0 {
 		return 0
 	}
 	n := 0
@@ -125,11 +134,29 @@ func rewriteFridaExportCStrings(data []byte, magic string) int {
 			break
 		}
 		at := idx + i
-		// only rewrite as a C identifier start (start of file or non-ident byte)
 		if at > 0 && isIdentCont(data[at-1]) {
 			idx = at + 1
 			continue
 		}
+		copy(data[at:at+len(old)], neu)
+		n++
+		idx = at + len(old)
+	}
+	return n
+}
+
+func rewriteSameLen(data, old, neu []byte) int {
+	if len(old) != len(neu) || len(old) == 0 {
+		return 0
+	}
+	n := 0
+	idx := 0
+	for {
+		i := bytes.Index(data[idx:], old)
+		if i < 0 {
+			break
+		}
+		at := idx + i
 		copy(data[at:at+len(old)], neu)
 		n++
 		idx = at + len(old)
@@ -210,6 +237,9 @@ func rewriteFridaNamesInStrtab(strtab []byte, magic string) int {
 		name := strtab[i:end]
 		if bytes.HasPrefix(name, []byte("frida_")) {
 			copy(name[:5], []byte(magic))
+			n++
+		} else if bytes.HasPrefix(name, []byte("_frida_")) {
+			copy(name[1:6], []byte(magic))
 			n++
 		}
 		i = end + 1
