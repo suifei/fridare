@@ -4,6 +4,8 @@
 
 对应 GitHub Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.0>
 
+**新用户请改下 [kxmwp-17.17.1](./kxmwp-17.17.1.md)**（去符号 + linux/win64 stealth 重编 + 花指令）。本页是 r1 用法底稿，端口/`-l`/无 iOS 说明仍适用。
+
 ---
 
 ## 1. 这批产物是什么

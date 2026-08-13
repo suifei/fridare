@@ -4,10 +4,18 @@
 
 ## Unreleased
 
+（无 GUI 版本变更。Frida 产物 r2 见下方 `kxmwp-17.17.1`。）
+
+## kxmwp-17.17.1 - 2026-08-13
+
+产物 tag（**不是** GUI latest；latest 仍是 v4.0.6）。  
+Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1>  
+说明：[docs/kxmwp-17.17.1.md](docs/kxmwp-17.17.1.md)
+
 ### Added
-- 源码 stealth：SELinux `frida_file`/`frida_memfd`（仅引号）、`/frida-zymbiote-`、注入 TU 花指令（constructor + used）
+- 源码 stealth：SELinux `frida_file`/`frida_memfd`（仅引号）、`/frida-zymbiote-`、注入 TU 花指令（constructor + noinline + rodata words）
 - 产物 `StripProductBinary`：ELF dynsym + 全文 `frida_` / `_frida_` 同长度改写
-- 预编译 r2：见 [kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1)
+- 预编译 r2：linux-x86_64 / windows-x86_64 增量重编；其余平台去符号 + 同长度标记
 
 ### Fixed
 - 禁止裸替换 `linjector` / `frida_file`（会砸 meson 与 libc-shim 标识符）
@@ -15,8 +23,11 @@
 - MinGW DNS stub 不用 `wchar_t`（可在任何 include 顺序下 -include）
 - per-TU ninja 补丁只改当前 `build.ninja`（禁止扫全部 build-*）
 - 花指令重注入用第一个 `#endif`，避免吞掉后面的预处理块
-- 仅 `used` 会被 `--gc-sections` 丢掉；改为 constructor 作 GC 根
+- 仅 `used` 会被 `--gc-sections` / 官方 strip 丢掉；改为 constructor + noinline
 - 产物补丁补 `frida-zymbiote` / `_frida_`（Vala 残留）
+
+### Notes
+- **不是免杀包。** 端口用 `-l`。客户端必须同一 magic 的 host wheel。
 
 ## v4.0.6 - 2026-08-13
 
