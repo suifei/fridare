@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+### Added
+- builder 镜像同时预装 NDK **r25**（`/opt/android-ndk-r25`）与 **r29**；16.x 按 `env_android.py` `NDK_REQUIRED` 自动选用
+- 编译脚本优先 Frida toolchain ninja（apt ninja 1.10 无 `ninja -t inputs`，windows-x86_64 compat 会失败）
+- MinGW DNS 桩写入 cross file 后 `meson configure -Dc_args=`，避免 meson 重生成丢掉 `-include`
+
+### Notes
+- `kxmwp-16.7.19` 八平台 server 已全部换成 GUI 源码重编译产物（**不是** GUI latest，**不是免杀**）
+
 ## v4.0.8 - 2026-08-13
 
 ### Fixed

@@ -66,7 +66,7 @@ func MinGWCrossFileDNSIncludeShell(headerFileName string) string {
 	}
 	// Embed a short Python script via bash heredoc (no Go/Python quote wars).
 	return fmt.Sprintf(`python3 - <<'PY'
-import pathlib, re
+import json, pathlib, re, subprocess, sys
 inc = "/work/%s"
 ps = list(pathlib.Path(".").glob("frida-*-mingw.txt"))
 if not ps:
@@ -81,5 +81,27 @@ for p in ps:
     s2 = re.sub(r"^(c_args|cpp_args)\s*=\s*(.+)$", fix, s, flags=re.M)
     p.write_text(s2)
     print("[fridare] MinGW cross-file DNS include:", p)
+# Meson caches c_args in coredata at first setup. Editing the cross file
+# alone is dropped on regenerate — persist via meson configure.
+def current(name):
+    p = pathlib.Path("meson-info/intro-buildoptions.json")
+    if not p.is_file():
+        return []
+    for o in json.loads(p.read_text(encoding="utf-8")):
+        if o.get("name") == name:
+            return list(o.get("value") or [])
+    return []
+def with_inc(args):
+    args = [str(a) for a in args]
+    if inc not in args:
+        args = ["-include", inc] + args
+    return args
+c_args = with_inc(current("c_args") or ["-ffunction-sections", "-fdata-sections"])
+cpp_args = with_inc(current("cpp_args") or ["-ffunction-sections", "-fdata-sections"])
+r = subprocess.run(["meson", "configure", "-Dc_args=" + ",".join(c_args), "-Dcpp_args=" + ",".join(cpp_args)],
+                   capture_output=True, text=True)
+print("[fridare] meson configure DNS include exit", r.returncode)
+if r.returncode != 0:
+    sys.stderr.write((r.stderr or r.stdout or "")[:800] + "\n")
 PY`, headerFileName)
 }

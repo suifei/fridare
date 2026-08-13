@@ -51,6 +51,9 @@ func TestDockerfileSkeletonForMirror(t *testing.T) {
 	if !strings.Contains(df, "ANDROID_NDK_ROOT") || !strings.Contains(df, "android-ndk-r29-linux.zip") {
 		t.Fatal("Dockerfile must preinstall NDK r29")
 	}
+	if !strings.Contains(df, "android-ndk-r25c-linux.zip") || !strings.Contains(df, "/opt/android-ndk-r25") {
+		t.Fatal("Dockerfile must preinstall NDK r25 for Frida 16.x")
+	}
 	if !strings.Contains(df, "gcc-aarch64-linux-gnu") || !strings.Contains(df, "g++-aarch64-linux-gnu") {
 		t.Fatal("Dockerfile must preinstall aarch64 cross GCC for linux-arm64")
 	}
@@ -81,7 +84,8 @@ func TestDockerfileSkeletonForMirror(t *testing.T) {
 
 func TestImageHasBuilderFeaturesShell(t *testing.T) {
 	sh := ImageHasBuilderFeaturesShell()
-	if !strings.Contains(sh, BuilderImageFeatureTag) || !strings.Contains(sh, BuilderImageNDKPath) {
+	if !strings.Contains(sh, BuilderImageFeatureTag) || !strings.Contains(sh, BuilderImageNDKPath) ||
+		!strings.Contains(sh, BuilderImageNDKR25Path) {
 		t.Fatal(sh)
 	}
 }

@@ -87,17 +87,19 @@ GUI 与 Docker **客户端**在 Windows、macOS、Linux 上均可使用：
 
 **原则**：重依赖只在 `docker build` 时安装一次；AI agent 魔改阶段只做环境确认，再按 Frida 版本拉 subprojects，不在编译任务里现装 NDK/Node/Go。
 
-`fridare/frida-builder` 在 **docker build** 时预装（feature **`toolchain-v4-ndk29-node20-go124-mingw-aarch64`**）：
+`fridare/frida-builder` 在 **docker build** 时预装（feature **`toolchain-v5-ndk25-ndk29-node20-go124-mingw-aarch64`**）：
 
 - apt：git / make / python3 / ninja / glib / cmake / flex / bison 等  
 - **Node.js 20**（Frida 硬性要求 ≥18；Ubuntu 22.04 自带 apt node 太旧）  
 - **Go 1.24**（Compiler backend / ESBuild）  
-- **Android NDK r29** → `/opt/android-ndk-r29`（`ANDROID_NDK_ROOT`）  
+- **Android NDK r29** → `/opt/android-ndk-r29`（默认 `ANDROID_NDK_ROOT`，Frida 17.x）  
+- **Android NDK r25** → `/opt/android-ndk-r25`（Frida 16.x `NDK_REQUIRED=25` 自动选用）  
 - **mingw-w64**（Windows x86 / x86_64 交叉）  
 - **gcc-aarch64-linux-gnu**（Linux arm64 交叉；`--host=aarch64-linux-gnu`）
 
 编译约定：`--enable-server --enable-gadget --enable-inject --disable-frida-python`。  
 MinGW DNS 类型桩只注入 meson **cross file**，不要设全局 `CFLAGS=-include`。  
+`make`/`ninja` 必须用 Frida `deps/toolchain-linux-x86_64/bin/ninja`（apt ninja 1.10 没有 `ninja -t inputs`，windows-x86_64 嵌套 32 位 helper 会失败）。  
 产物可选 **去符号**（ELF dynsym + 全文 `frida_` / `_frida_` 同长度改写）。`abi` 标识符重命名只作用于注入白名单（gum process / linjector / agent-glue）。注入相关 `.c` 插入种子花指令时必须带 **constructor + noinline + used** 和 rodata words（仅 `used` 会被折叠进 DWARF，官方 `strip` 后产物里看不到）；ninja **只补当前 `build.ninja`**，禁止全局 CFLAGS。
 
 GUI：**源码重编译**步骤②有与流水线对等的 stealth 开关（去符号 / 花指令 / 行为标记 / 随机 agent 落盘）。静态「frida 魔改」只有「导出后去符号」，没有花指令。行为隐身覆盖 **行为识别** 可见面（线程名、命名管道、SELinux/memfd、maps）。**不是免杀**，也不能保证对内核/游戏加固/杀软有「非常好的效果」。

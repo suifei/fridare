@@ -269,9 +269,11 @@ func BuildOnlyPipelineScript(opts PipelineScriptOptions) (string, error) {
 // Android NDK r29 (Frida 17.x configure requires ANDROID_NDK_ROOT = r29).
 // Install path: ONLY via Dockerfile (docker build). Runtime only verifies.
 const (
-	AndroidNDKVersion = "r29"
-	AndroidNDKURL     = "https://dl.google.com/android/repository/android-ndk-r29-linux.zip"
-	AndroidNDKDirName = "android-ndk-r29" // legacy workdir name; not used for install
+	AndroidNDKVersion   = "r29"
+	AndroidNDKURL       = "https://dl.google.com/android/repository/android-ndk-r29-linux.zip"
+	AndroidNDKR25URL    = "https://dl.google.com/android/repository/android-ndk-r25c-linux.zip"
+	AndroidNDKDirName   = "android-ndk-r29" // legacy workdir name; not used for install
+	AndroidNDKR25DirName = "android-ndk-r25"
 )
 
 // NeedsAndroidNDK reports whether any selected target needs ANDROID_NDK_ROOT.
@@ -355,6 +357,55 @@ func EnsureAndroidNDKShell() string {
 	return VerifyBuildEnvShell(true)
 }
 
+// SelectAndroidNDKForFridaSourceShell points ANDROID_NDK_ROOT at the NDK major
+// version Frida's releng/env_android.py requires (16.x → r25, 17.x → r29).
+func SelectAndroidNDKForFridaSourceShell(srcDir string) string {
+	if srcDir == "" {
+		srcDir = "frida"
+	}
+	return fmt.Sprintf(`echo '[fridare] select NDK to match this Frida tree'
+ndk_req="$(python3 - <<'PY'
+from pathlib import Path
+import re
+p = Path(%q) / "releng" / "env_android.py"
+if not p.is_file():
+    print("")
+    raise SystemExit
+m = re.search(r"NDK_REQUIRED\s*=\s*(\d+)", p.read_text(encoding="utf-8", errors="replace"))
+print(m.group(1) if m else "")
+PY
+)"
+if [ -n "$ndk_req" ] && [ -d "/opt/android-ndk-r${ndk_req}" ]; then
+  export ANDROID_NDK_ROOT="/opt/android-ndk-r${ndk_req}"
+  echo "[fridare] NDK r${ndk_req} -> $ANDROID_NDK_ROOT"
+elif [ -d %s ]; then
+  export ANDROID_NDK_ROOT=%s
+  echo "[fridare] NDK fallback image default -> $ANDROID_NDK_ROOT"
+fi
+export ANDROID_NDK_ROOT
+`, srcDir, shellQuote(BuilderImageNDKPath), shellQuote(BuilderImageNDKPath))
+}
+
+// PreferFridaToolchainNinjaShell exports NINJA from Frida's deps toolchain.
+// Image apt ninja 1.10 lacks `ninja -t inputs`; compat/build.py fails without it.
+func PreferFridaToolchainNinjaShell(srcDir string) string {
+	if srcDir == "" {
+		srcDir = "frida"
+	}
+	return fmt.Sprintf(`tc_ninja=""
+for c in %s/deps/toolchain-linux-x86_64/bin/ninja /work/%s/deps/toolchain-linux-x86_64/bin/ninja; do
+  if [ -x "$c" ]; then tc_ninja="$c"; break; fi
+done
+if [ -n "$tc_ninja" ]; then
+  export NINJA="$tc_ninja"
+  export PATH="$(dirname "$tc_ninja"):$PATH"
+  echo "[fridare] NINJA=$NINJA (toolchain; has ninja -t inputs)"
+else
+  echo "[fridare] warning: Frida toolchain ninja not found; apt ninja 1.10 cannot run compat/build.py -t inputs"
+fi
+`, shellQuote(srcDir), path.Base(srcDir))
+}
+
 // compileTargetsShell is the configure/make body that must only run in Linux Docker.
 // Script assumes execution from container workdir /work with source at /work/<srcDir>.
 // Build dirs are /work/build-<id> (sibling of source), NOT ../build-* (that escapes the volume).
@@ -371,8 +422,14 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir, stealthSeed st
 	b.WriteString(fmt.Sprintf("if [ ! -f %s/configure ] && [ ! -x %s/configure ]; then echo '[fridare] ERROR: no configure in source; listing:' >&2; ls -la %s | head -50; exit 127; fi\n",
 		shellQuote(srcDir), shellQuote(srcDir), shellQuote(srcDir)))
 	b.WriteString(fmt.Sprintf("chmod +x %s/configure 2>/dev/null || true\n", shellQuote(srcDir)))
+	// Ubuntu 22.04 /usr/bin/ninja 1.10 has no `ninja -t inputs`.
+	// frida-core compat/build.py needs that tool for windows-x86_64 32-bit helper.
+	b.WriteString(PreferFridaToolchainNinjaShell(srcDir))
 	// Verify image toolchain (NDK / aarch64 cross baked at docker build); do not re-download every job
 	b.WriteString(VerifyBuildEnvShellEx(NeedsAndroidNDK(targetIDs), NeedsLinuxArm64Cross(targetIDs)))
+	if NeedsAndroidNDK(targetIDs) {
+		b.WriteString(SelectAndroidNDKForFridaSourceShell(srcDir))
+	}
 	b.WriteString("\n")
 	// linux-arm64: ensure cross CC is visible to Frida configure/meson
 	// (host triplet aarch64-linux-gnu OR explicit CC= both work; set both for robustness)

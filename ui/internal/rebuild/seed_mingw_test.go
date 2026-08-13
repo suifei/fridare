@@ -106,6 +106,9 @@ func TestMinGWCrossFileDNSIncludeShell(t *testing.T) {
 	if !strings.Contains(sh, "frida-*-mingw.txt") && !strings.Contains(sh, "mingw.txt") {
 		t.Fatal("must target mingw cross files", sh)
 	}
+	if !strings.Contains(sh, "meson configure") || !strings.Contains(sh, "-Dc_args=") {
+		t.Fatal("must persist DNS include into meson coredata", sh)
+	}
 }
 
 func TestSkipBroadModCandidate_Shared(t *testing.T) {

@@ -13,7 +13,7 @@
 
 ## 预编译 Frida 产物（独立 tag，不是 GUI latest）
 
-- [kxmwp-16.7.19](https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19) — 官方 16.7.19 GUI 路径 linux-x86_64
+- [kxmwp-16.7.19](https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19) — 官方 16.7.19 八平台 GUI 源码重编译（Android NDK r25）
 - [kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1) — 官方 17.17.0，产品标签 17.17.1
 
 **不是免杀包。** 端口用 `-l`。客户端必须同一 magic 的 host wheel。

@@ -29,7 +29,7 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 | **v4.0.7** | 源码页 stealth 开关（去符号/花指令/行为标记）；静态魔改可去符号；**不是免杀** | [v4.0.7](https://github.com/suifei/fridare/releases/tag/v4.0.7) |
 | **v4.0.6** | Docker **toolchain-v4**（MinGW + aarch64）；监听端口用 `-l` | [v4.0.6](https://github.com/suifei/fridare/releases/tag/v4.0.6) |
 | **kxmwp-17.17.1**（当前 Frida 产物） | 官方 17.17.0；linux-x86_64 GUI 路径 stealth 重编；**不是免杀**；端口用 `-l` | [kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1) |
-| **kxmwp-16.7.19** | 官方 **16.7.19** GUI 路径 linux-x86_64 + host wheels | [kxmwp-16.7.19](https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19) |
+| **kxmwp-16.7.19** | 官方 **16.7.19** 八平台 GUI 源码重编译（Android NDK r25）+ host wheels；**不是免杀** | [kxmwp-16.7.19](https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19) |
 | **kxmwp-17.17.0** | Frida **17.17.0** deep 产物（8 平台 server + host wheels） | [kxmwp-17.17.0](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.0) |
 | **v4.0.5** | seed 脚本 Docker stage 修复；plan 扫描加速；README/CHANGELOG 精装；MinGW wrap 失败清理 | [v4.0.5](https://github.com/suifei/fridare/releases/tag/v4.0.5) |
 | v4.0.4 | **双技术路线**：默认 hex 静态魔改 + 可选 Docker **深度源码重编译**；Windows MinGW server；服务端/客户端协议同步（`re.{magic}.` · `/re/{magic}/` · `{magic}:rpc`）；内置 AI Agent；OpenAI 端点探测；代理默认不走 | [v4.0.4](https://github.com/suifei/fridare/releases/tag/v4.0.4) |

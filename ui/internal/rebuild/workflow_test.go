@@ -65,6 +65,26 @@ func TestManagementBranchName(t *testing.T) {
 	}
 }
 
+func TestSelectAndroidNDKForFridaSourceShell(t *testing.T) {
+	sh := SelectAndroidNDKForFridaSourceShell("frida")
+	if !strings.Contains(sh, "NDK_REQUIRED") || !strings.Contains(sh, "/opt/android-ndk-r") {
+		t.Fatal(sh)
+	}
+	if !strings.Contains(sh, "releng") || !strings.Contains(sh, "env_android.py") {
+		t.Fatal("must read Frida env_android.py")
+	}
+}
+
+func TestPreferFridaToolchainNinjaShell(t *testing.T) {
+	sh := PreferFridaToolchainNinjaShell("frida")
+	if !strings.Contains(sh, "export NINJA=") || !strings.Contains(sh, "toolchain-linux-x86_64/bin/ninja") {
+		t.Fatal(sh)
+	}
+	if !strings.Contains(sh, "ninja -t inputs") {
+		t.Fatal("must mention the apt ninja 1.10 gap")
+	}
+}
+
 func TestBuildPipelineScript_IncludesCloneBranchTargets(t *testing.T) {
 	script, err := BuildPipelineScript(PipelineScriptOptions{
 		Clone:     CloneSpec{Version: "17.16.4"},
@@ -177,6 +197,12 @@ func TestBuildOnlyPipelineScript_DockerOnlyMake(t *testing.T) {
 	}
 	if !strings.Contains(script, "configure --host=android-arm64") {
 		t.Fatal(script)
+	}
+	if !strings.Contains(script, "NDK_REQUIRED") || !strings.Contains(script, "/opt/android-ndk-r") {
+		t.Fatal("android job must select NDK major from env_android.py")
+	}
+	if !strings.Contains(script, "export NINJA=") || !strings.Contains(script, "toolchain-linux-x86_64/bin/ninja") {
+		t.Fatal("compile must prefer Frida toolchain ninja (apt 1.10 lacks -t inputs)")
 	}
 	if !strings.Contains(script, "--enable-server") || !strings.Contains(script, "--disable-frida-python") ||
 		!strings.Contains(script, "--disable-frida-tools") {

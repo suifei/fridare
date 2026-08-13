@@ -1,11 +1,11 @@
 # Fridare Frida builder — ALL heavy deps prepared at image build time
-# Base (Hub mirror aware): docker.1ms.run/library/ubuntu:22.04
-# Features: toolchain-v4-ndk29-node20-go124-mingw-aarch64
+# Base (Hub mirror aware): ubuntu:22.04
+# Features: toolchain-v5-ndk25-ndk29-node20-go124-mingw-aarch64
 # Policy: docker build installs toolchain; AI agent / compile only verifies + version subprojects.
-FROM docker.1ms.run/library/ubuntu:22.04
+FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive \
     ANDROID_NDK_ROOT=/opt/android-ndk-r29 \
-    FRIDARE_BUILDER_FEATURES=toolchain-v4-ndk29-node20-go124-mingw-aarch64 \
+    FRIDARE_BUILDER_FEATURES=toolchain-v5-ndk25-ndk29-node20-go124-mingw-aarch64 \
     LANG=C.UTF-8 \
     PATH=/usr/local/go/bin:/usr/local/node/bin:$PATH
 # Optional proxy for Google/Node/Go downloads during docker build (pass --build-arg)
@@ -73,9 +73,22 @@ RUN set -ex; \
     rm -rf /tmp/android-ndk.zip /tmp/ndk-extract; \
     test -d "$ANDROID_NDK_ROOT/toolchains" -o -f "$ANDROID_NDK_ROOT/ndk-build"; \
     echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT"
+# --- Android NDK r25 (Frida 16.x env_android.py NDK_REQUIRED=25) ---
+RUN set -ex; \
+    export http_proxy="${http_proxy:-${HTTP_PROXY:-}}"; \
+    export https_proxy="${https_proxy:-${HTTPS_PROXY:-}}"; \
+    curl -fL --retry 5 --retry-delay 3 -o /tmp/android-ndk-r25.zip https://dl.google.com/android/repository/android-ndk-r25c-linux.zip; \
+    mkdir -p /tmp/ndk-extract; \
+    unzip -q /tmp/android-ndk-r25.zip -d /tmp/ndk-extract; \
+    EXTRACTED="$(find /tmp/ndk-extract -maxdepth 1 -type d -name 'android-ndk-*' | head -1)"; \
+    test -n "$EXTRACTED"; \
+    mv "$EXTRACTED" /opt/android-ndk-r25; \
+    rm -rf /tmp/android-ndk-r25.zip /tmp/ndk-extract; \
+    test -d /opt/android-ndk-r25/toolchains -o -f /opt/android-ndk-r25/ndk-build; \
+    echo "ANDROID_NDK_R25=/opt/android-ndk-r25"
 # Clear build-time proxy for runtime containers
 ENV HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= ALL_PROXY= all_proxy=
 WORKDIR /work
 RUN echo "$FRIDARE_BUILDER_FEATURES" > /etc/fridare-builder-features && \
-    echo "node=$(node -v) go=$(go version) ndk=$ANDROID_NDK_ROOT" >> /etc/fridare-builder-features
+    echo "node=$(node -v) go=$(go version) ndk=$ANDROID_NDK_ROOT ndk25=/opt/android-ndk-r25" >> /etc/fridare-builder-features
 CMD ["bash"]

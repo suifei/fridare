@@ -77,9 +77,10 @@ func hasForeignRegistry(image string) bool {
 // Bootstrap uses this to decide whether an existing local image is stale.
 // v2: Node.js 20 + Go 1.24 + NDK r29 (Frida 17.x requires node>=18; Go powers Compiler backend).
 const (
-	// v4: + aarch64-linux-gnu cross GCC for linux-arm64 (v3 had mingw only)
-	BuilderImageFeatureTag = "toolchain-v4-ndk29-node20-go124-mingw-aarch64"
+	// v5: NDK r25 (Frida 16.x) + r29 (Frida 17.x)
+	BuilderImageFeatureTag = "toolchain-v5-ndk25-ndk29-node20-go124-mingw-aarch64"
 	BuilderImageNDKPath    = "/opt/android-ndk-r29"
+	BuilderImageNDKR25Path = "/opt/android-ndk-r25"
 	// Official tarball URLs installed at docker-build time (not per job).
 	BuilderImageNodeVersion = "20.18.1"
 	BuilderImageGoVersion   = "1.24.2"
@@ -89,12 +90,13 @@ const (
 
 // DockerfileSkeletonForMirror returns a full Frida builder image definition.
 // ALL heavy toolchain deps are installed HERE (docker build):
-//   apt tools, Node.js ≥18, Go ≥1.24, Android NDK r29, MinGW, aarch64 cross GCC.
+//   apt tools, Node.js ≥18, Go ≥1.24, Android NDK r25+r29, MinGW, aarch64 cross GCC.
 // Later AI-mod / compile jobs only VERIFY the environment and let Frida
 // fetch version-specific subprojects — never re-download NDK/Node/Go each job.
 func DockerfileSkeletonForMirror(mirror string) string {
 	base := ResolveDockerImage(DefaultDockerfileBaseImage, mirror)
 	ndkURL := AndroidNDKURL
+	ndk25URL := AndroidNDKR25URL
 	// China-friendly apt mirror when using docker.1ms.run or empty (still helps in CN)
 	useCNApt := mirror != "" || true
 	aptSetup := ""
@@ -176,24 +178,38 @@ RUN set -ex; \
     rm -rf /tmp/android-ndk.zip /tmp/ndk-extract; \
     test -d "$ANDROID_NDK_ROOT/toolchains" -o -f "$ANDROID_NDK_ROOT/ndk-build"; \
     echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT"
+# --- Android NDK r25 (Frida 16.x env_android.py NDK_REQUIRED=25) ---
+RUN set -ex; \
+    export http_proxy="${http_proxy:-${HTTP_PROXY:-}}"; \
+    export https_proxy="${https_proxy:-${HTTPS_PROXY:-}}"; \
+    curl -fL --retry 5 --retry-delay 3 -o /tmp/android-ndk-r25.zip %s; \
+    mkdir -p /tmp/ndk-extract; \
+    unzip -q /tmp/android-ndk-r25.zip -d /tmp/ndk-extract; \
+    EXTRACTED="$(find /tmp/ndk-extract -maxdepth 1 -type d -name 'android-ndk-*' | head -1)"; \
+    test -n "$EXTRACTED"; \
+    mv "$EXTRACTED" %s; \
+    rm -rf /tmp/android-ndk-r25.zip /tmp/ndk-extract; \
+    test -d %s/toolchains -o -f %s/ndk-build; \
+    echo "ANDROID_NDK_R25=%s"
 # Clear build-time proxy for runtime containers
 ENV HTTP_PROXY= HTTPS_PROXY= http_proxy= https_proxy= ALL_PROXY= all_proxy=
 WORKDIR /work
 RUN echo "$FRIDARE_BUILDER_FEATURES" > /etc/fridare-builder-features && \
-    echo "node=$(node -v) go=$(go version) ndk=$ANDROID_NDK_ROOT" >> /etc/fridare-builder-features
+    echo "node=$(node -v) go=$(go version) ndk=$ANDROID_NDK_ROOT ndk25=%s" >> /etc/fridare-builder-features
 CMD ["bash"]
 `, base, BuilderImageFeatureTag, base, BuilderImageNDKPath, BuilderImageFeatureTag, aptSetup,
 		BuilderImageNodeVersion, BuilderImageNodeURL,
 		BuilderImageGoVersion, BuilderImageGoURL,
-		ndkURL)
+		ndkURL, ndk25URL, BuilderImageNDKR25Path, BuilderImageNDKR25Path, BuilderImageNDKR25Path, BuilderImageNDKR25Path,
+		BuilderImageNDKR25Path)
 }
 
 // ImageHasBuilderFeaturesShell returns a one-liner to verify the image was built
 // with the expected toolchain (NDK + Node + Go + aarch64 cross). Exit 0 if OK.
 func ImageHasBuilderFeaturesShell() string {
 	return fmt.Sprintf(
-		`set -e; test -f /etc/fridare-builder-features; grep -q %s /etc/fridare-builder-features; test -d "$ANDROID_NDK_ROOT" -o -d %s; command -v node >/dev/null; node -e "const M=process.versions.node.split('.')[0]|0; if(M<18) process.exit(1)"; command -v go >/dev/null; command -v aarch64-linux-gnu-gcc >/dev/null || { echo '[fridare] aarch64-linux-gnu-gcc missing (linux-arm64)'; exit 1; }; echo OK`,
-		shellQuote(BuilderImageFeatureTag), shellQuote(BuilderImageNDKPath),
+		`set -e; test -f /etc/fridare-builder-features; grep -q %s /etc/fridare-builder-features; test -d "$ANDROID_NDK_ROOT" -o -d %s; test -d %s; command -v node >/dev/null; node -e "const M=process.versions.node.split('.')[0]|0; if(M<18) process.exit(1)"; command -v go >/dev/null; command -v aarch64-linux-gnu-gcc >/dev/null || { echo '[fridare] aarch64-linux-gnu-gcc missing (linux-arm64)'; exit 1; }; echo OK`,
+		shellQuote(BuilderImageFeatureTag), shellQuote(BuilderImageNDKPath), shellQuote(BuilderImageNDKR25Path),
 	)
 }
 
