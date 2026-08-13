@@ -594,8 +594,8 @@ func RenameMagicAssetFiles(sourceDir, magicName string) (int, error) {
 	if sourceDir == "" || magicName == "" || magicName == "frida" {
 		return 0, nil
 	}
-	// Keep in sync with DefaultModOps hyphen basenames (agent/server/gadget/helper)
-	prefixes := []string{"frida-agent", "frida-server", "frida-gadget", "frida-helper"}
+	// Keep in sync with hyphen product basenames (meson .version/.symbols/.xcent).
+	prefixes := []string{"frida-agent", "frida-server", "frida-gadget", "frida-helper", "frida-inject", "frida-policyd"}
 	renamed := 0
 	// Collect first to avoid walking while renaming
 	var todos [][2]string // oldPath, newPath

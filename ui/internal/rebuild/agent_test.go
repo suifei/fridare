@@ -385,6 +385,9 @@ func TestRenameMagicAssetFiles(t *testing.T) {
 	_ = os.MkdirAll(helperDir, 0755)
 	oldH := filepath.Join(helperDir, "frida-helper-backend.resources")
 	_ = os.WriteFile(oldH, []byte("R\n"), 0644)
+	injDir := filepath.Join(dir, "inject")
+	_ = os.MkdirAll(injDir, 0755)
+	_ = os.WriteFile(filepath.Join(injDir, "frida-inject.version"), []byte("V\n"), 0644)
 	// also a content-only file that should not be renamed
 	_ = os.WriteFile(filepath.Join(agentDir, "readme.txt"), []byte("frida-agent"), 0644)
 
@@ -392,8 +395,11 @@ func TestRenameMagicAssetFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 2 {
-		t.Fatalf("renamed %d want 2", n)
+	if n != 3 {
+		t.Fatalf("renamed %d want 3", n)
+	}
+	if _, err := os.Stat(filepath.Join(injDir, "abcde-inject.version")); err != nil {
+		t.Fatal("expected renamed inject.version")
 	}
 	if _, err := os.Stat(filepath.Join(agentDir, "abcde-agent-android.version")); err != nil {
 		t.Fatal("expected renamed agent file")
