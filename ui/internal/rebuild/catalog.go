@@ -236,6 +236,9 @@ func OrganizeExportToCatalog(catalogRoot string, cfg JobConfig, dockerArts, flat
 		_, _ = RenameArtifactBasenames(binDir, cfg.MagicName)
 		// In-binary same-length string markers (detectors scan these)
 		_, _ = PatchArtifactBinaryMarkers(binDir, cfg.MagicName)
+		if ShouldStripProductSymbols(cfg) {
+			_, _ = StripProductBinariesDir(binDir, cfg.MagicName)
+		}
 		// MANIFEST after rename — list real basenames only
 		binFiles, _ := listNonEmptyFiles(binDir)
 		man := ArtifactManifest{

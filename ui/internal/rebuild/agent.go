@@ -193,6 +193,7 @@ func GrokInvokeArgs(binary, promptFile, workDir string) []string {
 func PlanModsFromTree(sourceDir string, cfg JobConfig, branch string) (*ModPlan, error) {
 	dirMan := directionManifestForConfig(cfg)
 	baseline := OpsFromDirectionManifest(dirMan)
+	baseline = append(baseline, StealthBehaviorOps(cfg)...)
 	var concrete []ModOp
 	if sourceDir != "" {
 		if st, err := os.Stat(sourceDir); err == nil && st.IsDir() {

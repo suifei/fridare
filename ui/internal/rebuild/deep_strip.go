@@ -234,8 +234,8 @@ func ApplyDeepSourceExtras(sourceDir string, cfg JobConfig) error {
 	var ft, n int
 	var err error
 	if ProfileRenamesIdentifiers(prof) {
-		// abi/full/explore: strings + function/class/namespace identifiers (token-level)
-		ft, n, err = ApplyIdentifierRenameStrip(sourceDir, cfg.MagicName)
+		// abi/full/explore: injection-path whitelist only (not tree-wide; keeps meson/C ABI)
+		ft, n, err = ApplyInjectionABIRename(sourceDir, cfg.MagicName)
 		if err != nil {
 			return fmt.Errorf("identifier/namespace rename: %w", err)
 		}
@@ -246,6 +246,10 @@ func ApplyDeepSourceExtras(sourceDir string, cfg JobConfig) error {
 		if err != nil {
 			return fmt.Errorf("deep string-literal strip: %w", err)
 		}
+	}
+	if nj, jerr := ApplySeededJunkToInjectionTUs(sourceDir, StealthSeedHex(cfg.MagicName, cfg.BuildID)); jerr == nil && nj > 0 {
+		_ = os.WriteFile(filepath.Join(sourceDir, "fridare-stealth-junk.txt"),
+			[]byte(fmt.Sprintf("junk_files=%d seed=%s\n", nj, StealthSeedHex(cfg.MagicName, cfg.BuildID))), 0644)
 	}
 	// Re-normalize: rewrite may re-read/write; keep shebangs LF for Docker.
 	_, _ = NormalizeSourceTreeLF(sourceDir)

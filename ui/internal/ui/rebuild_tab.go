@@ -59,9 +59,10 @@ type RebuildTab struct {
 	useGrokCheck     *widget.Check
 	useGUIProxyCheck *widget.Check
 	// profileSelect: safe | deep — deep = server+client protocol/API/idents sync
-	profileSelect  *widget.Select
-	developBtn     *widget.Button
-	fullOneShotBtn *widget.Button
+	profileSelect     *widget.Select
+	randomAgentChk    *widget.Check
+	developBtn        *widget.Button
+	fullOneShotBtn    *widget.Button
 
 	// Agent panel (always visible — not buried under scroll)
 	goalsEntry    *widget.Entry
@@ -235,7 +236,8 @@ func (rt *RebuildTab) setupUI() {
 
 	rt.profileSelect = widget.NewSelect([]string{"safe", "deep", "abi", "explore"}, nil)
 	rt.profileSelect.SetSelected("deep") // default: server+client protocol/API/idents sync
-	profileHelp := widget.NewLabel("deep（推荐）：服务端+客户端同步 re.frida.*（接口）/ /re/frida/（对象路径）/ frida:rpc / Frida.* API；导出 host wheel + PROTOCOL-SYNC。缺对象路径会导致 UNKNOWN_METHOD。abi/full：额外标识符重命名。safe：少改。须用 catalog 内 wheel。")
+	rt.randomAgentChk = widget.NewCheck("随机 agent 落盘前缀（可选；种子=magic+构建号）", nil)
+	profileHelp := widget.NewLabel("deep（推荐）：服务端+客户端同步 re.frida.* / /re/frida/ / frida:rpc；导出去符号 + 注入 TU 花指令。abi：仅 gum injector / agent / 进程枚举白名单改标识符。须用 catalog 内 wheel + PROTOCOL-SYNC。")
 	profileHelp.Wrapping = fyne.TextWrapWord
 	profileHelp.Importance = widget.LowImportance
 
@@ -257,6 +259,7 @@ func (rt *RebuildTab) setupUI() {
 		targetsScroll,
 		container.NewBorder(nil, nil, widget.NewLabel("魔改强度"), nil, rt.profileSelect),
 		profileHelp,
+		rt.randomAgentChk,
 		rt.useGUIProxyCheck,
 		rt.useGrokCheck,
 		container.NewHBox(rt.developBtn, rt.fullOneShotBtn),
@@ -526,7 +529,9 @@ func (rt *RebuildTab) baseJobConfig(mode rebuild.JobMode) rebuild.JobConfig {
 		Mode:             mode,
 		ArchiveImage:     archive,
 		DryRun:           false,
-		DirectionProfile: profile,
+		DirectionProfile:  profile,
+		StripSymbols:      profile != "safe",
+		RandomAgentPrefix: rt.randomAgentChk != nil && rt.randomAgentChk.Checked,
 		DirectionFile:    dirFile,
 	}
 }

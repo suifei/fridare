@@ -122,6 +122,14 @@ type JobConfig struct {
 	DirectionProfile string
 	// DirectionFile: optional path to write/read DirectionManifest JSON (batch tools + Agent).
 	DirectionFile string
+	// StripSymbols forces post-export ELF/PE symbol strip + frida_ export rewrite.
+	StripSymbols bool
+	// DisableSymbolStrip turns off the default deep/abi/full strip.
+	DisableSymbolStrip bool
+	// RandomAgentPrefix enables optional per-job random on-disk agent name (seeded).
+	RandomAgentPrefix bool
+	// BuildID participates in stealth seed (magic|BuildID). Empty → "0".
+	BuildID string
 }
 
 // EffectiveMode returns Mode or JobModeFull when unset.
@@ -845,6 +853,7 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 		SourceDir:   "frida",
 		ArtifactDir: "artifacts",
 		TargetIDs:   cfg.TargetIDs,
+		StealthSeed: StealthSeedHex(cfg.MagicName, cfg.BuildID),
 	})
 	if serr != nil {
 		return serr
@@ -853,6 +862,7 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 		SourceDir:   "frida",
 		ArtifactDir: "artifacts",
 		TargetIDs:   cfg.TargetIDs,
+		StealthSeed: StealthSeedHex(cfg.MagicName, cfg.BuildID),
 	})
 	if berr != nil {
 		return berr

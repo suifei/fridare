@@ -228,7 +228,7 @@ func BuildPipelineScript(opts PipelineScriptOptions) (string, error) {
 		b.WriteString("echo '[fridare] no mod script embedded; AI agent applies mods separately on host bind-mount'\n")
 	}
 
-	compileBody, err := compileTargetsShell(opts.TargetIDs, srcDir, artifactDir)
+	compileBody, err := compileTargetsShell(opts.TargetIDs, srcDir, artifactDir, opts.StealthSeed)
 	if err != nil {
 		return "", err
 	}
@@ -257,7 +257,7 @@ func BuildOnlyPipelineScript(opts PipelineScriptOptions) (string, error) {
 	b.WriteString("echo '[fridare] build-only: source must already exist at " + srcDir + "'\n")
 	b.WriteString(fmt.Sprintf("if [ ! -d %s ]; then echo 'missing source tree' >&2; exit 1; fi\n", shellQuote(srcDir)))
 	b.WriteString(fmt.Sprintf("mkdir -p %s\n", shellQuote(artifactDir)))
-	compileBody, err := compileTargetsShell(opts.TargetIDs, srcDir, artifactDir)
+	compileBody, err := compileTargetsShell(opts.TargetIDs, srcDir, artifactDir, opts.StealthSeed)
 	if err != nil {
 		return "", err
 	}
@@ -358,7 +358,7 @@ func EnsureAndroidNDKShell() string {
 // compileTargetsShell is the configure/make body that must only run in Linux Docker.
 // Script assumes execution from container workdir /work with source at /work/<srcDir>.
 // Build dirs are /work/build-<id> (sibling of source), NOT ../build-* (that escapes the volume).
-func compileTargetsShell(targetIDs []string, srcDir, artifactDir string) (string, error) {
+func compileTargetsShell(targetIDs []string, srcDir, artifactDir, stealthSeed string) (string, error) {
 	var b strings.Builder
 	srcBase := path.Base(srcDir)
 	if srcBase == "" || srcBase == "." {
@@ -418,21 +418,26 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir string) (string
 		// Always request server/gadget/inject: native host builds disable them under meson auto
 		// (disable_auto_if(!cross)). Skip frida-python: deep magic renames break GIR bindgen namespaces.
 		productOpts := " --enable-server --enable-gadget --enable-inject --disable-frida-python"
-		// Export NDK for configure subprocess; From /work/build-<id>, source is ../frida.
-		// MinGW: clear CFLAGS pollution for configure; patch cross-file; then make.
+		// Per-TU stealth flags (ninja) after configure; never process-wide CFLAGS.
+		// Heredocs must be standalone statements (not `cmd && python <<'PY' ... PY && make`).
+		perTU := PerTUStealthFlagsShell(stealthSeed)
+		b.WriteString("(\n")
+		b.WriteString("export ANDROID_NDK_ROOT=\"${ANDROID_NDK_ROOT:-}\"\n")
 		if isMinGW {
-			b.WriteString(fmt.Sprintf(
-				"( export ANDROID_NDK_ROOT=\"${ANDROID_NDK_ROOT:-}\"; "+
-					"export CFLAGS=\"$(echo \"${CFLAGS:-}\" | sed -E 's/-include[[:space:]]+[^[:space:]]+//g')\"; "+
-					"export CPPFLAGS=\"$(echo \"${CPPFLAGS:-}\" | sed -E 's/-include[[:space:]]+[^[:space:]]+//g')\"; "+
-					"cd %s && ../%s/configure --host=%s%s%s && %s && make ) || { echo '[fridare] configure/make failed for %s exit=$?' >&2; exit 1; }\n",
-				shellQuote(buildDir), shellQuote(srcBase), shellQuote(t.Host), extraCfg, productOpts,
-				MinGWCrossFileDNSIncludeShell(MinGWDNSStubHeaderFileName),
-				shellQuote(t.ID)))
-		} else {
-			b.WriteString(fmt.Sprintf("( export ANDROID_NDK_ROOT=\"${ANDROID_NDK_ROOT:-}\"; cd %s && ../%s/configure --host=%s%s%s && make ) || { echo '[fridare] configure/make failed for %s exit=$?' >&2; exit 1; }\n",
-				shellQuote(buildDir), shellQuote(srcBase), shellQuote(t.Host), extraCfg, productOpts, shellQuote(t.ID)))
+			b.WriteString("export CFLAGS=\"$(echo \"${CFLAGS:-}\" | sed -E 's/-include[[:space:]]+[^[:space:]]+//g')\"\n")
+			b.WriteString("export CPPFLAGS=\"$(echo \"${CPPFLAGS:-}\" | sed -E 's/-include[[:space:]]+[^[:space:]]+//g')\"\n")
 		}
+		b.WriteString(fmt.Sprintf("cd %s || exit 1\n", shellQuote(buildDir)))
+		b.WriteString(fmt.Sprintf("../%s/configure --host=%s%s%s || exit 1\n",
+			shellQuote(srcBase), shellQuote(t.Host), extraCfg, productOpts))
+		if isMinGW {
+			b.WriteString(MinGWCrossFileDNSIncludeShell(MinGWDNSStubHeaderFileName))
+			b.WriteString("\n")
+		}
+		b.WriteString(perTU)
+		b.WriteString("\n")
+		b.WriteString("make || exit 1\n")
+		b.WriteString(fmt.Sprintf(") || { echo '[fridare] configure/make failed for %s exit=$?' >&2; exit 1; }\n", shellQuote(t.ID)))
 		b.WriteString(fmt.Sprintf("mkdir -p %s/%s\n", shellQuote(artifactDir), shellQuote(t.ID)))
 		// Only copy non-empty product blobs (skip 0-byte meson stubs)
 		b.WriteString(fmt.Sprintf("find %s -type f -size +1k \\( -name 'frida-server*' -o -name 'frida-agent*' -o -name 'frida-gadget*' -o -name '*-server' -o -name '*-agent*.so' -o -name '*-gadget*.so' \\) -exec cp -a {} %s/%s/ \\; 2>/dev/null || true\n",
@@ -558,6 +563,8 @@ type PipelineScriptOptions struct {
 	TargetIDs   []string
 	// ModScript is optional shell snippet applied after branch creation.
 	ModScript string
+	// StealthSeed is hex material for per-TU -DFRIDARE_JUNK_SEED (empty → "0").
+	StealthSeed string
 }
 
 // DockerfileSkeleton is a minimal multi-tool image for Frida Android/Linux builds.

@@ -162,15 +162,28 @@ func TestApplyDeepSourceExtras_DeepKeepsIdents_AbiRenames(t *testing.T) {
 		t.Fatalf("deep must rewrite protocol strings: %s", s)
 	}
 
-	// abi: token rename enabled
+	// abi: token rename only on injection whitelist
 	root2 := t.TempDir()
-	_ = os.WriteFile(filepath.Join(root2, "t.c"), []byte("void frida_server_start(void);\n"), 0644)
+	on := filepath.Join(root2, "subprojects", "frida-gum", "gum", "backend-linux", "gumprocess-linux.c")
+	off := filepath.Join(root2, "subprojects", "frida-core", "lib", "base", "session.vala")
+	_ = os.MkdirAll(filepath.Dir(on), 0755)
+	_ = os.MkdirAll(filepath.Dir(off), 0755)
+	_ = os.WriteFile(on, []byte("void frida_server_start(void);\nconst char *p=\"re.frida.Host\";\n"), 0644)
+	_ = os.WriteFile(off, []byte("void frida_server_start(void);\n"), 0644)
 	cfg2 := JobConfig{MagicName: "abcde", DirectionProfile: "abi", ListenPort: 27142}
 	if err := ApplyDeepSourceExtras(root2, cfg2); err != nil {
 		t.Fatal(err)
 	}
-	data2, _ := os.ReadFile(filepath.Join(root2, "t.c"))
-	if !strings.Contains(string(data2), "abcde_server_start") {
-		t.Fatalf("abi should rename idents: %s", data2)
+	data2, _ := os.ReadFile(on)
+	s2 := string(data2)
+	if !strings.Contains(s2, "abcde_server_start") {
+		t.Fatalf("abi on-list should rename idents: %s", s2)
+	}
+	if !strings.Contains(s2, "re.frida.Host") {
+		t.Fatalf("abi rename step must not rewrite re.frida.: %s", s2)
+	}
+	offB, _ := os.ReadFile(off)
+	if !strings.Contains(string(offB), "void frida_server_start") {
+		t.Fatalf("abi off-list must stay: %s", offB)
 	}
 }
