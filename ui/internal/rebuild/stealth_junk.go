@@ -160,7 +160,8 @@ import pathlib
 needles = [%s]
 flag = " -DFRIDARE_JUNK_SEED=0x%s "
 changed = 0
-for p in list(pathlib.Path(".").rglob("build.ninja")) + list(pathlib.Path(".").rglob("compile_commands.json")):
+# Only this build dir's ninja (rglob over all build-* trees is multi-minute).
+for p in list(pathlib.Path(".").glob("build.ninja")) + list(pathlib.Path(".").glob("compile_commands.json")):
     s = p.read_text(encoding="utf-8", errors="replace")
     out_lines = []
     file_changed = False
