@@ -2,6 +2,7 @@ package rebuild
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -88,6 +89,23 @@ func TestFormatDockerRunError_LocalhostHint(t *testing.T) {
 	}
 	if !strings.Contains(s, "Connection refused") {
 		t.Fatal(s)
+	}
+}
+
+func TestFormatDockerRunError_NoFalseVersionHint(t *testing.T) {
+	// ninja logs mention "file" and ".version" without a meson missing-file error
+	err := FormatDockerRunError("compile",
+		"[174/336] Generating compiler/agent.js\nv8-mksnapshot died with <Signals.SIGTRAP: 5>\nFile compiler.version used as input",
+		fmt.Errorf("exit status 1"))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	s := err.Error()
+	if strings.Contains(s, "缺 version/symbols") {
+		t.Fatalf("false version/symbols hint: %s", s)
+	}
+	if !strings.Contains(s, "compiler_snapshot") && !strings.Contains(s, "mksnapshot") {
+		t.Fatalf("want snapshot-tool hint: %s", s)
 	}
 }
 

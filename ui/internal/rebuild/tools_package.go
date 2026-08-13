@@ -37,6 +37,11 @@ func BuildPatchedFridaToolsWheels(cfg JobConfig, catalogRoot string, entryDirs [
 	if version == "" {
 		return nil, fmt.Errorf("Frida 版本为空，无法下载 host frida/frida-tools")
 	}
+	// Catalog stays on the product label (17.17.1); pip needs the official tag.
+	pipVer := EffectivePipVersion(cfg)
+	if pipVer == "" {
+		pipVer = version
+	}
 	if catalogRoot == "" {
 		catalogRoot = CatalogRoot(cfg.WorkDir)
 	}
@@ -69,10 +74,10 @@ func BuildPatchedFridaToolsWheels(cfg JobConfig, catalogRoot string, entryDirs [
 	sharedPy := filepath.Join(shared, "python")
 	_ = os.MkdirAll(sharedPy, 0755)
 
-	// --- multi-platform frida native wheels (must match Frida source tag) ---
-	hostRaw, herr := downloadHostFridaWheels(runner, py, pipEnv, version, indexArgs, filepath.Join(work, "host-raw"))
+	// --- multi-platform frida native wheels (official pip tag, not product label) ---
+	hostRaw, herr := downloadHostFridaWheels(runner, py, pipEnv, pipVer, indexArgs, filepath.Join(work, "host-raw"))
 	if herr != nil && len(hostRaw) == 0 {
-		return nil, fmt.Errorf("multi-platform frida==%s wheels: %w", version, herr)
+		return nil, fmt.Errorf("multi-platform frida==%s wheels: %w", pipVer, herr)
 	}
 	var hostPatched []string
 	hostOut := filepath.Join(sharedPy, "host")
@@ -89,7 +94,7 @@ func BuildPatchedFridaToolsWheels(cfg JobConfig, catalogRoot string, entryDirs [
 			_ = os.WriteFile(filepath.Join(destDir, "PATCH-WARN.txt"), []byte(perr.Error()), 0644)
 		} else {
 			_ = os.WriteFile(filepath.Join(destDir, "PATCHED.txt"),
-				[]byte(fmt.Sprintf("server+client protocol sync replacements=%d magic=%s frida==%s\n  frida:rpc / re.frida.* / Frida.*\n", n, cfg.MagicName, version)), 0644)
+				[]byte(fmt.Sprintf("server+client protocol sync replacements=%d magic=%s frida==%s product=%s\n  frida:rpc / re.frida.* / Frida.*\n", n, cfg.MagicName, pipVer, version)), 0644)
 		}
 		hostPatched = append(hostPatched, patchedPath)
 		_ = copyFile(filepath.Join(filepath.Dir(raw), "PLATFORM.txt"), filepath.Join(destDir, "PLATFORM.txt"))
@@ -97,19 +102,19 @@ func BuildPatchedFridaToolsWheels(cfg JobConfig, catalogRoot string, entryDirs [
 
 	// --- frida-tools pure package (version line independent of Frida 17.x) ---
 	var toolsBuilt []string
-	arch, toolsVer, terr := downloadFridaToolsForFrida(runner, py, pipEnv, dlDir, version, indexArgs)
+	arch, toolsVer, terr := downloadFridaToolsForFrida(runner, py, pipEnv, dlDir, pipVer, indexArgs)
 	if terr != nil {
 		_ = os.WriteFile(filepath.Join(sharedPy, "TOOLS-WARN.txt"), []byte(terr.Error()+"\n"), 0644)
 	} else {
 		_ = os.WriteFile(filepath.Join(work, "RESOLVED.txt"),
-			[]byte(fmt.Sprintf("frida_source=%s\nfrida_tools_pypi=%s\narchive=%s\n", version, toolsVer, filepath.Base(arch))), 0644)
+			[]byte(fmt.Sprintf("frida_source=%s\npip_frida=%s\nfrida_tools_pypi=%s\narchive=%s\n", version, pipVer, toolsVer, filepath.Base(arch))), 0644)
 		if err := extractArchive(arch, srcDir); err != nil {
 			_ = os.WriteFile(filepath.Join(sharedPy, "TOOLS-WARN.txt"), []byte("extract: "+err.Error()), 0644)
 		} else if pkgRoot, err := findFridaToolsPackageRoot(srcDir); err != nil {
 			_ = os.WriteFile(filepath.Join(sharedPy, "TOOLS-WARN.txt"), []byte(err.Error()), 0644)
 		} else {
 			_, _ = patchFridaToolsTree(pkgRoot, cfg.MagicName)
-			localVer := pinFridaToolsPackageVersion(pkgRoot, version, toolsVer, cfg.MagicName)
+			localVer := pinFridaToolsPackageVersion(pkgRoot, pipVer, toolsVer, cfg.MagicName)
 			// Prefer setup.py bdist_wheel (uses local setuptools; no isolation / network).
 			// Fall back to pip wheel, then hand-rolled pure wheel zip.
 			var buildErrs []string

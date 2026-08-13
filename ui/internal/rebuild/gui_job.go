@@ -13,6 +13,13 @@ func EffectiveCloneRef(cfg JobConfig) string {
 	if s := strings.TrimSpace(cfg.CloneRef); s != "" {
 		return s
 	}
+	return EffectivePipVersion(cfg)
+}
+
+// EffectivePipVersion is the PyPI frida== tag for host wheels.
+// Product-only labels (e.g. 17.17.1) map to the official wheel (17.17.0).
+// Unlike EffectiveCloneRef this ignores CloneRef (a git hash is not a pip version).
+func EffectivePipVersion(cfg JobConfig) string {
 	v := strings.TrimSpace(cfg.FridaVersion)
 	if alt, ok := productOnlyCloneRefs[v]; ok {
 		return alt

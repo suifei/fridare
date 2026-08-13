@@ -8,7 +8,7 @@
 #   powershell -File scripts\build-release.ps1 -Version 4.0.7 -Only windows-amd64
 
 param(
-    [string]$Version = "4.0.7",
+    [string]$Version = "4.0.8",
     # Optional: build only one platform dir name, e.g. windows-amd64
     [string]$Only = ""
 )
@@ -147,8 +147,9 @@ Source rebuild (GUI tab: source rebuild / Docker):
 
 Docs in this zip (docs/):
   dual-track.md       two tracks (static hex + Docker rebuild)
-  kxmwp-17.17.0.md    prebuilt Frida 17.17.0 deep products (r1)
-  kxmwp-17.17.1.md    r2: strip + stealth junk (not AV evasion)
+  kxmwp-16.7.19.md    official 16.7.19 GUI-path linux-x86_64
+  kxmwp-17.17.1.md    official 17.17.0, product label 17.17.1
+  kxmwp-16-vs-17.md   dual-version scan notes (not AV evasion)
 
 Prebuilt servers (not in this zip):
   https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1
@@ -186,6 +187,8 @@ foreach ($t in $ToolTargets) {
     Copy-Item (Join-Path $Root "docs\dual-track.md") $docsDir
     Copy-Item (Join-Path $Root "docs\kxmwp-17.17.0.md") $docsDir
     Copy-Item (Join-Path $Root "docs\kxmwp-17.17.1.md") $docsDir
+    Copy-Item (Join-Path $Root "docs\kxmwp-16.7.19.md") $docsDir
+    Copy-Item (Join-Path $Root "docs\kxmwp-16-vs-17.md") $docsDir
     if (Test-Path (Join-Path $Root "docs\release-v$Version.md")) {
         Copy-Item (Join-Path $Root "docs\release-v$Version.md") $docsDir
     }

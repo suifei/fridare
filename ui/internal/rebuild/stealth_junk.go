@@ -149,9 +149,7 @@ func InjectionCompileBasenames() []string {
 	}
 }
 
-// PerTUStealthFlagsShell patches build.ninja compile lines for injection TUs only.
-// Never exports process-wide CFLAGS/CPPFLAGS.
-func PerTUStealthFlagsShell(seed string) string {
+func normalizeJunkSeed(seed string) string {
 	seed = strings.TrimSpace(seed)
 	if seed == "" {
 		seed = "0"
@@ -159,6 +157,116 @@ func PerTUStealthFlagsShell(seed string) string {
 	if len(seed) > 8 {
 		seed = seed[:8]
 	}
+	return seed
+}
+
+func junkSeedFlag(seed string) string {
+	return fmt.Sprintf(" -DFRIDARE_JUNK_SEED=0x%s", normalizeJunkSeed(seed))
+}
+
+// isInjectionCompileBuildLine reports whether a ninja "build" edge compiles one
+// of the injection TUs (the $in source), not a later link that merely lists *.c.o.
+func isInjectionCompileBuildLine(line string, needles []string) bool {
+	s := strings.TrimLeft(line, " \t")
+	if !strings.HasPrefix(s, "build ") {
+		return false
+	}
+	if !strings.Contains(s, "c_COMPILER") {
+		return false
+	}
+	for _, n := range needles {
+		token := "/" + n
+		idx := 0
+		for {
+			i := strings.Index(s[idx:], token)
+			if i < 0 {
+				break
+			}
+			i += idx
+			end := i + len(token)
+			var next byte
+			if end < len(s) {
+				next = s[end]
+			}
+			// Source input: /gumprocess.c followed by space, tab, |, CR, LF, or EOF.
+			// Reject /gumprocess.c.o (linker inputs and DEPFILE paths).
+			if next == 0 || next == ' ' || next == '\t' || next == '|' || next == '\n' || next == '\r' {
+				return true
+			}
+			idx = end
+		}
+	}
+	return false
+}
+
+// PatchNinjaStealthFlags appends -DFRIDARE_JUNK_SEED only to the ARGS= of
+// injection-TU c_COMPILER edges. Never mutates "build " / DEPFILE lines —
+// appending there makes ninja treat the flag as an implicit input
+// (error: '-DFRIDARE_JUNK_SEED=…', needed by '…gumprocess.c.o').
+func PatchNinjaStealthFlags(content, seed string) (string, int) {
+	flag := junkSeedFlag(seed)
+	needles := InjectionCompileBasenames()
+	changed := 0
+	pending := false
+	var b strings.Builder
+	for _, line := range strings.SplitAfter(content, "\n") {
+		body := strings.TrimRight(line, "\r\n")
+		nl := line[len(body):]
+		trimmed := strings.TrimLeft(body, " \t")
+		if strings.HasPrefix(trimmed, "build ") {
+			pending = isInjectionCompileBuildLine(trimmed, needles)
+			b.WriteString(line)
+			continue
+		}
+		if pending && strings.HasPrefix(trimmed, "ARGS") && strings.Contains(trimmed, "=") &&
+			!strings.Contains(body, "FRIDARE_JUNK_SEED") {
+			b.WriteString(body)
+			b.WriteString(flag)
+			b.WriteString(nl)
+			changed++
+			pending = false
+			continue
+		}
+		b.WriteString(line)
+	}
+	return b.String(), changed
+}
+
+// PatchCompileCommandsStealthFlags inserts the seed flag before -c on
+// compile_commands.json "command" lines for injection TUs only.
+func PatchCompileCommandsStealthFlags(content, seed string) (string, int) {
+	flag := junkSeedFlag(seed) + " "
+	needles := InjectionCompileBasenames()
+	changed := 0
+	var b strings.Builder
+	for _, line := range strings.SplitAfter(content, "\n") {
+		if !strings.Contains(line, `"command"`) || !strings.Contains(line, " -c ") ||
+			strings.Contains(line, "FRIDARE_JUNK_SEED") {
+			b.WriteString(line)
+			continue
+		}
+		hit := false
+		for _, n := range needles {
+			if strings.Contains(line, "/"+n) || strings.Contains(line, " "+n) {
+				hit = true
+				break
+			}
+		}
+		if !hit {
+			b.WriteString(line)
+			continue
+		}
+		b.WriteString(strings.Replace(line, " -c ", flag+"-c ", 1))
+		changed++
+	}
+	return b.String(), changed
+}
+
+// PerTUStealthFlagsShell patches this build dir's ninja ARGS (injection TUs only).
+// Never exports process-wide CFLAGS/CPPFLAGS. Must not append flags to ninja
+// "build" edges — those tokens become implicit dependencies.
+func PerTUStealthFlagsShell(seed string) string {
+	seed = normalizeJunkSeed(seed)
 	names := InjectionCompileBasenames()
 	var lit strings.Builder
 	for i, n := range names {
@@ -170,26 +278,69 @@ func PerTUStealthFlagsShell(seed string) string {
 	return fmt.Sprintf(`python3 - <<'PY'
 import pathlib
 needles = [%s]
-flag = " -DFRIDARE_JUNK_SEED=0x%s "
+flag = " -DFRIDARE_JUNK_SEED=0x%s"
 changed = 0
+
+def is_injection_compile(line):
+    s = line.lstrip()
+    if not s.startswith("build ") or "c_COMPILER" not in s:
+        return False
+    for n in needles:
+        token = "/" + n
+        idx = 0
+        while True:
+            i = s.find(token, idx)
+            if i < 0:
+                break
+            end = i + len(token)
+            nxt = s[end:end+1]
+            if nxt in ("", " ", "\t", "|", "\n", "\r"):
+                return True
+            idx = end
+    return False
+
+def patch_ninja(text):
+    out = []
+    pending = False
+    nchg = 0
+    for line in text.splitlines(True):
+        stripped = line.lstrip()
+        if stripped.startswith("build "):
+            pending = is_injection_compile(line)
+            out.append(line)
+            continue
+        if pending and stripped.startswith("ARGS") and "=" in stripped and "FRIDARE_JUNK_SEED" not in line:
+            body = line.rstrip("\r\n")
+            nl = line[len(body):]
+            out.append(body + flag + nl)
+            nchg += 1
+            pending = False
+            continue
+        out.append(line)
+    return "".join(out), nchg
+
+def patch_compile_commands(text):
+    out = []
+    nchg = 0
+    for line in text.splitlines(True):
+        if '"command"' in line and " -c " in line and "FRIDARE_JUNK_SEED" not in line:
+            if any(("/" + n in line or " " + n in line) for n in needles):
+                line = line.replace(" -c ", flag + " -c ", 1)
+                nchg += 1
+        out.append(line)
+    return "".join(out), nchg
+
 # Only this build dir's ninja (rglob over all build-* trees is multi-minute).
 for p in list(pathlib.Path(".").glob("build.ninja")) + list(pathlib.Path(".").glob("compile_commands.json")):
     s = p.read_text(encoding="utf-8", errors="replace")
-    out_lines = []
-    file_changed = False
-    for line in s.splitlines(True):
-        hit = any(n in line for n in needles)
-        if hit and "FRIDARE_JUNK_SEED" not in line:
-            if " -c " in line:
-                line = line.replace(" -c ", flag + "-c ", 1)
-            else:
-                line = line.rstrip("\n") + flag + "\n"
-            file_changed = True
-        out_lines.append(line)
-    if file_changed:
-        p.write_text("".join(out_lines), encoding="utf-8")
+    if p.name == "compile_commands.json":
+        new, n = patch_compile_commands(s)
+    else:
+        new, n = patch_ninja(s)
+    if n:
+        p.write_text(new, encoding="utf-8")
         changed += 1
-        print("[fridare] per-TU stealth flags:", p)
+        print("[fridare] per-TU stealth flags:", p, "args+", n)
 print("[fridare] per-TU stealth files patched:", changed)
 PY`, lit.String(), seed)
 }

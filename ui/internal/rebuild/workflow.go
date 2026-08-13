@@ -417,7 +417,9 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir, stealthSeed st
 			shellQuote(srcDir)))
 		// Always request server/gadget/inject: native host builds disable them under meson auto
 		// (disable_auto_if(!cross)). Skip frida-python: deep magic renames break GIR bindgen namespaces.
-		productOpts := " --enable-server --enable-gadget --enable-inject --disable-frida-python"
+		// disable-frida-python is not enough: frida-tools still subprojects frida-python
+		// (native linux then fails on missing pyconfig.h). Tools wheels are patched on the host.
+		productOpts := " --enable-server --enable-gadget --enable-inject --disable-frida-python --disable-frida-tools"
 		// Per-TU stealth flags (ninja) after configure; never process-wide CFLAGS.
 		// Heredocs must be standalone statements (not `cmd && python <<'PY' ... PY && make`).
 		perTU := PerTUStealthFlagsShell(stealthSeed)
@@ -428,7 +430,17 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir, stealthSeed st
 			b.WriteString("export CPPFLAGS=\"$(echo \"${CPPFLAGS:-}\" | sed -E 's/-include[[:space:]]+[^[:space:]]+//g')\"\n")
 		}
 		b.WriteString(fmt.Sprintf("cd %s || exit 1\n", shellQuote(buildDir)))
-		b.WriteString(fmt.Sprintf("../%s/configure --host=%s%s%s || exit 1\n",
+		// Frida 16.x ships v8-mksnapshot in the official SDK; that binary SIGTRAPs
+		// (exit 133) even on `print(1);` under this builder. 17.x dropped the option
+		// (esbuild compiler). Only pass -D when meson.options still has it.
+		b.WriteString(fmt.Sprintf("snapopt=\"\"\n"+
+			"if grep -q \"option('compiler_snapshot'\" ../%s/subprojects/frida-core/meson.options 2>/dev/null; then\n"+
+			"  snapopt=\"-Dfrida-core:compiler_snapshot=disabled\"\n"+
+			"  echo '[fridare] compiler_snapshot=disabled (16.x SDK snapshot tool is unusable here)'\n"+
+			"fi\n", shellQuote(srcBase)))
+		// `--` is required so configure's argparse treats -D… as extra meson args.
+		b.WriteString(fmt.Sprintf("if [ -n \"$snapopt\" ]; then ../%s/configure --host=%s%s%s -- $snapopt || exit 1; else ../%s/configure --host=%s%s%s || exit 1; fi\n",
+			shellQuote(srcBase), shellQuote(t.Host), extraCfg, productOpts,
 			shellQuote(srcBase), shellQuote(t.Host), extraCfg, productOpts))
 		if isMinGW {
 			b.WriteString(MinGWCrossFileDNSIncludeShell(MinGWDNSStubHeaderFileName))
@@ -440,7 +452,7 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir, stealthSeed st
 		b.WriteString(fmt.Sprintf(") || { echo '[fridare] configure/make failed for %s exit=$?' >&2; exit 1; }\n", shellQuote(t.ID)))
 		b.WriteString(fmt.Sprintf("mkdir -p %s/%s\n", shellQuote(artifactDir), shellQuote(t.ID)))
 		// Only copy non-empty product blobs (skip 0-byte meson stubs)
-		b.WriteString(fmt.Sprintf("find %s -type f -size +1k \\( -name 'frida-server*' -o -name 'frida-agent*' -o -name 'frida-gadget*' -o -name '*-server' -o -name '*-agent*.so' -o -name '*-gadget*.so' \\) -exec cp -a {} %s/%s/ \\; 2>/dev/null || true\n",
+		b.WriteString(fmt.Sprintf("find %s -type f -size +1k \\( -name 'frida-server*' -o -name 'frida-agent*' -o -name 'frida-gadget*' -o -name '*-server' -o -name '*-server-raw' -o -name '*-server-raw.exe' -o -name '*-agent*.so' -o -name '*-gadget*.so' \\) -exec cp -a {} %s/%s/ \\; 2>/dev/null || true\n",
 			shellQuote(buildDir), shellQuote(artifactDir), shellQuote(t.ID)))
 	}
 	return b.String(), nil
@@ -518,8 +530,11 @@ func FormatDockerRunError(stage string, out string, err error) error {
 	if strings.Contains(low, "need go >=") || strings.Contains(low, "need go >=1") {
 		hint += "；需要 Go >=1.24（应在 Dockerfile 预装；请重建 builder 镜像）"
 	}
-	if strings.Contains(low, ".version does not exist") || strings.Contains(low, "file ") && strings.Contains(low, ".version") {
+	if strings.Contains(low, ".version does not exist") || strings.Contains(low, ".symbols does not exist") {
 		hint += "；魔改后缺 version/symbols 文件：内容替换后需同步重命名 frida-agent* 等资源文件名"
+	}
+	if strings.Contains(low, "signals.sigtrap") || strings.Contains(low, "trace/breakpoint trap") {
+		hint += "；v8-mksnapshot 在此环境无法运行：Frida 16.x 应关闭 compiler_snapshot（与魔改无关）"
 	}
 	if msg == "" {
 		return fmt.Errorf("%s: %v%s", stage, err, hint)

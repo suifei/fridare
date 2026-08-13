@@ -4,8 +4,18 @@
 
 ## Unreleased
 
-### Added
-- 行为隐身源码向量：Windows 管道 `g_string_new ("frida-")`、quote-only `gmain`/`gdbus`、`frida-policyd`、quoted `winjector`（不保证杀软/加固效果）
+## v4.0.8 - 2026-08-13
+
+### Fixed
+- `RenameMagicAssetFiles` 含 `frida-inject`（meson `kxmwp-inject.version`）
+- ninja 花指令只写 `ARGS=`，不再把 `-DFRIDARE_JUNK_SEED` 当成依赖
+- Frida 16.x 关 `compiler_snapshot`（官方 SDK mksnapshot 在本 builder 上 SIGTRAP）
+- `--disable-frida-tools`，避免 frida-tools 再拉缺 `pyconfig.h` 的 python 扩展
+- 产品标签 `17.17.1` 的 pip wheel 用 `EffectivePipVersion` → `17.17.0`
+
+### Notes
+- GUI latest 本 tag。Frida 产物：[kxmwp-16.7.19](https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19)、[kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1)（**不是** GUI latest，**不是免杀**）
+- 说明：[docs/release-v4.0.8.md](docs/release-v4.0.8.md) · [docs/kxmwp-16-vs-17.md](docs/kxmwp-16-vs-17.md)
 
 ## v4.0.7 - 2026-08-13
 

@@ -178,7 +178,8 @@ func TestBuildOnlyPipelineScript_DockerOnlyMake(t *testing.T) {
 	if !strings.Contains(script, "configure --host=android-arm64") {
 		t.Fatal(script)
 	}
-	if !strings.Contains(script, "--enable-server") || !strings.Contains(script, "--disable-frida-python") {
+	if !strings.Contains(script, "--enable-server") || !strings.Contains(script, "--disable-frida-python") ||
+		!strings.Contains(script, "--disable-frida-tools") {
 		t.Fatalf("product opts missing in configure: %s", script)
 	}
 	if !strings.Contains(script, "make") {
