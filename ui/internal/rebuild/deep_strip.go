@@ -210,7 +210,7 @@ func replacePairsInSegment(seg string, pairs [][2]string) (string, int) {
 
 // ApplyDeepSourceExtras runs after Default/DeepModOps content replace + asset renames:
 // structure-aware string rewrite + identifier/namespace rename (deep/explore/abi/full) + dig brief.
-// No-op for profile=safe (except LF normalize is always cheap/safe when called from Stub/Grok).
+// Junk still runs on safe when DisableJunk is false (GUI stealth checkbox).
 func ApplyDeepSourceExtras(sourceDir string, cfg JobConfig) error {
 	if sourceDir == "" {
 		return nil
@@ -228,28 +228,29 @@ func ApplyDeepSourceExtras(sourceDir string, cfg JobConfig) error {
 	// MinGW Windows cross: old headers / inject.xcent basename mismatches.
 	_, _ = ApplyMinGWCompatPatches(sourceDir)
 	prof := strings.ToLower(strings.TrimSpace(cfg.DirectionProfile))
-	if prof != "deep" && prof != "explore" && prof != "abi" && prof != "full" {
-		return nil
-	}
 	var ft, n int
 	var err error
-	if ProfileRenamesIdentifiers(prof) {
-		// abi/full/explore: injection-path whitelist only (not tree-wide; keeps meson/C ABI)
-		ft, n, err = ApplyInjectionABIRename(sourceDir, cfg.MagicName)
-		if err != nil {
-			return fmt.Errorf("identifier/namespace rename: %w", err)
-		}
-	} else {
-		// deep (default): product/RPC/protocol/API string surface only — keeps compile tree stable.
-		// Server+client protocol sync (re.frida.* / Frida.* / frida:rpc) without renaming C ABI / meson vars.
-		ft, n, err = ApplyStructureAwareStripOpts(sourceDir, cfg.MagicName, StringRewriteOpts{ProtocolAPI: true})
-		if err != nil {
-			return fmt.Errorf("deep string-literal strip: %w", err)
+	if prof == "deep" || prof == "explore" || prof == "abi" || prof == "full" {
+		if ProfileRenamesIdentifiers(prof) {
+			// abi/full/explore: injection-path whitelist only (not tree-wide; keeps meson/C ABI)
+			ft, n, err = ApplyInjectionABIRename(sourceDir, cfg.MagicName)
+			if err != nil {
+				return fmt.Errorf("identifier/namespace rename: %w", err)
+			}
+		} else {
+			// deep (default): product/RPC/protocol/API string surface only — keeps compile tree stable.
+			// Server+client protocol sync (re.frida.* / Frida.* / frida:rpc) without renaming C ABI / meson vars.
+			ft, n, err = ApplyStructureAwareStripOpts(sourceDir, cfg.MagicName, StringRewriteOpts{ProtocolAPI: true})
+			if err != nil {
+				return fmt.Errorf("deep string-literal strip: %w", err)
+			}
 		}
 	}
-	if nj, jerr := ApplySeededJunkToInjectionTUs(sourceDir, StealthSeedHex(cfg.MagicName, cfg.BuildID)); jerr == nil && nj > 0 {
-		_ = os.WriteFile(filepath.Join(sourceDir, "fridare-stealth-junk.txt"),
-			[]byte(fmt.Sprintf("junk_files=%d seed=%s\n", nj, StealthSeedHex(cfg.MagicName, cfg.BuildID))), 0644)
+	if !cfg.DisableJunk {
+		if nj, jerr := ApplySeededJunkToInjectionTUs(sourceDir, StealthSeedHex(cfg.MagicName, cfg.BuildID)); jerr == nil && nj > 0 {
+			_ = os.WriteFile(filepath.Join(sourceDir, "fridare-stealth-junk.txt"),
+				[]byte(fmt.Sprintf("junk_files=%d seed=%s\n", nj, StealthSeedHex(cfg.MagicName, cfg.BuildID))), 0644)
+		}
 	}
 	// Re-normalize: rewrite may re-read/write; keep shebangs LF for Docker.
 	_, _ = NormalizeSourceTreeLF(sourceDir)

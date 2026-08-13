@@ -194,7 +194,9 @@ func PlanModsFromTree(sourceDir string, cfg JobConfig, branch string) (*ModPlan,
 	dirMan := directionManifestForConfig(cfg)
 	// Random dump-prefix ops must precede DefaultModOps (which rewrites frida-agent).
 	baseline := prependRandomAgentOps(cfg, OpsFromDirectionManifest(dirMan))
-	baseline = append(baseline, StealthBehaviorOps(cfg)...)
+	if !cfg.DisableStealthMarkers {
+		baseline = append(baseline, StealthBehaviorOps(cfg)...)
+	}
 	var concrete []ModOp
 	if sourceDir != "" {
 		if st, err := os.Stat(sourceDir); err == nil && st.IsDir() {

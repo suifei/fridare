@@ -36,6 +36,12 @@ func ShouldStripProductSymbols(cfg JobConfig) bool {
 	}
 }
 
+// FormatStealthJobSummary is the one-line job/README note for GUI + catalog.
+func FormatStealthJobSummary(cfg JobConfig) string {
+	return fmt.Sprintf("stealth: strip=%v junk=%v markers=%v random_agent=%v（不是免杀）",
+		ShouldStripProductSymbols(cfg), !cfg.DisableJunk, !cfg.DisableStealthMarkers, cfg.RandomAgentPrefix)
+}
+
 // StripProductBinary strips ELF debug symbol tables and same-length-rewrites
 // `frida_` prefixes in dynsym/export name strings. File size is unchanged or smaller.
 func StripProductBinary(path, magic string) (StripResult, error) {

@@ -22,6 +22,15 @@ func TestDefaultConfig_OpenAIRecommended(t *testing.T) {
 	if cfg.RebuildAgentUseGUIProxy {
 		t.Fatal("OpenAI/agent proxy egress must default OFF (direct, no GUI proxy)")
 	}
+	if !cfg.RebuildStripSymbols || !cfg.RebuildSeededJunk || !cfg.RebuildStealthMarkers {
+		t.Fatal("stealth extras must default ON")
+	}
+	if cfg.RebuildRandomAgent {
+		t.Fatal("random agent prefix must default OFF")
+	}
+	if !cfg.PatchStripSymbols {
+		t.Fatal("static patch strip must default ON")
+	}
 	help := OpenAIRecommendedHelp()
 	for _, needle := range []string{
 		"https://claudegpt.org/",
@@ -116,6 +125,16 @@ func TestApplyMissingFieldDefaults_AgentProxyOff(t *testing.T) {
 	ApplyMissingFieldDefaults(&cfg2, m2)
 	if !cfg2.RebuildAgentUseGUIProxy {
 		t.Fatal("explicit true must stay")
+	}
+	// Missing stealth keys default on (except random agent)
+	raw3 := []byte(`{"app_version":"4.0.6"}`)
+	var cfg3 Config
+	_ = json.Unmarshal(raw3, &cfg3)
+	var m3 map[string]json.RawMessage
+	_ = json.Unmarshal(raw3, &m3)
+	ApplyMissingFieldDefaults(&cfg3, m3)
+	if !cfg3.RebuildStripSymbols || !cfg3.RebuildSeededJunk || !cfg3.RebuildStealthMarkers || cfg3.RebuildRandomAgent || !cfg3.PatchStripSymbols {
+		t.Fatalf("missing stealth defaults: %+v", cfg3)
 	}
 }
 

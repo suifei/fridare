@@ -33,6 +33,8 @@ func TestShippedSourceContainsOpenAIRecommendedStrings(t *testing.T) {
 				"QQGroupQR",
 				"OpenAI",
 				"源码重编译",
+				"导出后去符号",
+				"StripProductBinary",
 			},
 		},
 		{
@@ -57,6 +59,11 @@ func TestShippedSourceContainsOpenAIRecommendedStrings(t *testing.T) {
 				"deep",
 				"/re/frida/",
 				"PROTOCOL-SYNC",
+				"stripSymbolsChk",
+				"seededJunkChk",
+				"stealthMarkersChk",
+				"FormatStealthJobSummary",
+				"不是免杀",
 			},
 		},
 		{

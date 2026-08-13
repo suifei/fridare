@@ -103,6 +103,24 @@ const char *rpc = "frida:rpc";
 	}
 }
 
+func TestApplyDeepSourceExtras_DisableJunk(t *testing.T) {
+	root := t.TempDir()
+	on := filepath.Join(root, "subprojects", "frida-gum", "gum", "backend-linux", "gumprocess-linux.c")
+	_ = os.MkdirAll(filepath.Dir(on), 0755)
+	_ = os.WriteFile(on, []byte("void gum_process(void) {}\n"), 0644)
+	cfg := JobConfig{MagicName: "abcde", DirectionProfile: "deep", DisableJunk: true}
+	if err := ApplyDeepSourceExtras(root, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(on)
+	if strings.Contains(string(got), "FRIDARE_JUNK") {
+		t.Fatalf("DisableJunk must skip: %s", got)
+	}
+	if _, err := os.Stat(filepath.Join(root, "fridare-stealth-junk.txt")); err == nil {
+		t.Fatal("must not write junk receipt")
+	}
+}
+
 func TestOpsForProfile(t *testing.T) {
 	if len(OpsForProfile("deep", "abcde", 1)) <= len(OpsForProfile("safe", "abcde", 1)) {
 		t.Fatal("deep should have more ops than safe")

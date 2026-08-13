@@ -59,10 +59,13 @@ type RebuildTab struct {
 	useGrokCheck     *widget.Check
 	useGUIProxyCheck *widget.Check
 	// profileSelect: safe | deep — deep = server+client protocol/API/idents sync
-	profileSelect     *widget.Select
-	randomAgentChk    *widget.Check
-	developBtn        *widget.Button
-	fullOneShotBtn    *widget.Button
+	profileSelect      *widget.Select
+	stripSymbolsChk    *widget.Check
+	seededJunkChk      *widget.Check
+	stealthMarkersChk  *widget.Check
+	randomAgentChk     *widget.Check
+	developBtn         *widget.Button
+	fullOneShotBtn     *widget.Button
 
 	// Agent panel (always visible — not buried under scroll)
 	goalsEntry    *widget.Entry
@@ -183,8 +186,8 @@ func (rt *RebuildTab) setupUI() {
 
 	// ── Step 2 panel: develop ───────────────────────────────────────
 	rt.versionEntry = widget.NewEntry()
-	rt.versionEntry.SetPlaceHolder("官方 tag，如 17.16.4")
-	rt.versionEntry.SetText("17.16.4")
+	rt.versionEntry.SetPlaceHolder("官方 tag，如 17.17.0")
+	rt.versionEntry.SetText("17.17.0")
 
 	rt.magicEntry = widget.NewEntry()
 	if rt.config.MagicName != "" {
@@ -236,10 +239,32 @@ func (rt *RebuildTab) setupUI() {
 
 	rt.profileSelect = widget.NewSelect([]string{"safe", "deep", "abi", "explore"}, nil)
 	rt.profileSelect.SetSelected("deep") // default: server+client protocol/API/idents sync
-	rt.randomAgentChk = widget.NewCheck("随机 agent 落盘前缀（可选；种子=magic+构建号）", nil)
-	profileHelp := widget.NewLabel("deep（推荐）：服务端+客户端同步 re.frida.* / /re/frida/ / frida:rpc；导出去符号 + 注入 TU 花指令。abi：仅 gum injector / agent / 进程枚举白名单改标识符。须用 catalog 内 wheel + PROTOCOL-SYNC。")
+	rt.stripSymbolsChk = widget.NewCheck("导出时去符号（ELF/PE frida_ / _frida_ → magic）", func(on bool) {
+		rt.config.RebuildStripSymbols = on
+		_ = rt.config.Save()
+	})
+	rt.stripSymbolsChk.SetChecked(rt.config.RebuildStripSymbols)
+	rt.seededJunkChk = widget.NewCheck("注入 TU 花指令（constructor+noinline；官方 strip 后仍留常量）", func(on bool) {
+		rt.config.RebuildSeededJunk = on
+		_ = rt.config.Save()
+	})
+	rt.seededJunkChk.SetChecked(rt.config.RebuildSeededJunk)
+	rt.stealthMarkersChk = widget.NewCheck("行为标记（SELinux / zymbiote / memfd / 带引号 linjector）", func(on bool) {
+		rt.config.RebuildStealthMarkers = on
+		_ = rt.config.Save()
+	})
+	rt.stealthMarkersChk.SetChecked(rt.config.RebuildStealthMarkers)
+	rt.randomAgentChk = widget.NewCheck("随机 agent 落盘前缀（只改 dump so，不动 meson .version）", func(on bool) {
+		rt.config.RebuildRandomAgent = on
+		_ = rt.config.Save()
+	})
+	rt.randomAgentChk.SetChecked(rt.config.RebuildRandomAgent)
+	profileHelp := widget.NewLabel("deep（推荐）：协议面 re.frida.* → re.{magic}.、/re/frida/ → /re/{magic}/、frida:rpc → {magic}:rpc 成对。下面 stealth 开关与流水线对等，默认开去符号+花指令+行为标记。不能全树改名。这不是免杀。启动端口用 -l。须用 catalog 内 wheel + PROTOCOL-SYNC。")
 	profileHelp.Wrapping = fyne.TextWrapWord
 	profileHelp.Importance = widget.LowImportance
+	stealthHelp := widget.NewLabel("去掉字样 ≠ 行为隐身 ≠ 免杀。静态「frida 魔改」也能勾导出后去符号，但花指令/行为标记只有本页源码重编译能做。")
+	stealthHelp.Wrapping = fyne.TextWrapWord
+	stealthHelp.Importance = widget.LowImportance
 
 	rt.developBtn = widget.NewButton("启动步骤② 魔改+编译", rt.startDevelop)
 	rt.developBtn.Importance = widget.HighImportance
@@ -259,7 +284,12 @@ func (rt *RebuildTab) setupUI() {
 		targetsScroll,
 		container.NewBorder(nil, nil, widget.NewLabel("魔改强度"), nil, rt.profileSelect),
 		profileHelp,
+		widget.NewLabel("Stealth（与流水线对等，可关）:"),
+		rt.stripSymbolsChk,
+		rt.seededJunkChk,
+		rt.stealthMarkersChk,
 		rt.randomAgentChk,
+		stealthHelp,
 		rt.useGUIProxyCheck,
 		rt.useGrokCheck,
 		container.NewHBox(rt.developBtn, rt.fullOneShotBtn),
@@ -483,7 +513,7 @@ func (rt *RebuildTab) baseJobConfig(mode rebuild.JobMode) rebuild.JobConfig {
 	if rt.useGUIProxyCheck != nil {
 		useGUIProxy = rt.useGUIProxyCheck.Checked
 	}
-	version := "17.16.4"
+	version := "17.17.0"
 	if rt.versionEntry != nil {
 		version = strings.TrimSpace(rt.versionEntry.Text)
 	}
@@ -529,10 +559,13 @@ func (rt *RebuildTab) baseJobConfig(mode rebuild.JobMode) rebuild.JobConfig {
 		Mode:             mode,
 		ArchiveImage:     archive,
 		DryRun:           false,
-		DirectionProfile:  profile,
-		StripSymbols:      profile != "safe",
-		RandomAgentPrefix: rt.randomAgentChk != nil && rt.randomAgentChk.Checked,
-		DirectionFile:    dirFile,
+		DirectionProfile:      profile,
+		StripSymbols:          rt.stripSymbolsChk == nil || rt.stripSymbolsChk.Checked,
+		DisableSymbolStrip:    rt.stripSymbolsChk != nil && !rt.stripSymbolsChk.Checked,
+		DisableJunk:           rt.seededJunkChk != nil && !rt.seededJunkChk.Checked,
+		DisableStealthMarkers: rt.stealthMarkersChk != nil && !rt.stealthMarkersChk.Checked,
+		RandomAgentPrefix:     rt.randomAgentChk != nil && rt.randomAgentChk.Checked,
+		DirectionFile:         dirFile,
 	}
 }
 
@@ -654,7 +687,7 @@ func (rt *RebuildTab) startDevelop() {
 			return
 		}
 		rt.selectStep(1)
-		rt.appendAgent("→ 开始步骤②：clone → AI 魔改 → Docker 编译…\n目标: " + cfg.Goals)
+		rt.appendAgent("→ 开始步骤②：clone → AI 魔改 → Docker 编译…\n" + rebuild.FormatStealthJobSummary(cfg) + "\n目标: " + cfg.Goals)
 		rt.doStart(cfg)
 	}, rt.window)
 }
@@ -668,13 +701,17 @@ func (rt *RebuildTab) startFull() {
 		return
 	}
 	cfg := rt.baseJobConfig(rebuild.JobModeFull)
-	msg := fmt.Sprintf("一键全流程（① 镜像 + ② 魔改编译）\n版本 %s\n目标 %s\n产物 %s",
-		cfg.FridaVersion, strings.Join(cfg.TargetIDs, ", "), cfg.ArtifactDir)
+	cfg.DirectionProfile = "deep"
+	if rt.profileSelect != nil {
+		rt.profileSelect.SetSelected("deep")
+	}
+	msg := fmt.Sprintf("一键全流程（① 镜像 + ② 魔改编译）\n版本 %s\n目标 %s\n%s\n产物 %s",
+		cfg.FridaVersion, strings.Join(cfg.TargetIDs, ", "), rebuild.FormatStealthJobSummary(cfg), cfg.ArtifactDir)
 	dialog.ShowConfirm("确认全流程", msg, func(ok bool) {
 		if !ok {
 			return
 		}
-		rt.appendAgent("→ 一键全流程启动…")
+		rt.appendAgent("→ 一键全流程启动…\n" + rebuild.FormatStealthJobSummary(cfg))
 		rt.doStart(cfg)
 	}, rt.window)
 }

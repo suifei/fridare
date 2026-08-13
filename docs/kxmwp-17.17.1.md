@@ -54,7 +54,7 @@ zip 文件名带 `17.17.1`，内容仍是 Frida 17.17.0 + magic `kxmwp`：
 
 ## 自己再编
 
-Fridare GUI **源码重编译** → deep → 一键深度定制。需要 Docker。编译只在 Linux 容器里跑。
+Fridare GUI **源码重编译** → deep → 勾选 stealth（去符号 / 花指令 / 行为标记，默认开）→ 一键深度定制。需要 Docker。编译只在 Linux 容器里跑。静态「frida 魔改」只能勾导出后去符号，做不到花指令。
 
 GUI 当前发行版仍是 [v4.0.6](https://github.com/suifei/fridare/releases/tag/v4.0.6)；本 tag 只发 **Frida 产物**，不替换 GUI latest。
 

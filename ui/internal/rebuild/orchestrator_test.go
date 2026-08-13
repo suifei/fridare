@@ -274,6 +274,9 @@ func TestArtifactDeployTips(t *testing.T) {
 	if !strings.Contains(tips, "abcde") || !strings.Contains(tips, "whl") || !strings.Contains(tips, "27042") {
 		t.Fatal(tips)
 	}
+	if !strings.Contains(tips, "stealth:") || !strings.Contains(tips, "不是免杀") {
+		t.Fatal(tips)
+	}
 	g := ToolsPatchGuidance("abcde", 27042)
 	if !strings.Contains(g, "frida-tools 魔改") {
 		t.Fatal(g)

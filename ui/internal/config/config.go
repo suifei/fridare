@@ -55,6 +55,13 @@ type Config struct {
 	RebuildAgentUseGUIProxy bool `json:"rebuild_agent_use_gui_proxy"`
 	// 用户确认已知悉源码路径需要代理/磁盘（非系统强制）
 	RebuildAcknowledged bool `json:"rebuild_acknowledged"`
+	// Stealth 与源码流水线对等（缺省字段按 ApplyMissingFieldDefaults）
+	RebuildStripSymbols    bool `json:"rebuild_strip_symbols"`
+	RebuildSeededJunk      bool `json:"rebuild_seeded_junk"`
+	RebuildStealthMarkers  bool `json:"rebuild_stealth_markers"`
+	RebuildRandomAgent     bool `json:"rebuild_random_agent"`
+	// 静态「frida 魔改」导出后去符号
+	PatchStripSymbols bool `json:"patch_strip_symbols"`
 }
 
 // DefaultConfig 返回默认配置
@@ -97,6 +104,11 @@ func DefaultConfig() *Config {
 		RebuildUseLocalGrok:     true,
 		RebuildAgentUseGUIProxy: false, // OpenAI 端点默认直连，不走 GUI 代理
 		RebuildAcknowledged:     false,
+		RebuildStripSymbols:     true,
+		RebuildSeededJunk:       true,
+		RebuildStealthMarkers:   true,
+		RebuildRandomAgent:      false,
+		PatchStripSymbols:       true,
 	}
 }
 
@@ -169,6 +181,21 @@ func ApplyMissingFieldDefaults(cfg *Config, raw map[string]json.RawMessage) {
 	}
 	if _, ok := raw["rebuild_docker_pull_direct"]; !ok {
 		cfg.RebuildDockerPullDirect = true
+	}
+	if _, ok := raw["rebuild_strip_symbols"]; !ok {
+		cfg.RebuildStripSymbols = true
+	}
+	if _, ok := raw["rebuild_seeded_junk"]; !ok {
+		cfg.RebuildSeededJunk = true
+	}
+	if _, ok := raw["rebuild_stealth_markers"]; !ok {
+		cfg.RebuildStealthMarkers = true
+	}
+	if _, ok := raw["rebuild_random_agent"]; !ok {
+		cfg.RebuildRandomAgent = false
+	}
+	if _, ok := raw["patch_strip_symbols"]; !ok {
+		cfg.PatchStripSymbols = true
 	}
 }
 

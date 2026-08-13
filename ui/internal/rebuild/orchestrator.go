@@ -128,6 +128,10 @@ type JobConfig struct {
 	DisableSymbolStrip bool
 	// RandomAgentPrefix enables optional per-job random on-disk agent name (seeded).
 	RandomAgentPrefix bool
+	// DisableJunk skips seeded injection-TU junk (constructor + noinline).
+	DisableJunk bool
+	// DisableStealthMarkers skips StealthBehaviorOps (SELinux / zymbiote / quoted linjector).
+	DisableStealthMarkers bool
 	// BuildID participates in stealth seed (magic|BuildID). Empty → "0".
 	BuildID string
 }
@@ -1008,6 +1012,8 @@ func ArtifactDeployTips(artifactDir string, cfg JobConfig) string {
 	}
 	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("魔改强度: %s\n", strings.TrimSpace(cfg.DirectionProfile)))
+	b.WriteString(FormatStealthJobSummary(cfg))
+	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("目标: %s\n", strings.Join(cfg.TargetIDs, ", ")))
 	b.WriteString(fmt.Sprintf("产物目录: %s\n\n", artifactDir))
 	b.WriteString("目录结构: catalog/{version}/{platform}/{magic}/binaries|python\n\n")

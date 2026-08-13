@@ -51,6 +51,7 @@ type ModifyTab struct {
 	progressBar    *widget.ProgressBar
 	progressLabel  *widget.Label
 	patchBtn       *widget.Button
+	stripAfterChk  *widget.Check
 
 	// 核心功能
 	hexReplacer *core.HexReplacer
@@ -116,9 +117,23 @@ func (mt *ModifyTab) setupUI() {
 		nil, nil, nil, randomBtn, mt.magicNameEntry,
 	)
 
+	mt.stripAfterChk = widget.NewCheck("导出后去符号（ELF/PE 的 frida_ / _frida_ → magic；不是免杀）", func(on bool) {
+		if mt.config != nil {
+			mt.config.PatchStripSymbols = on
+			_ = mt.config.Save()
+		}
+	})
+	if mt.config != nil {
+		mt.stripAfterChk.SetChecked(mt.config.PatchStripSymbols)
+	} else {
+		mt.stripAfterChk.SetChecked(true)
+	}
+
 	optionsForm := container.NewVBox(
 		widget.NewLabel("魔改名称 (必须5个小写字母):"),
 		magicNameArea,
+		mt.stripAfterChk,
+		widget.NewLabel("花指令 / SELinux / zymbiote 只有「源码重编译」能做；本页是静态 hex。"),
 	)
 
 	// 文件信息显示区域
@@ -288,6 +303,15 @@ func (mt *ModifyTab) startPatching() {
 		}
 
 		err := mt.hexReplacer.PatchFile(inputPath, magicName, outputPath, progressCallback)
+		if err == nil && mt.stripAfterChk != nil && mt.stripAfterChk.Checked {
+			if res, serr := rebuild.StripProductBinary(outputPath, magicName); serr != nil {
+				err = fmt.Errorf("去符号: %w", serr)
+			} else {
+				fyne.Do(func() {
+					mt.addLog(fmt.Sprintf("INFO: 去符号 format=%s exports=%d debug=%v", res.Format, res.ExportsRewritten, res.DebugStripped))
+				})
+			}
+		}
 		if err != nil {
 			errorMsg := "魔改失败: " + err.Error()
 			fyne.Do(func() {
@@ -721,6 +745,7 @@ type ToolsTab struct {
 
 	magicNameEntry *FixedWidthEntry
 	portEntry      *FixedWidthEntry
+	stripAfterChk  *widget.Check
 
 	patchBtn   *widget.Button
 	restoreBtn *widget.Button
@@ -833,6 +858,18 @@ func (tt *ToolsTab) setupUI() {
 	})
 	tt.backupBtn.Disable()
 
+	tt.stripAfterChk = widget.NewCheck("原生库导出后去符号（_frida*.so/.pyd/.dll）", func(on bool) {
+		if tt.config != nil {
+			tt.config.PatchStripSymbols = on
+			_ = tt.config.Save()
+		}
+	})
+	if tt.config != nil {
+		tt.stripAfterChk.SetChecked(tt.config.PatchStripSymbols)
+	} else {
+		tt.stripAfterChk.SetChecked(true)
+	}
+
 	configArea := widget.NewCard("魔改配置", "", container.NewVBox(
 		container.NewHBox(
 			widget.NewLabel("魔改名称:"), tt.magicNameEntry,
@@ -840,6 +877,7 @@ func (tt *ToolsTab) setupUI() {
 			tt.patchBtn,
 			tt.restoreBtn,
 			tt.backupBtn),
+		tt.stripAfterChk,
 	))
 	// 进度显示
 	tt.progressBar = widget.NewProgressBar()
@@ -1392,6 +1430,13 @@ func (tt *ToolsTab) patchSOFiles(magicName, port string) error {
 			continue
 		}
 		tt.addLog(fmt.Sprintf("SUCCESS: 已魔改SO文件: %s", soFile))
+		if tt.stripAfterChk != nil && tt.stripAfterChk.Checked {
+			if res, serr := rebuild.StripProductBinary(soFile, magicName); serr != nil {
+				tt.addLog(fmt.Sprintf("WARN: 去符号失败: %s: %v", soFile, serr))
+			} else {
+				tt.addLog(fmt.Sprintf("INFO: 去符号 %s format=%s exports=%d", filepath.Base(soFile), res.Format, res.ExportsRewritten))
+			}
+		}
 	}
 
 	return nil
@@ -2960,7 +3005,10 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 4. 步骤① 基础镜像（可单独跑）；步骤② 魔改+编译  
 5. 默认 profile=**deep**；或点「一键深度定制（①+② deep）」  
 6. 填写官方版本（depth=1）、5 字母 magic、目标平台、对话目标  
-7. 完成后到 **catalog** 产物目录：安装 ` + "`python/host/.../frida-*.whl`" + `（已含协议同步）+ frida_tools  
+7. **Stealth 开关**（与流水线对等，默认开去符号 / 花指令 / 行为标记）：可单独关；随机 agent 落盘默认关  
+8. 完成后到 **catalog** 产物目录：安装 ` + "`python/host/.../frida-*.whl`" + `（已含协议同步）+ frida_tools  
+
+**不是免杀。** 花指令/SELinux/zymbiote 只有本页源码重编译能做；静态「frida 魔改」只能勾导出后去符号。端口用 -l。
 
 ## deep 协议面（须成对）
 ` + "- re.frida.* → re.{magic}.*\n- /re/frida/ → /re/{magic}/（对象路径；缺则 UNKNOWN_METHOD）\n- frida:rpc → {magic}:rpc\n- \"Frida. → \"{Magic}.\n" + `产物含 PROTOCOL-SYNC.json 交叉核对结果。
@@ -3003,6 +3051,7 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 - **魔改名称**：5个字符，必须以字母开头
 - **目标端口**：1-65535 范围内的有效端口
 - **输出路径**：可选择覆盖或另存
+- **导出后去符号**（默认开）：对产物做 ELF/PE frida_ / _frida_ 同长度改写；**不是免杀**，也不能注入花指令
 
 ### 3. 执行魔改
 - 实时显示处理进度

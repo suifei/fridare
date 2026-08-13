@@ -7,6 +7,28 @@ import (
 	"testing"
 )
 
+func TestPlanModsFromTree_DisableStealthMarkers(t *testing.T) {
+	root := t.TempDir()
+	src := filepath.Join(root, "subprojects", "frida-core", "src", "linux", "linjector-glue.c")
+	_ = os.MkdirAll(filepath.Dir(src), 0755)
+	_ = os.WriteFile(src, []byte(`const char *inj = "linjector";`+"\n"), 0644)
+	cfg := JobConfig{
+		MagicName: "abcde", DirectionProfile: "deep", FridaVersion: "17.17.0",
+		DisableStealthMarkers: true,
+	}
+	plan, err := PlanModsFromTree(root, cfg, "br")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyPlanNaive(root, plan); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(src)
+	if !strings.Contains(string(got), `"linjector"`) {
+		t.Fatalf("markers disabled must leave quoted linjector: %s", got)
+	}
+}
+
 func TestStealthSeedHex_Stable(t *testing.T) {
 	a := StealthSeedHex("abcde", "build1")
 	b := StealthSeedHex("abcde", "build1")
