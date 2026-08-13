@@ -66,20 +66,36 @@ func StealthBehaviorOps(cfg JobConfig) []ModOp {
 	return ops
 }
 
+// agentDumpSOSuffixes are runtime dump / memfd SO names only.
+// Do NOT use a bare "frida-agent-" find — that rewrites meson
+// frida-agent-android.version while RenameMagicAssetFiles still uses magic.
+var agentDumpSOSuffixes = []string{
+	"-64.so", "-32.so", "-arm.so", "-arm64.so", "-armhf.so",
+	"-64.dylib", "-32.dylib",
+}
+
 // randomAgentDiskOps must run *before* DefaultModOps (frida-agent → {magic}-agent).
-// PlanModsFromTree prepends these so expand+apply still see stock "frida-agent-".
+// PlanModsFromTree prepends these so expand+apply still see stock dump SO names.
 func randomAgentDiskOps(magic, buildID string) []ModOp {
 	pfx := AgentDiskPrefix(magic, buildID, true)
 	if pfx == "" || pfx == magic {
 		return nil
 	}
-	return []ModOp{
-		{Path: "**/*", Operation: "replace", Description: "random agent dump prefix", Find: "frida-agent-", Replace: pfx + "-agent-"},
-		// after DefaultModOps the same dump string is {magic}-agent-; keep a second find
-		// for plans that apply stealth after basename rewrite without prepending.
-		{Path: "**/*", Operation: "replace", Description: "random agent dump prefix after magic", Find: magic + "-agent-", Replace: pfx + "-agent-"},
-		{Path: "**/*", Operation: "replace", Description: "random memfd agent", Find: "memfd:" + magic + "-agent", Replace: "memfd:" + pfx + "-agent"},
+	var ops []ModOp
+	for _, suf := range agentDumpSOSuffixes {
+		stock := "frida-agent" + suf
+		mag := magic + "-agent" + suf
+		neu := pfx + "-agent" + suf
+		ops = append(ops,
+			ModOp{Path: "**/*", Operation: "replace", Description: "random agent dump " + stock, Find: stock, Replace: neu},
+			ModOp{Path: "**/*", Operation: "replace", Description: "random agent dump after magic " + mag, Find: mag, Replace: neu},
+		)
 	}
+	ops = append(ops, ModOp{
+		Path: "**/*", Operation: "replace", Description: "random memfd agent so",
+		Find: "memfd:" + magic + "-agent-", Replace: "memfd:" + pfx + "-agent-",
+	})
+	return ops
 }
 
 // prependRandomAgentOps puts dump-prefix replacements ahead of DefaultModOps.

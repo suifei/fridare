@@ -110,6 +110,55 @@ func TestPlanModsFromTree_RandomAgentPrefix_AfterDefaultModOps(t *testing.T) {
 	}
 }
 
+func TestPlanModsFromTree_RandomAgentPrefix_PreservesMesonAssets(t *testing.T) {
+	// meson asset stems stay magic; only dump SO names get the random prefix.
+	root := t.TempDir()
+	meson := filepath.Join(root, "subprojects", "frida-core", "lib", "agent", "meson.build")
+	ver := filepath.Join(root, "subprojects", "frida-core", "lib", "agent", "frida-agent-android.version")
+	src := filepath.Join(root, "subprojects", "frida-core", "lib", "agent", "agent-glue.c")
+	_ = os.MkdirAll(filepath.Dir(src), 0755)
+	_ = os.WriteFile(meson, []byte("files('frida-agent-android.version')\n"), 0644)
+	_ = os.WriteFile(ver, []byte("17.17.0\n"), 0644)
+	_ = os.WriteFile(src, []byte("char *dump = \"frida-agent-64.so\";\n"), 0644)
+
+	cfg := JobConfig{
+		MagicName: "abcde", BuildID: "job9", RandomAgentPrefix: true,
+		DirectionProfile: "deep", FridaVersion: "17.17.0",
+	}
+	plan, err := PlanModsFromTree(root, cfg, "br")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyPlanNaive(root, plan); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := RenameMagicAssetFiles(root, cfg.MagicName); err != nil {
+		t.Fatal(err)
+	}
+
+	pfx := AgentDiskPrefix("abcde", "job9", true)
+	mb, _ := os.ReadFile(filepath.Join(root, "subprojects", "frida-core", "lib", "agent", "meson.build"))
+	ms := string(mb)
+	if !strings.Contains(ms, "abcde-agent-android.version") {
+		t.Fatalf("meson must keep magic asset stem: %s", ms)
+	}
+	if strings.Contains(ms, pfx+"-agent-android") {
+		t.Fatalf("random prefix must not rewrite meson .version: %s", ms)
+	}
+	magicVer := filepath.Join(root, "subprojects", "frida-core", "lib", "agent", "abcde-agent-android.version")
+	if _, err := os.Stat(magicVer); err != nil {
+		t.Fatalf("on-disk asset must be magic-named (meson File exists): %v", err)
+	}
+	randVer := filepath.Join(root, "subprojects", "frida-core", "lib", "agent", pfx+"-agent-android.version")
+	if _, err := os.Stat(randVer); err == nil {
+		t.Fatal("must not rename .version to random prefix")
+	}
+	got, _ := os.ReadFile(src)
+	if !strings.Contains(string(got), pfx+"-agent-64.so") {
+		t.Fatalf("dump SO not randomized: %s", got)
+	}
+}
+
 func TestStealthBehaviorOps_RandomAgentPrefix(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(root, "subprojects", "frida-core", "lib", "agent", "agent-glue.c")
