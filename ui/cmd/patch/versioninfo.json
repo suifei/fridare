@@ -3,13 +3,13 @@
                           "FileVersion":  {
                                               "Major":  4,
                                               "Minor":  0,
-                                              "Patch":  6,
+                                              "Patch":  7,
                                               "Build":  0
                                           },
                           "ProductVersion":  {
                                                  "Major":  4,
                                                  "Minor":  0,
-                                                 "Patch":  6,
+                                                 "Patch":  7,
                                                  "Build":  0
                                              },
                           "FileFlagsMask":  "3f",
@@ -22,12 +22,12 @@
                            "Comments":  "Fridare patch — https://github.com/suifei/fridare",
                            "CompanyName":  "suifei",
                            "FileDescription":  "Fridare — iOS DEB / 二进制补丁工具",
-                           "FileVersion":  "4.0.6.0",
+                           "FileVersion":  "4.0.7.0",
                            "InternalName":  "fridare-patch",
                            "LegalCopyright":  "Copyright (c) suifei",
                            "OriginalFilename":  "fridare-patch.exe",
                            "ProductName":  "Fridare",
-                           "ProductVersion":  "4.0.6.0"
+                           "ProductVersion":  "4.0.7.0"
                        },
     "VarFileInfo":  {
                         "Translation":  {

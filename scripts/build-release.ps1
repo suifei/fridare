@@ -4,11 +4,11 @@
 # GUI (Fyne): requires CGO + OpenGL; built for host Windows only (windows-amd64).
 #
 # Usage:
-#   powershell -File scripts\build-release.ps1 -Version 4.0.6
-#   powershell -File scripts\build-release.ps1 -Version 4.0.6 -Only windows-amd64
+#   powershell -File scripts\build-release.ps1 -Version 4.0.7
+#   powershell -File scripts\build-release.ps1 -Version 4.0.7 -Only windows-amd64
 
 param(
-    [string]$Version = "4.0.6",
+    [string]$Version = "4.0.7",
     # Optional: build only one platform dir name, e.g. windows-amd64
     [string]$Only = ""
 )
@@ -147,10 +147,11 @@ Source rebuild (GUI tab: source rebuild / Docker):
 
 Docs in this zip (docs/):
   dual-track.md       two tracks (static hex + Docker rebuild)
-  kxmwp-17.17.0.md    prebuilt Frida 17.17.0 deep products
+  kxmwp-17.17.0.md    prebuilt Frida 17.17.0 deep products (r1)
+  kxmwp-17.17.1.md    r2: strip + stealth junk (not AV evasion)
 
 Prebuilt servers (not in this zip):
-  https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.0
+  https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1
 
 Windows batch helpers (ASCII + CRLF only):
   See repository win/patch-frida.cmd and win/patch-frida-tools.cmd
@@ -184,6 +185,10 @@ foreach ($t in $ToolTargets) {
     New-Item -ItemType Directory -Force -Path $docsDir | Out-Null
     Copy-Item (Join-Path $Root "docs\dual-track.md") $docsDir
     Copy-Item (Join-Path $Root "docs\kxmwp-17.17.0.md") $docsDir
+    Copy-Item (Join-Path $Root "docs\kxmwp-17.17.1.md") $docsDir
+    if (Test-Path (Join-Path $Root "docs\release-v$Version.md")) {
+        Copy-Item (Join-Path $Root "docs\release-v$Version.md") $docsDir
+    }
     Copy-Item (Join-Path $Root "CHANGELOG") (Join-Path $dir "CHANGELOG.txt")
 
     Write-Readme -Path (Join-Path $dir "README.txt") -PlatformLabel $t.Dir -HasGui $hasGui

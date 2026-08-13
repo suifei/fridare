@@ -25,7 +25,8 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 
 | 版本 | 要点 | 下载 |
 |------|------|------|
-| **v4.0.6**（当前 GUI） | Docker **toolchain-v4**（MinGW + aarch64）；监听端口用 `-l`；安装包附 dual-track / kxmwp 说明 | [v4.0.6](https://github.com/suifei/fridare/releases/tag/v4.0.6) |
+| **v4.0.7**（当前 GUI） | 源码页 stealth 开关（去符号/花指令/行为标记）；静态魔改可去符号；**不是免杀** | [v4.0.7](https://github.com/suifei/fridare/releases/tag/v4.0.7) |
+| **v4.0.6** | Docker **toolchain-v4**（MinGW + aarch64）；监听端口用 `-l` | [v4.0.6](https://github.com/suifei/fridare/releases/tag/v4.0.6) |
 | **kxmwp-17.17.1**（当前 Frida 产物） | 17.17.0 r2：去符号 + linux/win64 stealth 重编；**不是免杀**；端口用 `-l` | [kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1) |
 | **kxmwp-17.17.0** | Frida **17.17.0** deep 产物（8 平台 server + host wheels） | [kxmwp-17.17.0](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.0) |
 | **v4.0.5** | seed 脚本 Docker stage 修复；plan 扫描加速；README/CHANGELOG 精装；MinGW wrap 失败清理 | [v4.0.5](https://github.com/suifei/fridare/releases/tag/v4.0.5) |
@@ -33,7 +34,7 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 | v4.0.3 | CLI 多平台静态链接（win/linux/darwin × amd64/arm64）+ Windows GUI 预编译 | [v4.0.3](https://github.com/suifei/fridare/releases/tag/v4.0.3) |
 | v4.0.0 | Fyne GUI + Windows 原生 deb 魔改 | [v4.0.0](https://github.com/suifei/fridare/releases) |
 
-**文档**：[双技术路线](docs/dual-track.md) · [17.17.0 deep 产物 kxmwp](docs/kxmwp-17.17.0.md) · [17.17.1 r2（去符号 / stealth）](docs/kxmwp-17.17.1.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
+**文档**：[双技术路线](docs/dual-track.md) · [v4.0.7](docs/release-v4.0.7.md) · [17.17.0 deep 产物 kxmwp](docs/kxmwp-17.17.0.md) · [17.17.1 r2](docs/kxmwp-17.17.1.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
 
 ### 双技术路线（v4.0.4）
 
@@ -636,7 +637,7 @@ Fridare automates Frida customization on **iOS / Android / Linux / Windows**: re
 | **A · Static patch (default)** | hex/string replace on official binaries + tools | No Docker |
 | **B · Source rebuild (optional)** | AI/host edits + **Docker-only** `configure/make` (incl. MinGW Windows server) | Docker |
 
-**v4.0.6**: Docker builder toolchain-v4 (MinGW + aarch64-linux-gnu); listen port via `-l` (baked-in default optional). See [docs/dual-track.md](docs/dual-track.md) and [Releases](https://github.com/suifei/fridare/releases/tag/v4.0.6).
+**v4.0.7**: GUI stealth checkboxes (strip / junk / markers) + static post-strip; not AV evasion. See [docs/dual-track.md](docs/dual-track.md) and [Releases](https://github.com/suifei/fridare/releases/tag/v4.0.7).
 
 [CHANGELOG](CHANGELOG) · Chinese docs above · [Windows notes](win/README.md)
 

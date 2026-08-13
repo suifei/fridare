@@ -4,18 +4,22 @@
 
 ## Unreleased
 
+## v4.0.7 - 2026-08-13
+
 ### Added
 - GUI 源码重编译页 stealth 开关与流水线对等：去符号 / 花指令 / 行为标记 / 随机 agent 落盘（可关，写入配置）
 - 静态「frida 魔改」与 frida-tools 页：导出后去符号（`StripProductBinary`）
 
 ### Changed
 - 一键深度定制强制 profile=`deep`；默认 Frida 版本改为 17.17.0
+- 安装包附 `docs/kxmwp-17.17.1.md`
 
-（Frida 产物 r2 见下方 `kxmwp-17.17.1`。GUI 安装包要等下一版 v4.0.7 才带这些开关；现源码已合入。）
+### Notes
+- **不是免杀包。** Frida 预编译产物仍是独立 tag [kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1)
 
 ## kxmwp-17.17.1 - 2026-08-13
 
-产物 tag（**不是** GUI latest；latest 仍是 v4.0.6）。  
+产物 tag（**不是** GUI latest；GUI latest 现为 v4.0.7）。  
 Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1>  
 说明：[docs/kxmwp-17.17.1.md](docs/kxmwp-17.17.1.md)
 
