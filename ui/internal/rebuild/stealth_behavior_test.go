@@ -78,6 +78,38 @@ func TestStealthBehaviorOps_ApplyFixture_SkipsVendorAndRandomOff(t *testing.T) {
 	}
 }
 
+func TestPlanModsFromTree_RandomAgentPrefix_AfterDefaultModOps(t *testing.T) {
+	// Real shipped path: PlanModsFromTree includes DefaultModOps then applyPlanNaive.
+	// Random prefix must still win (not stay as {magic}-agent-).
+	root := t.TempDir()
+	src := filepath.Join(root, "subprojects", "frida-core", "lib", "agent", "agent-glue.c")
+	_ = os.MkdirAll(filepath.Dir(src), 0755)
+	_ = os.WriteFile(src, []byte("char *dump = \"frida-agent-64.so\";\nvoid load_frida_agent(void);\n"), 0644)
+	cfg := JobConfig{
+		MagicName: "abcde", BuildID: "job9", RandomAgentPrefix: true,
+		DirectionProfile: "deep", FridaVersion: "17.17.0",
+	}
+	plan, err := PlanModsFromTree(root, cfg, "br")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyPlanNaive(root, plan); err != nil {
+		t.Fatal(err)
+	}
+	pfx := AgentDiskPrefix("abcde", "job9", true)
+	got, _ := os.ReadFile(src)
+	s := string(got)
+	if !strings.Contains(s, pfx+"-agent-64.so") {
+		t.Fatalf("dump prefix not applied via PlanModsFromTree: pfx=%s body=%s", pfx, s)
+	}
+	if strings.Contains(s, "frida-agent-64") {
+		t.Fatalf("stock dump name remains: %s", s)
+	}
+	if strings.Contains(s, "abcde-agent-64") {
+		t.Fatalf("stuck at magic-agent dump name (random op ran too late): %s", s)
+	}
+}
+
 func TestStealthBehaviorOps_RandomAgentPrefix(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(root, "subprojects", "frida-core", "lib", "agent", "agent-glue.c")

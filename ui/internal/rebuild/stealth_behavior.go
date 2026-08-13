@@ -61,12 +61,39 @@ func StealthBehaviorOps(cfg JobConfig) []ModOp {
 		{Path: "**/*", Operation: "replace", Description: "memfd:frida", Find: "memfd:frida", Replace: "memfd:" + magic},
 	}
 	if cfg.RandomAgentPrefix {
-		pfx := AgentDiskPrefix(magic, cfg.BuildID, true)
-		// on-disk dump names only — not the product basename meson target (already magic)
-		ops = append(ops,
-			ModOp{Path: "**/*", Operation: "replace", Description: "random agent dump prefix", Find: "frida-agent-", Replace: pfx + "-agent-"},
-			ModOp{Path: "**/*", Operation: "replace", Description: "random memfd agent", Find: "memfd:" + magic + "-agent", Replace: "memfd:" + pfx + "-agent"},
-		)
+		ops = append(ops, randomAgentDiskOps(magic, cfg.BuildID)...)
 	}
 	return ops
+}
+
+// randomAgentDiskOps must run *before* DefaultModOps (frida-agent → {magic}-agent).
+// PlanModsFromTree prepends these so expand+apply still see stock "frida-agent-".
+func randomAgentDiskOps(magic, buildID string) []ModOp {
+	pfx := AgentDiskPrefix(magic, buildID, true)
+	if pfx == "" || pfx == magic {
+		return nil
+	}
+	return []ModOp{
+		{Path: "**/*", Operation: "replace", Description: "random agent dump prefix", Find: "frida-agent-", Replace: pfx + "-agent-"},
+		// after DefaultModOps the same dump string is {magic}-agent-; keep a second find
+		// for plans that apply stealth after basename rewrite without prepending.
+		{Path: "**/*", Operation: "replace", Description: "random agent dump prefix after magic", Find: magic + "-agent-", Replace: pfx + "-agent-"},
+		{Path: "**/*", Operation: "replace", Description: "random memfd agent", Find: "memfd:" + magic + "-agent", Replace: "memfd:" + pfx + "-agent"},
+	}
+}
+
+// prependRandomAgentOps puts dump-prefix replacements ahead of DefaultModOps.
+func prependRandomAgentOps(cfg JobConfig, rest []ModOp) []ModOp {
+	if !cfg.RandomAgentPrefix {
+		return rest
+	}
+	magic := strings.TrimSpace(cfg.MagicName)
+	if magic == "" || magic == "frida" {
+		return rest
+	}
+	head := randomAgentDiskOps(magic, cfg.BuildID)
+	if len(head) == 0 {
+		return rest
+	}
+	return append(head, rest...)
 }

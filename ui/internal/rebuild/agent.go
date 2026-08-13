@@ -192,7 +192,8 @@ func GrokInvokeArgs(binary, promptFile, workDir string) []string {
 // many minutes and are prone to host job-object kills during e2e runs.
 func PlanModsFromTree(sourceDir string, cfg JobConfig, branch string) (*ModPlan, error) {
 	dirMan := directionManifestForConfig(cfg)
-	baseline := OpsFromDirectionManifest(dirMan)
+	// Random dump-prefix ops must precede DefaultModOps (which rewrites frida-agent).
+	baseline := prependRandomAgentOps(cfg, OpsFromDirectionManifest(dirMan))
 	baseline = append(baseline, StealthBehaviorOps(cfg)...)
 	var concrete []ModOp
 	if sourceDir != "" {
