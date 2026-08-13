@@ -6,6 +6,26 @@ Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19>
 
 本 tag **不是** GUI `latest`（GUI latest 仍是 v4.0.8）。
 
+## 魔改面（术语）
+
+`deep` + stealth，magic=`kxmwp`。**不是免杀。**
+
+- basename：`frida-server` / `frida-agent` / `frida-gadget` / `frida-helper` / `frida-inject` / `frida-policyd`
+- blob getter：`get_frida_agent` 等
+- RPC：`frida:rpc` → `kxmwp:rpc`
+- D-Bus：`re.frida.` → `re.kxmwp.`，`/re/frida/` → `/re/kxmwp/`
+- 公开 API 字面量：`"Frida.` → `"Kxmwp.`
+- 线程 / 池：`gum-js-loop`、`frida-main-loop`、`frida-server-main-loop`、`pool-frida`、`"gmain"`、`"gdbus"`
+- maps：`"linjector"` / `"winjector"`
+- socket / pipe：`unix:frida`、`abstract/frida`、named pipe 前缀、`/frida-zymbiote-`
+- SELinux / memfd：`frida_file`、`frida_memfd`、`memfd:frida`
+- 资源文件名：`frida-*.version` / `.symbols`
+- 产物：strip、dynsym `frida_` 同长改写、注入 TU 花指令
+- host wheel：同一协议面（须成对）
+- 默认端口仍 **27042**（用 `-l`）
+
+未改：C ABI 标识符（如 `frida_agent_main`）、`github.com/frida/` wrap。
+
 ## 包内容（8 平台全部 GUI 源码重编译）
 
 Builder 镜像 `fridare/frida-builder:latest` feature **`toolchain-v5-ndk25-ndk29-node20-go124-mingw-aarch64`**：默认 NDK **r29**（17.x），另备 **r25**（`/opt/android-ndk-r25`）。16.7.19 的 `releng/env_android.py` 写了 `NDK_REQUIRED=25`，流水线会自动切到 r25。
