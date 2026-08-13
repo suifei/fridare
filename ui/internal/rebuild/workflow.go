@@ -449,10 +449,11 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir, stealthSeed st
 		b.WriteString(perTU)
 		b.WriteString("\n")
 		b.WriteString("make || exit 1\n")
-		b.WriteString(fmt.Sprintf(") || { echo '[fridare] configure/make failed for %s exit=$?' >&2; exit 1; }\n", shellQuote(t.ID)))
+		// Per-target failure must not abort the remaining matrix (16.7.19 8-zip set).
+		b.WriteString(fmt.Sprintf(") || { echo '[fridare] configure/make failed for %s (continue)' >&2; }\n", shellQuote(t.ID)))
 		b.WriteString(fmt.Sprintf("mkdir -p %s/%s\n", shellQuote(artifactDir), shellQuote(t.ID)))
-		// Only copy non-empty product blobs (skip 0-byte meson stubs)
-		b.WriteString(fmt.Sprintf("find %s -type f -size +1k \\( -name 'frida-server*' -o -name 'frida-agent*' -o -name 'frida-gadget*' -o -name '*-server' -o -name '*-server-raw' -o -name '*-server-raw.exe' -o -name '*-agent*.so' -o -name '*-gadget*.so' \\) -exec cp -a {} %s/%s/ \\; 2>/dev/null || true\n",
+		// ELF + PE product blobs (skip 0-byte meson stubs)
+		b.WriteString(fmt.Sprintf("find %s -type f -size +1k \\( -name 'frida-server*' -o -name 'frida-agent*' -o -name 'frida-gadget*' -o -name '*-server' -o -name '*-server.exe' -o -name '*-server-raw' -o -name '*-server-raw.exe' -o -name '*-agent*.so' -o -name '*-agent*.dll' -o -name '*-gadget*.so' -o -name '*-gadget*.dll' -o -name '*-helper*.exe' -o -name '*-inject*.exe' \\) -exec cp -a {} %s/%s/ \\; 2>/dev/null || true\n",
 			shellQuote(buildDir), shellQuote(artifactDir), shellQuote(t.ID)))
 	}
 	return b.String(), nil

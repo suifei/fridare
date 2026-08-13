@@ -280,6 +280,12 @@ func TestBuildOnlyPipelineScript_PerTUAndNoGlobalInclude(t *testing.T) {
 	if !strings.Contains(script, "compiler_snapshot") || !strings.Contains(script, "-Dfrida-core:compiler_snapshot=disabled") {
 		t.Fatal("16.x compiler_snapshot disable (SDK snapshot tool workaround) missing")
 	}
+	if !strings.Contains(script, "*-server.exe") || !strings.Contains(script, "*-gadget*.dll") {
+		t.Fatal("Windows PE collect patterns missing")
+	}
+	if strings.Contains(script, "configure/make failed for windows-x86_64 exit=") {
+		t.Fatal("one MinGW fail must not abort android/linux siblings")
+	}
 	if strings.Contains(script, `export CFLAGS="${CFLAGS:-} -include`) ||
 		strings.Contains(script, "export CFLAGS=\"${CFLAGS:-} -include") {
 		t.Fatal("must not add global CFLAGS=-include")

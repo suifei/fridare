@@ -182,6 +182,12 @@ func TestBuildOnlyPipelineScript_DockerOnlyMake(t *testing.T) {
 		!strings.Contains(script, "--disable-frida-tools") {
 		t.Fatalf("product opts missing in configure: %s", script)
 	}
+	if strings.Contains(script, "configure/make failed for android-arm64 exit=") {
+		t.Fatal("per-target make failure must not abort the rest of the matrix")
+	}
+	if !strings.Contains(script, "continue") {
+		t.Fatal("failed target should continue the remaining platforms")
+	}
 	if !strings.Contains(script, "make") {
 		t.Fatal(script)
 	}
