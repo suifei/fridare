@@ -46,18 +46,20 @@ func StealthBehaviorOps(cfg JobConfig) []ModOp {
 		return nil
 	}
 	ops := []ModOp{
-		// maps / injector (same length: linjector = 9, magic+ctor = 9 when len(magic)==5)
-		{Path: "**/*", Operation: "replace", Description: "maps linjector", Find: "linjector", Replace: magic + "ctor"},
+		// Quoted maps token only — never meson 'linjector.vala' / linjector-glue.c / identifiers.
+		{Path: "**/*", Operation: "replace", Description: "maps \"linjector\"", Find: `"linjector"`, Replace: `"` + magic + `ctor"`},
 		// unix socket brand
 		{Path: "**/*", Operation: "replace", Description: "unix:frida socket", Find: "unix:frida", Replace: "unix:" + magic},
 		{Path: "**/*", Operation: "replace", Description: "abstract frida socket", Find: "abstract/frida", Replace: "abstract/" + magic},
-		// /proc maps path crumbs
-		{Path: "**/*", Operation: "replace", Description: "maps /frida-", Find: "/frida-", Replace: "/" + magic + "-"},
-		// SELinux
+		// Quoted /frida- socket/maps prefixes only (bare /frida- smashes github.com/frida/frida-core).
+		{Path: "**/*", Operation: "replace", Description: "quoted /frida- path", Find: `"/frida-"`, Replace: `"/` + magic + `-"`},
+		{Path: "**/*", Operation: "replace", Description: "frida-zymbiote socket", Find: "/frida-zymbiote-", Replace: "/" + magic + "-zymbiote-"},
+		// SELinux type names (same length when len(magic)==5)
 		{Path: "**/*", Operation: "replace", Description: "SELinux u:object_r:frida", Find: "u:object_r:frida", Replace: "u:object_r:" + magic},
 		{Path: "**/*", Operation: "replace", Description: "SELinux u:r:frida", Find: "u:r:frida", Replace: "u:r:" + magic},
-		{Path: "**/*", Operation: "replace", Description: "SELinux frida_file", Find: "frida_file", Replace: magic + "_file"},
-		// memfd
+		{Path: "**/*", Operation: "replace", Description: "SELinux \"frida_file\"", Find: `"frida_file"`, Replace: `"` + magic + `_file"`},
+		{Path: "**/*", Operation: "replace", Description: "SELinux \"frida_memfd\"", Find: `"frida_memfd"`, Replace: `"` + magic + `_memfd"`},
+		// memfd name prefix
 		{Path: "**/*", Operation: "replace", Description: "memfd:frida", Find: "memfd:frida", Replace: "memfd:" + magic},
 	}
 	if cfg.RandomAgentPrefix {
