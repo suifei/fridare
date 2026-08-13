@@ -163,7 +163,7 @@ func TestRewriteFridaExportCStrings_LeadingUnderscoreAndInterior(t *testing.T) {
 func TestFormatStealthJobSummary(t *testing.T) {
 	s := FormatStealthJobSummary(JobConfig{DirectionProfile: "deep"})
 	if !strings.Contains(s, "strip=true") || !strings.Contains(s, "junk=true") ||
-		!strings.Contains(s, "markers=true") || !strings.Contains(s, "不是免杀") {
+		!strings.Contains(s, "markers=true") || !strings.Contains(s, "免杀") {
 		t.Fatalf("%s", s)
 	}
 	s2 := FormatStealthJobSummary(JobConfig{DirectionProfile: "deep", DisableJunk: true, DisableStealthMarkers: true, DisableSymbolStrip: true})

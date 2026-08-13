@@ -63,13 +63,19 @@ func TestStealthBehaviorOps_ApplyFixture_SkipsVendorAndRandomOff(t *testing.T) {
 	_ = os.MkdirAll(filepath.Dir(vendor), 0755)
 	body := strings.Join([]string{
 		`const char *inj = "linjector";`,
+		`const char *winj = "winjector";`,
 		`const char *sock = "unix:frida";`,
 		`const char *maps = "/frida-";`,
 		`const char *sel = "u:object_r:frida_file";`,
 		`const char *mf = "memfd:frida";`,
 		`const char *mfd = "frida_memfd";`,
 		`static void frida_file_get_impl(void);`,
+		`static void g_main_context_iterate(void);`,
+		`const char *th = "gmain";`,
+		`const char *gd = "gdbus";`,
+		`s = g_string_new ("frida-");`,
 		`const char *dump = "frida-agent-64.so";`,
+		`files("frida-agent-android.version");`,
 		`files('linjector.vala');`,
 	}, "\n")
 	_ = os.WriteFile(src, []byte(body+"\n"), 0644)
@@ -85,8 +91,23 @@ func TestStealthBehaviorOps_ApplyFixture_SkipsVendorAndRandomOff(t *testing.T) {
 	if !strings.Contains(s, `"abcdector"`) || strings.Contains(s, `"linjector"`) {
 		t.Fatalf("quoted linjector: %s", s)
 	}
+	if !strings.Contains(s, `"abcdewtor"`) || strings.Contains(s, `"winjector"`) {
+		t.Fatalf("quoted winjector: %s", s)
+	}
 	if !strings.Contains(s, "files('linjector.vala')") {
 		t.Fatalf("meson linjector.vala must stay: %s", s)
+	}
+	if !strings.Contains(s, `g_string_new ("abcde-")`) || strings.Contains(s, `g_string_new ("frida-")`) {
+		t.Fatalf("pipe prefix: %s", s)
+	}
+	if !strings.Contains(s, `files("frida-agent-android.version")`) {
+		t.Fatalf("must not smash meson frida-agent- via bare \"frida-\": %s", s)
+	}
+	if !strings.Contains(s, "g_main_context_iterate") {
+		t.Fatalf("must not smash g_main_* identifiers: %s", s)
+	}
+	if !strings.Contains(s, `"abcde"`) || strings.Contains(s, `"gmain"`) || strings.Contains(s, `"gdbus"`) {
+		t.Fatalf("quoted gmain/gdbus: %s", s)
 	}
 	if !strings.Contains(s, "unix:abcde") || !strings.Contains(s, `"/abcde-"`) {
 		t.Fatalf("socket/maps: %s", s)

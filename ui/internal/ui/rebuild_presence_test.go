@@ -64,6 +64,9 @@ func TestShippedSourceContainsOpenAIRecommendedStrings(t *testing.T) {
 				"stealthMarkersChk",
 				"FormatStealthJobSummary",
 				"不是免杀",
+				"行为识别",
+				"行为隐身",
+				"杀软",
 			},
 		},
 		{

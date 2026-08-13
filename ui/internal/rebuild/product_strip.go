@@ -38,7 +38,7 @@ func ShouldStripProductSymbols(cfg JobConfig) bool {
 
 // FormatStealthJobSummary is the one-line job/README note for GUI + catalog.
 func FormatStealthJobSummary(cfg JobConfig) string {
-	return fmt.Sprintf("stealth: strip=%v junk=%v markers=%v random_agent=%v（不是免杀）",
+	return fmt.Sprintf("stealth: strip=%v junk=%v markers=%v random_agent=%v（行为隐身≠免杀，不能保证杀软/加固效果）",
 		ShouldStripProductSymbols(cfg), !cfg.DisableJunk, !cfg.DisableStealthMarkers, cfg.RandomAgentPrefix)
 }
 

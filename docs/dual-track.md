@@ -98,9 +98,9 @@ GUI 与 Docker **客户端**在 Windows、macOS、Linux 上均可使用：
 
 编译约定：`--enable-server --enable-gadget --enable-inject --disable-frida-python`。  
 MinGW DNS 类型桩只注入 meson **cross file**，不要设全局 `CFLAGS=-include`。  
-产物可选 **去符号**（ELF dynsym + 全文 `frida_` / `_frida_` 同长度改写）。`abi` 标识符重命名只作用于注入白名单（gum process / linjector / agent-glue）。注入相关 `.c` 插入种子花指令时必须带 **constructor + noinline + used** 和 rodata words（仅 `used` 会被折叠进 DWARF，官方 `strip` 后产物里看不到）；ninja **只补当前 `build.ninja`**，禁止全局 CFLAGS。去掉字样 **不是** 免杀。
+产物可选 **去符号**（ELF dynsym + 全文 `frida_` / `_frida_` 同长度改写）。`abi` 标识符重命名只作用于注入白名单（gum process / linjector / agent-glue）。注入相关 `.c` 插入种子花指令时必须带 **constructor + noinline + used** 和 rodata words（仅 `used` 会被折叠进 DWARF，官方 `strip` 后产物里看不到）；ninja **只补当前 `build.ninja`**，禁止全局 CFLAGS。
 
-GUI：**源码重编译**步骤②有与流水线对等的 stealth 开关（去符号 / 花指令 / 行为标记 / 随机 agent 落盘）。静态「frida 魔改」只有「导出后去符号」，没有花指令。
+GUI：**源码重编译**步骤②有与流水线对等的 stealth 开关（去符号 / 花指令 / 行为标记 / 随机 agent 落盘）。静态「frida 魔改」只有「导出后去符号」，没有花指令。行为隐身覆盖 **行为识别** 可见面（线程名、命名管道、SELinux/memfd、maps）。**不是免杀**，也不能保证对内核/游戏加固/杀软有「非常好的效果」。
 
 **国内 Hub 镜像源**默认 `docker.1ms.run`（设置页与「源码重编译」页均可改；pull/build 默认直连、不走 GUI 代理）。
 

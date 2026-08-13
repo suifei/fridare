@@ -259,6 +259,7 @@ func DefaultModOps(magicName string, port int) []ModOp {
 		{Path: "**/*", Operation: "replace", Description: "frida-helper basename", Find: "frida-helper", Replace: magicName + "-helper"},
 		{Path: "**/*", Operation: "replace", Description: "frida-agent basename", Find: "frida-agent", Replace: magicName + "-agent"},
 		{Path: "**/*", Operation: "replace", Description: "frida-gadget basename", Find: "frida-gadget", Replace: magicName + "-gadget"},
+		{Path: "**/*", Operation: "replace", Description: "frida-policyd basename", Find: "frida-policyd", Replace: magicName + "-policyd"},
 		// --- GResource/blob getters generated from magic basenames (get_frida_agent_* → get_{magic}_agent_*) ---
 		// Surgical: do NOT replace bare frida_agent (would break valac-emitted frida_agent_main).
 		{Path: "**/*", Operation: "replace", Description: "get_frida_agent blob getter", Find: "get_frida_agent", Replace: "get_" + magicName + "_agent"},

@@ -4,7 +4,7 @@
 
 Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1>
 
-**这不是免杀包。** 去掉字样 ≠ 行为隐身。端口用 `-l` 自己指定。客户端必须用 **同一 magic** 的 host wheel。
+**这不是免杀包。** 行为隐身覆盖运行时可见向量（maps/管道/SELinux/线程名/花指令），**不能保证**对行为识别、内核/游戏加固、杀软有非常好的效果。端口用 `-l`。客户端必须用 **同一 magic** 的 host wheel。
 
 上游仍是官方 Frida **17.17.0**；`17.17.1` 只是本仓库这批产物的 r2 标签。
 

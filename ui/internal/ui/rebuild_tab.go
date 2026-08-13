@@ -259,10 +259,10 @@ func (rt *RebuildTab) setupUI() {
 		_ = rt.config.Save()
 	})
 	rt.randomAgentChk.SetChecked(rt.config.RebuildRandomAgent)
-	profileHelp := widget.NewLabel("deep（推荐）：协议面 re.frida.* → re.{magic}.、/re/frida/ → /re/{magic}/、frida:rpc → {magic}:rpc 成对。下面 stealth 开关与流水线对等，默认开去符号+花指令+行为标记。不能全树改名。这不是免杀。启动端口用 -l。须用 catalog 内 wheel + PROTOCOL-SYNC。")
+	profileHelp := widget.NewLabel("deep（推荐）：协议面 re.frida.* → re.{magic}.、/re/frida/ → /re/{magic}/、frida:rpc → {magic}:rpc 成对。下面 stealth 开关针对行为识别可见面（线程名/管道/SELinux/maps）。不能全树改名。这不是免杀。启动端口用 -l。须用 catalog 内 wheel + PROTOCOL-SYNC。")
 	profileHelp.Wrapping = fyne.TextWrapWord
 	profileHelp.Importance = widget.LowImportance
-	stealthHelp := widget.NewLabel("去掉字样 ≠ 行为隐身 ≠ 免杀。静态「frida 魔改」也能勾导出后去符号，但花指令/行为标记只有本页源码重编译能做。")
+	stealthHelp := widget.NewLabel("行为隐身覆盖运行时可见向量，不是对内核/游戏加固/杀软的保证，不能保证非常好的效果，这不是免杀。静态「frida 魔改」只能去符号，花指令/行为标记只有本页源码重编译能做。")
 	stealthHelp.Wrapping = fyne.TextWrapWord
 	stealthHelp.Importance = widget.LowImportance
 

@@ -243,6 +243,9 @@ func TestDefaultModOps(t *testing.T) {
 		if op.Find == "frida-server" && op.Replace == "abcde-server" {
 			foundPairHyphen = true
 		}
+		if op.Find == "frida-policyd" && op.Replace == "abcde-policyd" {
+			foundPairHyphen = true
+		}
 		if strings.Contains(op.Find, "DEFAULT_CONTROL_PORT") && strings.Contains(op.Replace, "27142") {
 			foundPort = true
 		}
@@ -274,7 +277,7 @@ func TestArtifactDeployTips(t *testing.T) {
 	if !strings.Contains(tips, "abcde") || !strings.Contains(tips, "whl") || !strings.Contains(tips, "27042") {
 		t.Fatal(tips)
 	}
-	if !strings.Contains(tips, "stealth:") || !strings.Contains(tips, "不是免杀") {
+	if !strings.Contains(tips, "stealth:") || !strings.Contains(tips, "免杀") {
 		t.Fatal(tips)
 	}
 	g := ToolsPatchGuidance("abcde", 27042)

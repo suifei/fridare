@@ -48,12 +48,20 @@ func StealthBehaviorOps(cfg JobConfig) []ModOp {
 	ops := []ModOp{
 		// Quoted maps token only — never meson 'linjector.vala' / linjector-glue.c / identifiers.
 		{Path: "**/*", Operation: "replace", Description: "maps \"linjector\"", Find: `"linjector"`, Replace: `"` + magic + `ctor"`},
+		{Path: "**/*", Operation: "replace", Description: "maps \"winjector\"", Find: `"winjector"`, Replace: `"` + magic + `wtor"`},
 		// unix socket brand
 		{Path: "**/*", Operation: "replace", Description: "unix:frida socket", Find: "unix:frida", Replace: "unix:" + magic},
 		{Path: "**/*", Operation: "replace", Description: "abstract frida socket", Find: "abstract/frida", Replace: "abstract/" + magic},
 		// Quoted /frida- socket/maps prefixes only (bare /frida- smashes github.com/frida/frida-core).
 		{Path: "**/*", Operation: "replace", Description: "quoted /frida- path", Find: `"/frida-"`, Replace: `"/` + magic + `-"`},
 		{Path: "**/*", Operation: "replace", Description: "frida-zymbiote socket", Find: "/frida-zymbiote-", Replace: "/" + magic + "-zymbiote-"},
+		// Windows named-pipe prefix (pipe-windows.c). Do NOT find bare "frida-"
+		// (that rewrites meson "frida-agent-android.version").
+		{Path: "**/*", Operation: "replace", Description: "pipe g_string_new (\"frida-\")", Find: `g_string_new ("frida-")`, Replace: `g_string_new ("` + magic + `-")`},
+		{Path: "**/*", Operation: "replace", Description: "exact = \"frida-\" pipe prefix", Find: `= "frida-"`, Replace: `= "` + magic + `-"`},
+		// Quote-only glib thread names (行为识别). Identifiers g_main_* stay.
+		{Path: "**/*", Operation: "replace", Description: "quoted gmain thread", Find: `"gmain"`, Replace: `"` + magic + `"`},
+		{Path: "**/*", Operation: "replace", Description: "quoted gdbus thread", Find: `"gdbus"`, Replace: `"` + magic + `"`},
 		// SELinux type names (same length when len(magic)==5)
 		{Path: "**/*", Operation: "replace", Description: "SELinux u:object_r:frida", Find: "u:object_r:frida", Replace: "u:object_r:" + magic},
 		{Path: "**/*", Operation: "replace", Description: "SELinux u:r:frida", Find: "u:r:frida", Replace: "u:r:" + magic},

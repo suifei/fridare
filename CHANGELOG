@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+### Added
+- 行为隐身源码向量：Windows 管道 `g_string_new ("frida-")`、quote-only `gmain`/`gdbus`、`frida-policyd`、quoted `winjector`（不保证杀软/加固效果）
+
 ## v4.0.7 - 2026-08-13
 
 ### Added
