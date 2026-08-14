@@ -11,6 +11,15 @@
 - 产品标签 `17.17.1` 的 host wheel 走 PyPI `frida==17.17.0`（`EffectivePipVersion`）
 - 一键深度定制仍强制 `deep`；stealth 默认开
 
+## 16.7.19 矩阵收尾（已在 main）
+
+与本版同一发布系列，不另开 GUI 版本：
+
+- builder **toolchain-v5**：镜像同时预装 NDK **r25**（`/opt/android-ndk-r25`）与 **r29**；16.x 按 `NDK_REQUIRED` 自动选用
+- 编译优先 Frida `deps/toolchain-linux-x86_64/bin/ninja`（Ubuntu apt ninja 1.10 无 `ninja -t inputs`）
+- MinGW DNS 桩写入 meson cross file 后 `meson configure -Dc_args=`，避免重生成丢掉 `-include`
+- `kxmwp-16.7.19` 八平台 server 全部换成 GUI 源码重编译产物
+
 ## 预编译 Frida 产物（独立 tag，不是 GUI latest）
 
 - [kxmwp-16.7.19](https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19) — 官方 16.7.19 八平台 GUI 源码重编译（Android NDK r25）

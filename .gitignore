@@ -71,3 +71,6 @@ AGENTS.md
 # Accidental dumps / local builder drafts (do not ship)
 ui/-mirror
 **/-mirror
+
+# Host-side NDK zip used only to patch an existing builder image (do not ship)
+builder-ndk/

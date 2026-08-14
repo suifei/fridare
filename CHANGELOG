@@ -4,15 +4,12 @@
 
 ## Unreleased
 
+## v4.0.8 - 2026-08-13
+
 ### Added
 - builder 镜像同时预装 NDK **r25**（`/opt/android-ndk-r25`）与 **r29**；16.x 按 `env_android.py` `NDK_REQUIRED` 自动选用
 - 编译脚本优先 Frida toolchain ninja（apt ninja 1.10 无 `ninja -t inputs`，windows-x86_64 compat 会失败）
 - MinGW DNS 桩写入 cross file 后 `meson configure -Dc_args=`，避免 meson 重生成丢掉 `-include`
-
-### Notes
-- `kxmwp-16.7.19` 八平台 server 已全部换成 GUI 源码重编译产物（**不是** GUI latest，**不是免杀**）
-
-## v4.0.8 - 2026-08-13
 
 ### Fixed
 - `RenameMagicAssetFiles` 含 `frida-inject`（meson `kxmwp-inject.version`）
@@ -23,6 +20,7 @@
 
 ### Notes
 - GUI latest 本 tag。Frida 产物：[kxmwp-16.7.19](https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19)、[kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1)（**不是** GUI latest，**不是免杀**）
+- `kxmwp-16.7.19` 八平台 server 已全部换成 GUI 源码重编译产物
 - 说明：[docs/release-v4.0.8.md](docs/release-v4.0.8.md) · [docs/kxmwp-16-vs-17.md](docs/kxmwp-16-vs-17.md)
 
 ## v4.0.7 - 2026-08-13
