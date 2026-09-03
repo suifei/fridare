@@ -73,6 +73,9 @@ func ClientProtocolBinaryPairs(magicName string) ([][2][]byte, error) {
 		{[]byte("re.frida."), []byte("re." + magicName + ".")},
 		// object path segment (same length as re.frida. pair family when magic len==5)
 		{[]byte("/re/frida/"), []byte("/re/" + magicName + "/")},
+		// Java helper dex descriptors: Lre/frida/HelperBackend — NOT matched by /re/frida/
+		// (no leading slash). Missing this → backend_class != null on Android.
+		{[]byte("re/frida"), []byte("re/" + magicName)},
 		{[]byte("Frida."), []byte(pas + ".")},
 	}
 	for _, p := range pairs {

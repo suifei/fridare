@@ -365,7 +365,7 @@ func PatchArtifactBinaryMarkers(dir, magic string) (int, error) {
 			}
 			data = bytes.ReplaceAll(data, p[0], p[1])
 		}
-		if !bytes.Equal(orig, data) {
+		if PatchAndroidHelperInBinary(data, magic) > 0 || !bytes.Equal(orig, data) {
 			if err := os.WriteFile(path, data, info.Mode()); err != nil {
 				return err
 			}

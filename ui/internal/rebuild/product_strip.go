@@ -79,6 +79,7 @@ func StripProductBinaryBytes(data []byte, magic string) ([]byte, StripResult, er
 		// Always also rewrite leftover identifier strings (Vala `_frida_*`,
 		// rodata). Dynsym-only pass leaves those in the file.
 		n += rewriteFridaExportCStrings(out, magic)
+		n += PatchAndroidHelperInBinary(out, magic)
 		res.ExportsRewritten = n
 		res.DebugStripped = dbg
 	} else if len(out) > 64 && out[0] == 'M' && out[1] == 'Z' {

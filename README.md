@@ -47,6 +47,12 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 
 **深度魔改（deep）要点**：魔改名固定 **5 位小写 a-z**；server 与 host client wheel **必须成对**（同一 magic）；对象路径含 `/re/{magic}/`，避免只改 `re.frida.` 导致 UNKNOWN_METHOD。详细说明见 **[docs/dual-track.md](docs/dual-track.md)**。
 
+### kxmwp-17.17.1 安装注意
+
+- **host-wheels / pip**：tools 文件名必须是 PEP 440 本地版本，带 **`+`**：`frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl`。写成 `14.10.4.frida.` pip 会报 `Invalid wheel filename`（[#36](https://github.com/suifei/fridare/issues/36)）。
+- **Android `kxmwp-server` abort**（`backend_class != null`）：请用本 tag **重新下载** `frida-kxmwp-17.17.1-android-arm64-server.zip`。旧包 helper dex 仍是 `re/frida`，native 已是 `re.kxmwp`。
+- **Frida 17 `Java.perform`**：`frida` CLI / `frida-trace` 自带 java-bridge。Python `session.create_script` 要自己处理 `frida:load-bridge`，否则 `Java is not defined`。native `Interceptor` 不受影响。用法见 [docs/kxmwp-17.17.1.md](docs/kxmwp-17.17.1.md)。
+
 ```text
 GUI：打开「源码重编译」→ 选 deep →「一键深度定制（①+② deep）」
 Host：只跑 GUI / AI 改挂载源码 / docker 客户端

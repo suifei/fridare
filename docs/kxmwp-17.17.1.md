@@ -30,6 +30,32 @@ frida -H 127.0.0.1:28888 -n <进程名>
 
 `host-wheels` 里 tools 文件名必须带 PEP 440 的 `+`：`frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl`。旧 zip 若仍是 `14.10.4.frida.`，pip 会报 `Invalid wheel filename`，把那段改成 `14.10.4+frida.` 再装。
 
+### Android：`backend_class != null` abort
+
+旧 android-arm64 zip 里 helper dex 仍是 `Lre/frida/HelperBackend`，native 已改 `re.kxmwp`，启动立刻：
+
+`kxmwp_android_helper_service_do_start: assertion failed: (backend_class != null)`
+
+请重新下载本 tag 的 `frida-kxmwp-17.17.1-android-arm64-server.zip`（已替换）。导出流水线会跑 `PatchAndroidHelperInBinary`（dex 描述符 + SHA-1/Adler32 + `kxmwp_agent_main` GNU/sysv hash）。
+
+```bash
+adb push kxmwp-server /data/local/tmp/kxmwp-server
+chmod 755 /data/local/tmp/kxmwp-server
+# 若 tmp 不能执行：cp 到 /data/kxmwp-server
+./kxmwp-server -l 0.0.0.0:27042
+```
+
+MIUI `theme_compatibility.xml` ENOENT 可忽略。PC 端：
+
+```powershell
+adb forward tcp:27042 tcp:27042
+pip install --force-reinstall --no-deps frida-17.17.0-*.whl
+pip install --force-reinstall --no-deps frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl
+frida -H 127.0.0.1:27042 -n Starbucks -l hook.js
+```
+
+Frida **17** 的 Python `session.create_script` **不会**自动带上 `Java`。`frida` CLI / `frida-trace` 会加载 `frida-java-bridge`。自己写 Python 注入时要处理 `frida:load-bridge`（与 REPL 相同），否则 `Java.perform` 报 `Java is not defined`。
+
 默认监听仍是官方 **27042**。换端口用 `-l`。
 
 ## 下载

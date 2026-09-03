@@ -173,6 +173,7 @@ func quotedFridaReplacementsOpts(magic string, opts StringRewriteOpts) [][2]stri
 		pairs = append([][2]string{
 			{"re.frida.", "re." + magic + "."},
 			{"/re/frida/", "/re/" + magic + "/"},
+			{"re/frida", "re/" + magic}, // Java dex descriptors Lre/frida/Helper
 			{"re.frida", "re." + magic}, // rare bare suffix
 			{"\"Frida.", "\"" + pas + "."},
 			{"'Frida.", "'" + pas + "."},

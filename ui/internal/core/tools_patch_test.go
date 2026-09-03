@@ -65,7 +65,7 @@ func TestClientProtocolBinaryPairs_SameLength(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var hasPath bool
+	var hasPath, hasDex bool
 	for _, p := range pairs {
 		if len(p[0]) != len(p[1]) {
 			t.Fatalf("%q vs %q", p[0], p[1])
@@ -76,9 +76,18 @@ func TestClientProtocolBinaryPairs_SameLength(t *testing.T) {
 				t.Fatalf("path pair: %q", p[1])
 			}
 		}
+		if string(p[0]) == "re/frida" {
+			hasDex = true
+			if string(p[1]) != "re/abcde" {
+				t.Fatalf("dex pair: %q", p[1])
+			}
+		}
 	}
 	if !hasPath {
 		t.Fatal("missing /re/frida/ object-path pair")
+	}
+	if !hasDex {
+		t.Fatal("missing re/frida Java descriptor pair")
 	}
 }
 
