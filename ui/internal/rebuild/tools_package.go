@@ -879,7 +879,7 @@ func fridaToolsInstallNotes(cfg JobConfig, toolsWheels, hostFridaWheels []string
 		hostList.WriteString("  (未下载到多平台 frida 原生 wheel，请本机 pip install frida==版本)\n")
 	} else {
 		for _, w := range hostFridaWheels {
-			hostList.WriteString("  - " + w + "\n")
+			hostList.WriteString("  - " + hostWheelRelPath(w) + "\n")
 		}
 	}
 	return fmt.Sprintf(`Fridare 魔改 frida-tools + 多平台 host frida（与源码 tag 对齐）
@@ -931,6 +931,17 @@ B) frida 原生扩展（按宿主机 OS/架构选 python/host/<id>/，共 6 个�
 		cfg.MagicName, cfg.MagicName, cfg.MagicName, strings.ToUpper(cfg.MagicName[:1])+cfg.MagicName[1:],
 		strings.Join(toolsNames, ", "), cfg.FridaVersion,
 		hostList.String(), whl, cfg.FridaVersion, cfg.ListenPort)
+}
+
+// hostWheelRelPath is the path written into INSTALL.txt / zip (never a host
+// absolute path like D:\works\…\catalog\…).
+func hostWheelRelPath(w string) string {
+	base := filepath.Base(w)
+	plat := filepath.Base(filepath.Dir(w))
+	if plat == "" || plat == "." || plat == string(filepath.Separator) {
+		return filepath.ToSlash(filepath.Join("host", base))
+	}
+	return filepath.ToSlash(filepath.Join("host", plat, base))
 }
 
 func basenameList(paths []string) []string {

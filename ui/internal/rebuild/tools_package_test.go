@@ -8,6 +8,26 @@ import (
 	"testing"
 )
 
+func TestFridaToolsInstallNotesRelativeHostPaths(t *testing.T) {
+	cfg := JobConfig{FridaVersion: "16.7.19", MagicName: "kxmwp", ListenPort: 27042}
+	notes := fridaToolsInstallNotes(cfg,
+		[]string{filepath.Join("out", "frida_tools-13.7.1+frida.16.7.19.fridare.kxmwp-py3-none-any.whl")},
+		[]string{filepath.Join("D:", "works", "catalog", "python", "host", "windows-amd64", "frida-16.7.19-cp37-abi3-win_amd64.whl")},
+	)
+	if strings.Contains(notes, `D:\`) || strings.Contains(notes, `/works/`) {
+		t.Fatalf("INSTALL.txt leaked absolute path:\n%s", notes)
+	}
+	if !strings.Contains(notes, "host/windows-amd64/frida-16.7.19-cp37-abi3-win_amd64.whl") {
+		t.Fatalf("missing relative host path:\n%s", notes)
+	}
+	if !strings.Contains(notes, "frida_tools-13.7.1+frida.16.7.19.fridare.kxmwp-py3-none-any.whl") {
+		t.Fatalf("missing tools wheel name:\n%s", notes)
+	}
+	if strings.Contains(notes, "frida_tools-tools.frida.") {
+		t.Fatal("must not advertise illegal tools.frida filename")
+	}
+}
+
 func TestParseVersionFromArchiveName(t *testing.T) {
 	cases := map[string]string{
 		"frida_tools-14.10.4.tar.gz":             "14.10.4",

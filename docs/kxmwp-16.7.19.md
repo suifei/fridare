@@ -73,15 +73,14 @@ frida -H 127.0.0.1:28888 -n <进程名>
 默认端口仍是 **27042**。换端口用 `-l`。PC 客户端必须是 **frida==16.7.19** 的魔改 wheel；**不要**用 [kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1) 那条 `frida_tools-14.10.4+frida.17.17.0…`（major mismatch）。
 
 ```powershell
-# 1) 原生绑定：解压 host-wheels，按本机选 python/host/<os-arch>/frida-16.7.19-*.whl
-pip install --force-reinstall --no-deps .\frida-16.7.19-cp37-abi3-win_amd64.whl
-# 2) CLI：本 tag 单独挂的 tools wheel（PEP 440，带 +）
+# 解压本 tag 已替换的 host-wheels.zip
+pip install --force-reinstall --no-deps .\host\windows-amd64\frida-16.7.19-cp37-abi3-win_amd64.whl
 pip install --force-reinstall --no-deps .\frida_tools-13.7.1+frida.16.7.19.fridare.kxmwp-py3-none-any.whl
 ```
 
-直链：<https://github.com/suifei/fridare/releases/download/kxmwp-16.7.19/frida_tools-13.7.1+frida.16.7.19.fridare.kxmwp-py3-none-any.whl>
+tools 也可直链：<https://github.com/suifei/fridare/releases/download/kxmwp-16.7.19/frida_tools-13.7.1+frida.16.7.19.fridare.kxmwp-py3-none-any.whl>
 
-旧 `host-wheels.zip` 里的 `frida_tools-tools.frida.16.7.19.fridare.kxmwp-…` 文件名非法，pip 会拒。
+请重新下载 `frida-kxmwp-16.7.19-host-wheels.zip`。旧 zip 里的 `frida_tools-tools.frida.16.7.19…` 文件名非法，pip 会拒。
 
 ### `frida-ps`：`undefined symbol: kxmwp_agent_main`
 
