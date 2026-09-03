@@ -9,6 +9,7 @@
 - Android `kxmwp-server` 启动 `backend_class != null` abort：嵌入 helper dex 仍是 `Lre/frida/HelperBackend`，且同长度改 `frida_agent_main` 后 GNU hash 未更新。`PatchAndroidHelperInBinary` 改 dex 描述符、重算 SHA-1/Adler32、按当前 dynstr 重写 `DT_GNU_HASH`。
 - 16.x `frida-ps` 报 `undefined symbol: kxmwp_agent_main`：只对导出 `*_agent_main` 的嵌入 agent ELF 重写 GNU/sysv hash；agent 内残留的 GumJS 全局 `Frida` 改成 PascalCase(magic)（**不**把 `Kxmwp.` 写回 `Frida.`）。已重传 `kxmwp-16.7.19` 的 android-arm64 zip。
 - 16.x `frida-tools` wheel 文件名把 PyPI 源包 `frida-tools-13.7.1` 解析成版本 `tools`，pip 拒装。已单独挂 `frida_tools-13.7.1+frida.16.7.19.fridare.kxmwp-py3-none-any.whl`，并替换 `frida-kxmwp-16.7.19-host-wheels.zip`（不要用 17 的 `14.10.4+frida.17.17.0` tools）。
+- 17.x `host-wheels.zip` 的 tools 文件名已是 PEP 440（`14.10.4+frida.17.17.0…`），但 `INSTALL.txt` 写了本机绝对路径。已替换 zip，改为 `host/<plat>/` 相对路径。
 
 ## v4.0.8 - 2026-08-13
 

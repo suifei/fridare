@@ -21,14 +21,13 @@ Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1>
 ```powershell
 # Windows 包仍是 kxmwp-server.exe；Linux 本轮是 ELF kxmwp-server
 .\kxmwp-server.exe -l 0.0.0.0:28888
-# 装 host-wheels 里同一 magic 的 frida + frida_tools
-# tools wheel 文件名必须带 PEP 440 的 '+'（不要用 14.10.4.frida.…）
-# pip install --force-reinstall --no-deps python/host/<你的平台>/frida-*.whl
-# pip install --force-reinstall --no-deps python/frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl
+# 解压本 tag 已替换的 host-wheels.zip（zip 根目录是 host/<plat>/，没有 python/ 前缀）
+pip install --force-reinstall --no-deps .\host\windows-amd64\frida-17.17.0-cp37-abi3-win_amd64.whl
+pip install --force-reinstall --no-deps .\frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl
 frida -H 127.0.0.1:28888 -n <进程名>
 ```
 
-`host-wheels` 里 tools 文件名必须带 PEP 440 的 `+`：`frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl`。旧 zip 若仍是 `14.10.4.frida.`，pip 会报 `Invalid wheel filename`，把那段改成 `14.10.4+frida.` 再装。
+tools 文件名必须带 PEP 440 的 `+`：`frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl`。请重新下载 `frida-kxmwp-17.17.1-host-wheels.zip`（INSTALL.txt 已改成相对路径 `host/<plat>/`）。旧 zip 若仍是 `14.10.4.frida.`，pip 会报 `Invalid wheel filename`。
 
 ### Android：`backend_class != null` abort
 
