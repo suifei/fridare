@@ -1,8 +1,8 @@
 // patch-helper-once repairs already-magic Android product binaries:
 // helper dex descriptors/checksums, *_agent_main GNU/sysv hashes, and
-// renaming leftover GumJS "Frida" identifiers to PascalCase(magic) inside
-// the embedded agent ELF (so 16.x frida-ps works without writing Frida.
-// back as a detection string).
+// renaming leftover GumJS token "Frida" to PascalCase(magic) inside the
+// embedded agent ELF (16.x frida-ps; does not write Frida. back; skips
+// Friday / FridaXxx).
 package main
 
 import (

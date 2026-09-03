@@ -67,19 +67,19 @@ func TestPatchEmbeddedDexJavaPackage_RewritesAndChecksums(t *testing.T) {
 }
 
 func TestRenameAgentGumJSGlobal(t *testing.T) {
-	img := []byte("Frida.version=1; re.kxmwp.Host=2; 'Frida'; rawFridaType")
+	img := []byte("Frida.version=1; re.kxmwp.Host=2; 'Frida'; rawFridaType; Friday; FridaScriptOptions")
 	n := renameAgentGumJSGlobal(img, "kxmwp")
-	if n < 3 {
-		t.Fatalf("n=%d want >=3", n)
+	if n != 2 {
+		t.Fatalf("n=%d want 2 exact tokens; got %s", n, img)
 	}
-	if bytes.Contains(img, []byte("Frida")) {
-		t.Fatalf("Frida leftover: %s", img)
-	}
-	if !bytes.Contains(img, []byte("Kxmwp.version=1")) || !bytes.Contains(img, []byte("'Kxmwp'")) || !bytes.Contains(img, []byte("rawKxmwpType")) {
+	if !bytes.Contains(img, []byte("Kxmwp.version=1")) || !bytes.Contains(img, []byte("'Kxmwp'")) {
 		t.Fatalf("got %s", img)
 	}
 	if !bytes.Contains(img, []byte("re.kxmwp.Host=2")) {
 		t.Fatal("must not rewrite re.kxmwp protocol")
+	}
+	if !bytes.Contains(img, []byte("rawFridaType")) || !bytes.Contains(img, []byte("Friday")) || !bytes.Contains(img, []byte("FridaScriptOptions")) {
+		t.Fatalf("must not smash Friday/Vala/embedded ident: %s", img)
 	}
 }
 

@@ -113,8 +113,9 @@ func resyncExportHashesAllELFs(data []byte, magic string) int {
 				// GumJS registers globalThis.Frida. Deep hexreplace already
 				// turned Frida.* uses into {Magic}.* so 16.x internal-agent.js
 				// throws "Kxmwp is not defined". Do NOT write Frida. back
-				// (detection string). Rename leftover "Frida" identifiers in
-				// the agent ELF to the magic PascalCase global instead.
+				// (detection string). Rename leftover JS identifier "Frida"
+				// in the agent ELF to PascalCase(magic). Only whole tokens —
+				// not Friday, FridaScriptOptions, rawFridaType.
 				n += renameAgentGumJSGlobal(img, magic)
 			}
 		}
@@ -375,12 +376,28 @@ func renameAgentGumJSGlobal(img []byte, magic string) int {
 	if len(old) != len(neu) || bytes.Equal(old, neu) {
 		return 0
 	}
-	n := bytes.Count(img, old)
-	if n == 0 {
-		return 0
+	n := 0
+	off := 0
+	for {
+		i := bytes.Index(img[off:], old)
+		if i < 0 {
+			break
+		}
+		at := off + i
+		prevOK := at == 0 || !isIdentByte(img[at-1])
+		next := at + len(old)
+		nextOK := next >= len(img) || !isIdentByte(img[next])
+		if prevOK && nextOK {
+			copy(img[at:next], neu)
+			n++
+		}
+		off = at + len(old)
 	}
-	copy(img, bytes.ReplaceAll(img, old, neu))
 	return n
+}
+
+func isIdentByte(c byte) bool {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'
 }
 
 func elfExportsAgentMain(img []byte) bool {
