@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"hash/adler32"
+	"strings"
 )
 
 // PatchAndroidHelperInBinary fixes two post-rename traps that abort stock
@@ -24,7 +25,7 @@ func PatchAndroidHelperInBinary(data []byte, magic string) int {
 	}
 	n := 0
 	n += patchEmbeddedDexJavaPackage(data, magic)
-	n += resyncExportHashesAllELFs(data)
+	n += resyncExportHashesAllELFs(data, magic)
 	return n
 }
 
@@ -90,7 +91,7 @@ func fixDexChecksum(dex []byte) {
 	binary.LittleEndian.PutUint32(dex[8:12], adler32.Checksum(dex[12:]))
 }
 
-func resyncExportHashesAllELFs(data []byte) int {
+func resyncExportHashesAllELFs(data []byte, magic string) int {
 	n := 0
 	off := 0
 	for {
@@ -101,8 +102,20 @@ func resyncExportHashesAllELFs(data []byte) int {
 		at := off + i
 		size := elfImageSize(data[at:])
 		if size >= 256 && at+size <= len(data) {
-			n += resyncGnuHash(data[at : at+size])
-			n += resyncSysvHash(data[at : at+size])
+			img := data[at : at+size]
+			// Only touch ELFs that actually export *agent_main. Blindly
+			// rewriting every nested 0x7fELF (and the outer server image)
+			// smashes GumJS / internal-agent.js — 16.x then dies with
+			// "Kxmwp is not defined" while enumerating processes.
+			if elfExportsAgentMain(img) {
+				n += resyncGnuHash(img)
+				n += resyncSysvHash(img)
+				// GumJS still registers globalThis.Frida. Deep hexreplace of
+				// Frida.* → {Magic}.* inside the embedded agent makes 16.x
+				// internal-agent.js throw "Kxmwp is not defined" during
+				// frida-ps. Restore only inside the agent ELF.
+				n += restoreAgentFridaJSGlobal(img, magic)
+			}
 		}
 		// Nested ELFs (embedded agent/helper) sit inside the outer image;
 		// do not skip forward by outer size.
@@ -349,6 +362,37 @@ func resyncGnuHash(img []byte) int {
 		}
 	}
 	return n
+}
+
+func restoreAgentFridaJSGlobal(img []byte, magic string) int {
+	if len(magic) != 5 {
+		return 0
+	}
+	pas := strings.ToUpper(magic[:1]) + magic[1:] + "."
+	old := []byte(pas)
+	neu := []byte("Frida.")
+	if len(old) != len(neu) || bytes.Equal(old, neu) {
+		return 0
+	}
+	n := bytes.Count(img, old)
+	if n == 0 {
+		return 0
+	}
+	copy(img, bytes.ReplaceAll(img, old, neu))
+	return n
+}
+
+func elfExportsAgentMain(img []byte) bool {
+	secs, ok := parseELFNamedSections(img)
+	if !ok {
+		return false
+	}
+	dynstr := secs[".dynstr"]
+	if dynstr.size == 0 || int(dynstr.off+dynstr.size) > len(img) {
+		return false
+	}
+	ds := img[dynstr.off : dynstr.off+dynstr.size]
+	return bytes.Contains(ds, []byte("frida_agent_main\x00")) || bytes.Contains(ds, []byte("_agent_main\x00"))
 }
 
 func gnuHash(name []byte) uint32 {

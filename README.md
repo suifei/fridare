@@ -51,6 +51,7 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 
 - **host-wheels / pip**：tools 文件名必须是 PEP 440 本地版本，带 **`+`**：`frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl`。写成 `14.10.4.frida.` pip 会报 `Invalid wheel filename`（[#36](https://github.com/suifei/fridare/issues/36)）。
 - **Android `kxmwp-server` abort**（`backend_class != null`）：请用本 tag **重新下载** `frida-kxmwp-17.17.1-android-arm64-server.zip`。旧包 helper dex 仍是 `re/frida`，native 已是 `re.kxmwp`。
+- **16.x `frida-ps`：`undefined symbol: kxmwp_agent_main`**：请重新下载 [kxmwp-16.7.19](https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19) 的 `android-arm64` zip。客户端必须 `frida==16.7.19` 魔改 wheel。
 - **Frida 17 `Java.perform`**：`frida` CLI / `frida-trace` 自带 java-bridge。Python `session.create_script` 要自己处理 `frida:load-bridge`，否则 `Java is not defined`。native `Interceptor` 不受影响。用法见 [docs/kxmwp-17.17.1.md](docs/kxmwp-17.17.1.md)。
 
 ```text

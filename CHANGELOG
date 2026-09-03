@@ -7,6 +7,7 @@
 ### Fixed
 - 手搓 `frida-tools` wheel 文件名把 PEP 440 本地版本的 `+` 错写成 `.`，pip 报 `Invalid wheel filename (invalid version)`（[issue #36](https://github.com/suifei/fridare/issues/36)）。正确形式：`frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl`。已发布包把文件名里 `14.10.4.frida.` 改成 `14.10.4+frida.` 即可安装。
 - Android `kxmwp-server` 启动 `backend_class != null` abort：嵌入 helper dex 仍是 `Lre/frida/HelperBackend`，且同长度改 `frida_agent_main` 后 GNU hash 未更新。`PatchAndroidHelperInBinary` 改 dex 描述符、重算 SHA-1/Adler32、按当前 dynstr 重写 `DT_GNU_HASH`。
+- 16.x `frida-ps` 报 `undefined symbol: kxmwp_agent_main`：只对导出 `*_agent_main` 的嵌入 agent ELF 重写 GNU/sysv hash；并把 agent 内 `Kxmwp.` 还原为 GumJS 全局 `Frida.`（否则 hash 修好后会 `Kxmwp is not defined`）。已重传 `kxmwp-16.7.19` 的 android-arm64 zip。
 
 ## v4.0.8 - 2026-08-13
 

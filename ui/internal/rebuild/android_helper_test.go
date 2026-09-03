@@ -66,6 +66,36 @@ func TestPatchEmbeddedDexJavaPackage_RewritesAndChecksums(t *testing.T) {
 	}
 }
 
+func TestRestoreAgentFridaJSGlobal(t *testing.T) {
+	img := []byte("Kxmwp.version=1; re.kxmwp.Host=2; Kxmwp.Agent=3")
+	n := restoreAgentFridaJSGlobal(img, "kxmwp")
+	if n != 2 {
+		t.Fatalf("n=%d want 2", n)
+	}
+	if !bytes.Contains(img, []byte("Frida.version=1")) || !bytes.Contains(img, []byte("Frida.Agent=3")) {
+		t.Fatalf("got %s", img)
+	}
+	if !bytes.Contains(img, []byte("re.kxmwp.Host=2")) {
+		t.Fatal("must not rewrite re.kxmwp protocol")
+	}
+}
+
+func TestPatchAndroidHelper_SkipsNonAgentELF(t *testing.T) {
+	// A container ELF-looking blob must not rewrite hashes unless dynstr
+	// contains *agent_main — otherwise GumJS in 16.x kxmwp-server is smashed.
+	js := []byte("internal-agent.js Frida.version Kxmwp-sentinel-keep\x00")
+	buf := make([]byte, MinArtifactBytes+len(js)+64)
+	copy(buf, []byte{0x7f, 'E', 'L', 'F', 2, 1, 1})
+	copy(buf[64:], js)
+	n := PatchAndroidHelperInBinary(buf, "kxmwp")
+	if n != 0 {
+		t.Fatalf("hits=%d want 0 on non-agent ELF", n)
+	}
+	if !bytes.Contains(buf, []byte("Kxmwp-sentinel-keep")) {
+		t.Fatal("corrupted non-agent payload")
+	}
+}
+
 func TestPatchArtifactBinaryMarkers_RewritesDexJavaDescriptor(t *testing.T) {
 	dir := t.TempDir()
 	body := []byte("Lre/frida/HelperBackend;\x00kxmwp-server\x00")

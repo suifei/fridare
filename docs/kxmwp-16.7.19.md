@@ -69,7 +69,21 @@ zip 内 `ORIGIN.txt` 写 `origin=GUI-path source rebuild`。没有 iOS / macOS s
 frida -H 127.0.0.1:28888 -n <进程名>
 ```
 
-默认端口仍是 **27042**。换端口用 `-l`。装本 tag `host-wheels` 里同一 magic 的 wheel。
+默认端口仍是 **27042**。换端口用 `-l`。装本 tag `host-wheels` 里同一 magic 的 wheel。PC 客户端必须是 **frida==16.7.19** 的魔改 wheel；用 17.x 的 `frida` 模块会报 major versions mismatch。
+
+### `frida-ps`：`undefined symbol: kxmwp_agent_main`
+
+16.x 列举进程会往 helper 注入 agent。静态改名把 dynstr 里的 `frida_agent_main` 改成 `kxmwp_agent_main` 后 **GNU hash 仍按旧名计算**，`frida-ps -H` 就会报这个错。修过的 `android-arm64` zip 已重传（只修 agent ELF 的 hash，并把 agent 内被改掉的 `Kxmwp.` 还原成 GumJS 的 `Frida.`，否则下一步会 `Kxmwp is not defined`）。
+
+```bash
+adb push kxmwp-server /data/local/tmp/kxmwp-server
+chmod 755 /data/local/tmp/kxmwp-server
+./kxmwp-server -l 0.0.0.0:27042
+adb forward tcp:27042 tcp:27042
+frida-ps -H 127.0.0.1:27042
+```
+
+请重新下载本 tag 的 `frida-kxmwp-16.7.19-android-arm64-server.zip`。
 
 ## 自己再编
 
