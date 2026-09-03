@@ -66,13 +66,16 @@ func TestPatchEmbeddedDexJavaPackage_RewritesAndChecksums(t *testing.T) {
 	}
 }
 
-func TestRestoreAgentFridaJSGlobal(t *testing.T) {
-	img := []byte("Kxmwp.version=1; re.kxmwp.Host=2; Kxmwp.Agent=3")
-	n := restoreAgentFridaJSGlobal(img, "kxmwp")
-	if n != 2 {
-		t.Fatalf("n=%d want 2", n)
+func TestRenameAgentGumJSGlobal(t *testing.T) {
+	img := []byte("Frida.version=1; re.kxmwp.Host=2; 'Frida'; rawFridaType")
+	n := renameAgentGumJSGlobal(img, "kxmwp")
+	if n < 3 {
+		t.Fatalf("n=%d want >=3", n)
 	}
-	if !bytes.Contains(img, []byte("Frida.version=1")) || !bytes.Contains(img, []byte("Frida.Agent=3")) {
+	if bytes.Contains(img, []byte("Frida")) {
+		t.Fatalf("Frida leftover: %s", img)
+	}
+	if !bytes.Contains(img, []byte("Kxmwp.version=1")) || !bytes.Contains(img, []byte("'Kxmwp'")) || !bytes.Contains(img, []byte("rawKxmwpType")) {
 		t.Fatalf("got %s", img)
 	}
 	if !bytes.Contains(img, []byte("re.kxmwp.Host=2")) {

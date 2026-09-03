@@ -110,11 +110,12 @@ func resyncExportHashesAllELFs(data []byte, magic string) int {
 			if elfExportsAgentMain(img) {
 				n += resyncGnuHash(img)
 				n += resyncSysvHash(img)
-				// GumJS still registers globalThis.Frida. Deep hexreplace of
-				// Frida.* → {Magic}.* inside the embedded agent makes 16.x
-				// internal-agent.js throw "Kxmwp is not defined" during
-				// frida-ps. Restore only inside the agent ELF.
-				n += restoreAgentFridaJSGlobal(img, magic)
+				// GumJS registers globalThis.Frida. Deep hexreplace already
+				// turned Frida.* uses into {Magic}.* so 16.x internal-agent.js
+				// throws "Kxmwp is not defined". Do NOT write Frida. back
+				// (detection string). Rename leftover "Frida" identifiers in
+				// the agent ELF to the magic PascalCase global instead.
+				n += renameAgentGumJSGlobal(img, magic)
 			}
 		}
 		// Nested ELFs (embedded agent/helper) sit inside the outer image;
@@ -364,13 +365,13 @@ func resyncGnuHash(img []byte) int {
 	return n
 }
 
-func restoreAgentFridaJSGlobal(img []byte, magic string) int {
+func renameAgentGumJSGlobal(img []byte, magic string) int {
 	if len(magic) != 5 {
 		return 0
 	}
-	pas := strings.ToUpper(magic[:1]) + magic[1:] + "."
-	old := []byte(pas)
-	neu := []byte("Frida.")
+	pas := strings.ToUpper(magic[:1]) + magic[1:]
+	old := []byte("Frida")
+	neu := []byte(pas)
 	if len(old) != len(neu) || bytes.Equal(old, neu) {
 		return 0
 	}

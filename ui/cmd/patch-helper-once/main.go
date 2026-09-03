@@ -1,9 +1,8 @@
 // patch-helper-once repairs already-magic Android product binaries:
 // helper dex descriptors/checksums, *_agent_main GNU/sysv hashes, and
-// restoring GumJS Frida.* inside the embedded agent ELF (so 16.x frida-ps
-// does not die with kxmwp_agent_main / Kxmwp is not defined).
-// Do not run patch-static-once on already-renamed products (would rewrite
-// leftover Frida.* again).
+// renaming leftover GumJS "Frida" identifiers to PascalCase(magic) inside
+// the embedded agent ELF (so 16.x frida-ps works without writing Frida.
+// back as a detection string).
 package main
 
 import (

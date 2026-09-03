@@ -73,7 +73,7 @@ frida -H 127.0.0.1:28888 -n <进程名>
 
 ### `frida-ps`：`undefined symbol: kxmwp_agent_main`
 
-16.x 列举进程会往 helper 注入 agent。静态改名把 dynstr 里的 `frida_agent_main` 改成 `kxmwp_agent_main` 后 **GNU hash 仍按旧名计算**，`frida-ps -H` 就会报这个错。修过的 `android-arm64` zip 已重传（只修 agent ELF 的 hash，并把 agent 内被改掉的 `Kxmwp.` 还原成 GumJS 的 `Frida.`，否则下一步会 `Kxmwp is not defined`）。
+16.x 列举进程会往 helper 注入 agent。静态改名把 dynstr 里的 `frida_agent_main` 改成 `kxmwp_agent_main` 后 **GNU hash 仍按旧名计算**，`frida-ps -H` 就会报这个错。修过的 `android-arm64` zip 已重传：只修导出 `*_agent_main` 的嵌入 agent ELF 的 hash，并把 agent 里残留的 GumJS 全局名 `Frida` 改成 `Kxmwp`（**不会**把 `Kxmwp.` 写回 `Frida.`，避免特征）。
 
 ```bash
 adb push kxmwp-server /data/local/tmp/kxmwp-server
@@ -83,7 +83,7 @@ adb forward tcp:27042 tcp:27042
 frida-ps -H 127.0.0.1:27042
 ```
 
-请重新下载本 tag 的 `frida-kxmwp-16.7.19-android-arm64-server.zip`。
+请重新下载本 tag 的 `frida-kxmwp-16.7.19-android-arm64-server.zip`。真机（Redmi Note 8 / Android 11 arm64）已验证：`frida-ps` 列举进程、attach/spawn 星巴克、`Java.perform`、`Activity.onResume`。
 
 ## 自己再编
 
