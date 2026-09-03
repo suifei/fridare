@@ -568,16 +568,40 @@ func pipIndexArgs(cfg JobConfig) []string {
 }
 
 func parseVersionFromArchiveName(name string) string {
-	// frida_tools-14.10.4.tar.gz / frida_tools-14.10.4-py3-none-any.whl
-	name = strings.TrimSuffix(name, ".tar.gz")
-	name = strings.TrimSuffix(name, ".zip")
-	name = strings.TrimSuffix(name, ".whl")
-	// strip platform tags for wheel: frida_tools-14.10.4-py3-none-any
-	parts := strings.Split(name, "-")
-	if len(parts) >= 2 {
-		return parts[1]
+	// PyPI sdist is often frida-tools-13.7.1.tar.gz (hyphen). Taking
+	// Split("-")[1] yields "tools" and the wheel becomes
+	// frida_tools-tools.frida.16.7.19.fridare.kxmwp — pip rejects it.
+	base := filepath.Base(name)
+	lower := strings.ToLower(base)
+	switch {
+	case strings.HasSuffix(lower, ".tar.gz"):
+		base = base[:len(base)-len(".tar.gz")]
+	case strings.HasSuffix(lower, ".zip"):
+		base = base[:len(base)-4]
+	case strings.HasSuffix(lower, ".whl"):
+		base = base[:len(base)-4]
 	}
-	return name
+	lower = strings.ToLower(base)
+	var rest string
+	switch {
+	case strings.HasPrefix(lower, "frida-tools-"):
+		rest = base[len("frida-tools-"):]
+	case strings.HasPrefix(lower, "frida_tools-"):
+		rest = base[len("frida_tools-"):]
+	default:
+		parts := strings.Split(base, "-")
+		if len(parts) >= 2 {
+			return parts[1]
+		}
+		return base
+	}
+	lowRest := strings.ToLower(rest)
+	for _, tag := range []string{"-py2", "-py3", "-cp2", "-cp3"} {
+		if i := strings.Index(lowRest, tag); i > 0 {
+			return rest[:i]
+		}
+	}
+	return rest
 }
 
 // pep440WheelFilenameVersion is the version segment written into a wheel filename.

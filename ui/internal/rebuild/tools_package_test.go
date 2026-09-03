@@ -8,6 +8,32 @@ import (
 	"testing"
 )
 
+func TestParseVersionFromArchiveName(t *testing.T) {
+	cases := map[string]string{
+		"frida_tools-14.10.4.tar.gz":             "14.10.4",
+		"frida-tools-13.7.1.tar.gz":              "13.7.1",
+		"frida-tools-13.7.1.zip":                 "13.7.1",
+		"frida_tools-14.10.4-py3-none-any.whl":   "14.10.4",
+		"frida-tools-13.7.1-py3-none-any.whl":    "13.7.1",
+		"frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl": "14.10.4+frida.17.17.0.fridare.kxmwp",
+	}
+	for in, want := range cases {
+		got := parseVersionFromArchiveName(in)
+		if got != want {
+			t.Errorf("parseVersionFromArchiveName(%q)=%q want %q", in, got, want)
+		}
+	}
+	// The 16.7.19 host-wheels bug: hyphenated sdist must not yield "tools".
+	if got := parseVersionFromArchiveName("frida-tools-13.7.1.tar.gz"); got == "tools" {
+		t.Fatal("hyphenated frida-tools sdist must not parse as version tools")
+	}
+	got := pinFridaToolsPackageVersion(t.TempDir(), "16.7.19", parseVersionFromArchiveName("frida-tools-13.7.1.tar.gz"), "kxmwp")
+	want := "13.7.1+frida.16.7.19.fridare.kxmwp"
+	if got != want {
+		t.Fatalf("16.x local version %q want %q", got, want)
+	}
+}
+
 func TestPep440WheelFilenameVersion(t *testing.T) {
 	cases := []struct {
 		in, want string
