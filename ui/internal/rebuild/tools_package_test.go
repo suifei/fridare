@@ -1,0 +1,115 @@
+package rebuild
+
+import (
+	"archive/zip"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestPep440WheelFilenameVersion(t *testing.T) {
+	cases := []struct {
+		in, want string
+		ok       bool
+	}{
+		{"14.10.4+frida.17.17.0.fridare.kxmwp", "14.10.4+frida.17.17.0.fridare.kxmwp", true},
+		{"14.10.4.frida.17.17.0.fridare.kxmwp", "14.10.4+frida.17.17.0.fridare.kxmwp", true},
+		{"14.10.4_frida.17.17.0.fridare.kxmwp", "14.10.4+frida.17.17.0.fridare.kxmwp", true},
+		{"14.10.4", "14.10.4", true},
+		{" 14.10.4+frida.17.16.4.fridare.abcde ", "14.10.4+frida.17.16.4.fridare.abcde", true},
+	}
+	for _, c := range cases {
+		got := pep440WheelFilenameVersion(c.in)
+		if got != c.want {
+			t.Errorf("pep440WheelFilenameVersion(%q)=%q want %q", c.in, got, c.want)
+		}
+		if isPEP440Version(got) != c.ok {
+			t.Errorf("isPEP440Version(%q)=%v want %v", got, isPEP440Version(got), c.ok)
+		}
+	}
+	if isPEP440Version("14.10.4.frida.17.17.0.fridare.kxmwp") {
+		t.Fatal("dotted local version must not pass PEP 440")
+	}
+}
+
+func TestPinFridaToolsPackageVersionLocal(t *testing.T) {
+	root := t.TempDir()
+	got := pinFridaToolsPackageVersion(root, "17.17.0", "14.10.4", "kxmwp")
+	want := "14.10.4+frida.17.17.0.fridare.kxmwp"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if !isPEP440Version(got) {
+		t.Fatalf("not PEP 440: %s", got)
+	}
+}
+
+func TestBuildPureFridaToolsWheelKeepsPlus(t *testing.T) {
+	root := t.TempDir()
+	pkg := filepath.Join(root, "frida_tools")
+	if err := os.MkdirAll(pkg, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pkg, "__init__.py"), []byte("# patched\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	ver := pinFridaToolsPackageVersion(root, "17.17.0", "14.10.4", "kxmwp")
+	out := filepath.Join(root, "out")
+	whl, err := buildPureFridaToolsWheel(root, out, ver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := filepath.Base(whl)
+	want := "frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl"
+	if base != want {
+		t.Fatalf("wheel name %q want %q", base, want)
+	}
+	if strings.Contains(base, "14.10.4.frida.") {
+		t.Fatal("must not emit dotted local version (pip rejects it)")
+	}
+	infoDir := "frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp.dist-info/"
+	if !zipHasPrefix(t, whl, infoDir) {
+		t.Fatalf("missing dist-info %s", infoDir)
+	}
+	if zipHasPrefix(t, whl, "frida_tools-14.10.4.frida.") {
+		t.Fatal("dist-info still uses dotted local version")
+	}
+}
+
+func TestEnsurePEP440ToolsWheelFilename(t *testing.T) {
+	dir := t.TempDir()
+	old := filepath.Join(dir, "frida_tools-14.10.4.frida.17.17.0.fridare.kxmwp-py3-none-any.whl")
+	if err := os.WriteFile(old, []byte("whl"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ensurePEP440ToolsWheelFilename(old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(dir, "frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl")
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatal("old invalid filename should be gone")
+	}
+}
+
+func zipHasPrefix(t *testing.T, whl, prefix string) bool {
+	t.Helper()
+	r, err := zip.OpenReader(whl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	for _, f := range r.File {
+		if strings.HasPrefix(f.Name, prefix) {
+			return true
+		}
+	}
+	return false
+}

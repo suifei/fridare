@@ -136,6 +136,9 @@ func BuildPatchedFridaToolsWheels(cfg JobConfig, catalogRoot string, entryDirs [
 			if len(toolsBuilt) == 0 {
 				toolsBuilt, _ = filepath.Glob(filepath.Join(outDir, "*.whl"))
 			}
+			// GitHub #36: older hand-rolled wheels used '.' instead of '+' in the
+			// local version; pip rejects those filenames. Normalize before copy.
+			toolsBuilt = sanitizeToolsWheelFilenames(toolsBuilt)
 		}
 	}
 
@@ -577,6 +580,139 @@ func parseVersionFromArchiveName(name string) string {
 	return name
 }
 
+// pep440WheelFilenameVersion is the version segment written into a wheel filename.
+// PEP 440 local versions MUST keep '+' (e.g. 14.10.4+frida.17.17.0.fridare.kxmwp).
+// Replacing '+' with '.' or '_' makes packaging.utils.parse_wheel_filename fail:
+//
+//	Invalid wheel filename (invalid version)
+//
+// See GitHub suifei/fridare#36.
+func pep440WheelFilenameVersion(version string) string {
+	v := strings.ReplaceAll(strings.TrimSpace(version), " ", "")
+	if isPEP440Version(v) {
+		return v
+	}
+	if fixed := repairDottedFridaLocalVersion(v); isPEP440Version(fixed) {
+		return fixed
+	}
+	return v
+}
+
+func isPEP440Version(v string) bool {
+	if v == "" {
+		return false
+	}
+	pub, local, hasLocal := strings.Cut(v, "+")
+	if !isPEP440Release(pub) {
+		return false
+	}
+	if !hasLocal {
+		return true
+	}
+	if local == "" {
+		return false
+	}
+	for _, seg := range strings.Split(local, ".") {
+		if !isAlnum(seg) {
+			return false
+		}
+	}
+	return true
+}
+
+func isPEP440Release(v string) bool {
+	if v == "" {
+		return false
+	}
+	for _, seg := range strings.Split(v, ".") {
+		if seg == "" {
+			return false
+		}
+		for _, c := range seg {
+			if c < '0' || c > '9' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isAlnum(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
+// repairDottedFridaLocalVersion restores '+' after the public version when a
+// previous Fridare build wrote 14.10.4.frida.… or 14.10.4_frida.… .
+func repairDottedFridaLocalVersion(v string) string {
+	for _, sep := range []string{".frida.", "_frida."} {
+		if i := strings.Index(v, sep); i > 0 {
+			return v[:i] + "+frida." + v[i+len(sep):]
+		}
+	}
+	return v
+}
+
+func splitWheelFilename(base string) (name, ver, py, abi, plat string, ok bool) {
+	if !strings.HasSuffix(strings.ToLower(base), ".whl") || len(base) < 5 {
+		return
+	}
+	stem := base[:len(base)-4]
+	parts := strings.Split(stem, "-")
+	if len(parts) < 5 {
+		return
+	}
+	plat = parts[len(parts)-1]
+	abi = parts[len(parts)-2]
+	py = parts[len(parts)-3]
+	name = parts[0]
+	ver = strings.Join(parts[1:len(parts)-3], "-")
+	if name == "" || ver == "" {
+		return
+	}
+	ok = true
+	return
+}
+
+// ensurePEP440ToolsWheelFilename renames a wheel on disk if its version segment
+// is not PEP 440 (the historical '.'-local-version bug). pip only inspects the
+// outer filename; METADATA inside may already be correct.
+func ensurePEP440ToolsWheelFilename(path string) (string, error) {
+	base := filepath.Base(path)
+	name, ver, py, abi, plat, ok := splitWheelFilename(base)
+	if !ok {
+		return path, nil
+	}
+	newVer := pep440WheelFilenameVersion(ver)
+	if newVer == ver {
+		return path, nil
+	}
+	newPath := filepath.Join(filepath.Dir(path), fmt.Sprintf("%s-%s-%s-%s-%s.whl", name, newVer, py, abi, plat))
+	if err := os.Rename(path, newPath); err != nil {
+		return path, err
+	}
+	return newPath, nil
+}
+
+func sanitizeToolsWheelFilenames(paths []string) []string {
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		if nw, err := ensurePEP440ToolsWheelFilename(p); err == nil && nw != "" {
+			out = append(out, nw)
+		} else {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // pinFridaToolsPackageVersion patches PKG-INFO / setup.py so the rebuilt wheel
 // reports a local version and pins install_requires to frida==sourceVer.
 // Returns the PEP 440 local version string (e.g. 14.10.4+frida.17.16.4.fridare.abcde).
@@ -634,11 +770,12 @@ func buildPureFridaToolsWheel(pkgRoot, outDir, version string) (string, error) {
 	if st, err := os.Stat(pkgDir); err != nil || !st.IsDir() {
 		return "", fmt.Errorf("frida_tools package dir missing under %s", pkgRoot)
 	}
-	// Normalize version for filename: local versions use + which becomes . in wheel tags sometimes;
-	// PEP 427 allows + in version but filename uses the version as-is with + kept or replaced.
-	// Use underscore-safe: replace + with _
-	fileVer := strings.ReplaceAll(version, "+", ".")
-	fileVer = strings.ReplaceAll(fileVer, " ", "")
+	// Keep PEP 440 '+' in the filename. Do NOT replace with '.' or '_' —
+	// pip/packaging parse the version as-is (GitHub #36).
+	fileVer := pep440WheelFilenameVersion(version)
+	if fileVer == "" {
+		return "", fmt.Errorf("empty frida-tools wheel version")
+	}
 	whlName := fmt.Sprintf("frida_tools-%s-py3-none-any.whl", fileVer)
 	dst := filepath.Join(outDir, whlName)
 	_ = os.MkdirAll(outDir, 0755)
@@ -758,7 +895,7 @@ B) frida 原生扩展（按宿主机 OS/架构选 python/host/<id>/，共 6 个�
   # Linux aarch64
   pip install --force-reinstall --no-deps "python/host/linux-arm64/frida-*.whl"
 
-  # 再装 frida-tools（纯 Python，任意宿主机）:
+  # 再装 frida-tools（纯 Python，任意宿主机）。文件名里的 '+' 是 PEP 440 本地版本，不要改成 '.'。
   pip install --force-reinstall --no-deps "%s"
 
 验证:

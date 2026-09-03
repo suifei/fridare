@@ -22,8 +22,13 @@ Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1>
 # Windows 包仍是 kxmwp-server.exe；Linux 本轮是 ELF kxmwp-server
 .\kxmwp-server.exe -l 0.0.0.0:28888
 # 装 host-wheels 里同一 magic 的 frida + frida_tools
+# tools wheel 文件名必须带 PEP 440 的 '+'（不要用 14.10.4.frida.…）
+# pip install --force-reinstall --no-deps python/host/<你的平台>/frida-*.whl
+# pip install --force-reinstall --no-deps python/frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl
 frida -H 127.0.0.1:28888 -n <进程名>
 ```
+
+`host-wheels` 里 tools 文件名必须带 PEP 440 的 `+`：`frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl`。旧 zip 若仍是 `14.10.4.frida.`，pip 会报 `Invalid wheel filename`，把那段改成 `14.10.4+frida.` 再装。
 
 默认监听仍是官方 **27042**。换端口用 `-l`。
 

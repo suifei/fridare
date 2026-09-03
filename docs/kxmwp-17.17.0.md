@@ -83,16 +83,26 @@ python/host/linux-x86_64/...
 python/host/linux-arm64/...
 python/host/macos-x86_64/...
 python/host/macos-arm64/...
-python/frida_tools-*.fridare.kxmwp-*.whl
+python/frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl
 ```
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\pip install --force-reinstall path\to\frida-17.17.0-cp37-abi3-win_amd64.whl
-.\.venv\Scripts\pip install --force-reinstall path\to\frida_tools-*.whl
+.\.venv\Scripts\pip install --force-reinstall --no-deps path\to\frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl
 ```
 
 Linux / macOS 把 `pip` 换成 `bin/pip`。
+
+若 pip 报 `Invalid wheel filename (invalid version)`，是旧包把 PEP 440 的 `+` 写成了 `.`。先改名再装：
+
+```powershell
+# 错误: frida_tools-14.10.4.frida.17.17.0.fridare.kxmwp-py3-none-any.whl
+# 正确: 把 14.10.4.frida. 改成 14.10.4+frida.
+Rename-Item frida_tools-14.10.4.frida.17.17.0.fridare.kxmwp-py3-none-any.whl `
+  frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl
+pip install --force-reinstall --no-deps .\frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl
+```
 
 ### 3.2 启动服务端
 

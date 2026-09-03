@@ -4,6 +4,9 @@
 
 ## Unreleased
 
+### Fixed
+- 手搓 `frida-tools` wheel 文件名把 PEP 440 本地版本的 `+` 错写成 `.`，pip 报 `Invalid wheel filename (invalid version)`（[issue #36](https://github.com/suifei/fridare/issues/36)）。正确形式：`frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl`。已发布包把文件名里 `14.10.4.frida.` 改成 `14.10.4+frida.` 即可安装。
+
 ## v4.0.8 - 2026-08-13
 
 ### Added
