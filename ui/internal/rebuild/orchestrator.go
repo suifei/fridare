@@ -963,8 +963,14 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 			notify(StageToolsPatch, 0.95, "frida-tools wheel 打包失败（二进制仍可用）: "+werr.Error(), nil)
 		} else {
 			notify(StageToolsPatch, 0.96, fmt.Sprintf("已生成 frida-tools wheel: %v", wheels), nil)
+			toolsWhl, hostWhl := splitClientWheels(wheels)
 			_ = os.WriteFile(filepath.Join(primary, "PYTHON-TOOLS.txt"),
-				[]byte(fridaToolsInstallNotes(cfg, wheels, nil)), 0644)
+				[]byte(fridaToolsInstallNotes(cfg, toolsWhl, hostWhl)), 0644)
+		}
+		if packed, perr := PackReleaseZips(catalogRoot, cfg); perr != nil {
+			notify(StageToolsPatch, 0.965, "发布 zip 打包警告: "+perr.Error(), nil)
+		} else if len(packed) > 0 {
+			notify(StageToolsPatch, 0.965, fmt.Sprintf("已打包发布 zip %d 个 → %s", len(packed), CatalogReleaseDir(catalogRoot, cfg.FridaVersion)), nil)
 		}
 	} else {
 		// dry-run: fake wheel note in catalog
@@ -1032,7 +1038,7 @@ func ArtifactDeployTips(artifactDir string, cfg JobConfig) string {
 	b.WriteString("  勿 pip install 官方未魔改 frida/frida-tools。\n\n")
 	b.WriteString("部署提示:\n")
 	b.WriteString("1. 部署 binaries 下 *server* 到设备并 chmod +x 运行\n")
-	b.WriteString("2. 本机客户端: 先装 python/host/<你的OS-arch>/frida-*.whl，再装 python/frida_tools-*.whl\n")
+	b.WriteString("2. 本机客户端: 先装 python/host/<你的OS-arch>/frida-*.whl（host-wheels zip 根目录则是 host/<平台>/），再装 python/frida_tools-*.whl\n")
 	b.WriteString("   （详见 python/INSTALL.txt；PROTOCOL-SYNC.json 为协议交叉核对结果）\n")
 	b.WriteString("3. 启动带 -l 指定 IP:端口（可不用 27042）；客户机必须写同一个端口（frida -H host:port）\n")
 	b.WriteString(fmt.Sprintf("   例: %s-server -l 0.0.0.0:%d  →  frida -H 127.0.0.1:%d\n", cfg.MagicName, listen, listen))

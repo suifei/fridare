@@ -2,6 +2,8 @@ package rebuild
 
 import (
 	"archive/zip"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +19,9 @@ func TestFridaToolsInstallNotesRelativeHostPaths(t *testing.T) {
 	if strings.Contains(notes, `D:\`) || strings.Contains(notes, `/works/`) {
 		t.Fatalf("INSTALL.txt leaked absolute path:\n%s", notes)
 	}
+	if strings.Contains(notes, `python/host/`) {
+		t.Fatal("INSTALL pip examples must be host/<plat>/ (relative to python/ or zip root)")
+	}
 	if !strings.Contains(notes, "host/windows-amd64/frida-16.7.19-cp37-abi3-win_amd64.whl") {
 		t.Fatalf("missing relative host path:\n%s", notes)
 	}
@@ -26,6 +31,91 @@ func TestFridaToolsInstallNotesRelativeHostPaths(t *testing.T) {
 	if strings.Contains(notes, "frida_tools-tools.frida.") {
 		t.Fatal("must not advertise illegal tools.frida filename")
 	}
+}
+
+func TestCanonicalToolsVersionRecoversFromPKGINFO(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "PKG-INFO"), []byte("Name: frida-tools\nVersion: 13.7.1\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got := canonicalToolsVersion("tools", root, "frida-tools-13.7.1.tar.gz")
+	if got != "13.7.1" {
+		t.Fatalf("got %q want 13.7.1", got)
+	}
+	got = pinFridaToolsPackageVersion(root, "16.7.19", "tools", "kxmwp")
+	want := "13.7.1+frida.16.7.19.fridare.kxmwp"
+	if got != want {
+		t.Fatalf("pin %q want %q", got, want)
+	}
+}
+
+func TestRewriteToolsWheelToVersion(t *testing.T) {
+	dir := t.TempDir()
+	old := filepath.Join(dir, "frida_tools-tools.frida.16.7.19.fridare.kxmwp-py3-none-any.whl")
+	if err := writeTinyToolsWheel(old, "tools.frida.16.7.19.fridare.kxmwp"); err != nil {
+		t.Fatal(err)
+	}
+	local := "13.7.1+frida.16.7.19.fridare.kxmwp"
+	got, err := rewriteToolsWheelToVersion(old, local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(dir, "frida_tools-13.7.1+frida.16.7.19.fridare.kxmwp-py3-none-any.whl")
+	if got != want {
+		t.Fatalf("path %q want %q", got, want)
+	}
+	if _, err := os.Stat(want); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatal("old illegal filename should be gone")
+	}
+	r, err := zip.OpenReader(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	foundMeta := false
+	for _, f := range r.File {
+		if strings.Contains(f.Name, "tools.frida.") {
+			t.Fatalf("leftover dist-info name %s", f.Name)
+		}
+		if strings.HasSuffix(f.Name, "METADATA") {
+			rc, _ := f.Open()
+			b, _ := io.ReadAll(rc)
+			_ = rc.Close()
+			if !strings.Contains(string(b), "Version: 13.7.1+frida.16.7.19.fridare.kxmwp") {
+				t.Fatalf("METADATA: %s", b)
+			}
+			foundMeta = true
+		}
+	}
+	if !foundMeta {
+		t.Fatal("missing METADATA")
+	}
+}
+
+func writeTinyToolsWheel(path, ver string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	zw := zip.NewWriter(f)
+	info := fmt.Sprintf("frida_tools-%s.dist-info/METADATA", ver)
+	w, err := zw.Create(info)
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte("Metadata-Version: 2.1\nName: frida-tools\nVersion: " + ver + "\n")); err != nil {
+		return err
+	}
+	w2, err := zw.Create("frida_tools/__init__.py")
+	if err != nil {
+		return err
+	}
+	_, _ = w2.Write([]byte("# patched\n"))
+	return zw.Close()
 }
 
 func TestParseVersionFromArchiveName(t *testing.T) {

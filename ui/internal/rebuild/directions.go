@@ -79,7 +79,7 @@ func DefaultStripLayers() []StripLayer {
 		{
 			ID: LayerBinaryMarkers, Mode: StripModePostBuild,
 			Title:       "编译后二进制同长度标记",
-			Description: "PatchArtifactBinaryMarkers：frida_agent/frida_server/frida:rpc 等写入产物（valac 仍发 frida_agent_main）。",
+			Description: "PatchArtifactBinaryMarkers：frida_agent/frida_server/frida:rpc、dex re/frida、GNU hash、GumJS token Frida。valac 仍发 frida_agent_main。",
 			Patterns:    []string{"frida_agent", "frida_server", "frida-server", "frida:rpc"},
 		},
 		{

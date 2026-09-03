@@ -114,6 +114,7 @@ func BuildPatchedFridaToolsWheels(cfg JobConfig, catalogRoot string, entryDirs [
 			_ = os.WriteFile(filepath.Join(sharedPy, "TOOLS-WARN.txt"), []byte(err.Error()), 0644)
 		} else {
 			_, _ = patchFridaToolsTree(pkgRoot, cfg.MagicName)
+			toolsVer = canonicalToolsVersion(toolsVer, pkgRoot, filepath.Base(arch))
 			localVer := pinFridaToolsPackageVersion(pkgRoot, pipVer, toolsVer, cfg.MagicName)
 			// Prefer setup.py bdist_wheel (uses local setuptools; no isolation / network).
 			// Fall back to pip wheel, then hand-rolled pure wheel zip.
@@ -136,9 +137,9 @@ func BuildPatchedFridaToolsWheels(cfg JobConfig, catalogRoot string, entryDirs [
 			if len(toolsBuilt) == 0 {
 				toolsBuilt, _ = filepath.Glob(filepath.Join(outDir, "*.whl"))
 			}
-			// GitHub #36: older hand-rolled wheels used '.' instead of '+' in the
-			// local version; pip rejects those filenames. Normalize before copy.
-			toolsBuilt = sanitizeToolsWheelFilenames(toolsBuilt)
+			// GitHub #36 / 16.x tools.frida. filename: rewrite both the outer
+			// name and dist-info/METADATA to the pinned PEP 440 local version.
+			toolsBuilt = normalizeToolsWheels(toolsBuilt, localVer)
 		}
 	}
 
@@ -737,11 +738,182 @@ func sanitizeToolsWheelFilenames(paths []string) []string {
 	return out
 }
 
+func publicRelease(v string) string {
+	pub, _, _ := strings.Cut(strings.TrimSpace(v), "+")
+	return pub
+}
+
+func pkgInfoVersion(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	for _, ln := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(ln, "Version: ") {
+			return strings.TrimSpace(strings.TrimPrefix(ln, "Version: "))
+		}
+	}
+	return ""
+}
+
+// canonicalToolsVersion recovers a PEP 440 public version when the archive
+// parser used to return "tools" from frida-tools-13.7.1.tar.gz.
+func canonicalToolsVersion(toolsVer, pkgRoot, archiveName string) string {
+	if isPEP440Release(publicRelease(toolsVer)) {
+		return publicRelease(toolsVer)
+	}
+	if pkgRoot != "" {
+		if v := publicRelease(pkgInfoVersion(filepath.Join(pkgRoot, "PKG-INFO"))); isPEP440Release(v) {
+			return v
+		}
+	}
+	if archiveName != "" {
+		if v := publicRelease(parseVersionFromArchiveName(archiveName)); isPEP440Release(v) {
+			return v
+		}
+	}
+	return toolsVer
+}
+
+func normalizeToolsWheels(paths []string, localVer string) []string {
+	out := make([]string, 0, len(paths))
+	for _, p := range paths {
+		base := strings.ToLower(filepath.Base(p))
+		if strings.HasPrefix(base, "frida_tools-") {
+			if np, err := rewriteToolsWheelToVersion(p, localVer); err == nil && np != "" {
+				p = np
+			}
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+func distInfoPrefixFromZip(r *zip.ReadCloser) string {
+	for _, zf := range r.File {
+		if i := strings.Index(zf.Name, ".dist-info/"); i > 0 {
+			return zf.Name[:i+len(".dist-info/")]
+		}
+	}
+	return ""
+}
+
+func rewriteMetadataVersion(data []byte, localVer string) []byte {
+	lines := strings.Split(string(data), "\n")
+	for i, ln := range lines {
+		if strings.HasPrefix(ln, "Version: ") {
+			lines[i] = "Version: " + localVer
+			break
+		}
+	}
+	return []byte(strings.Join(lines, "\n"))
+}
+
+// rewriteToolsWheelToVersion rewrites a frida_tools wheel filename and its
+// dist-info/METADATA to localVer (PEP 440, keep '+'). Covers setuptools
+// turning '+' into '.' and the 16.x "tools.frida.…" parser bug.
+func rewriteToolsWheelToVersion(path, localVer string) (string, error) {
+	localVer = pep440WheelFilenameVersion(localVer)
+	if !isPEP440Version(localVer) {
+		return path, fmt.Errorf("tools wheel version not PEP 440: %q", localVer)
+	}
+	base := filepath.Base(path)
+	name, _, py, abi, plat, ok := splitWheelFilename(base)
+	if !ok || name != "frida_tools" {
+		return path, nil
+	}
+	wantBase := fmt.Sprintf("frida_tools-%s-%s-%s-%s.whl", localVer, py, abi, plat)
+	wantPath := filepath.Join(filepath.Dir(path), wantBase)
+
+	r, err := zip.OpenReader(path)
+	if err != nil {
+		return path, err
+	}
+	oldPrefix := distInfoPrefixFromZip(r)
+	newPrefix := fmt.Sprintf("frida_tools-%s.dist-info/", localVer)
+	type zipEnt struct {
+		name string
+		data []byte
+	}
+	var ents []zipEnt
+	for _, zf := range r.File {
+		n := zf.Name
+		if oldPrefix != "" && strings.HasPrefix(n, oldPrefix) {
+			n = newPrefix + n[len(oldPrefix):]
+		}
+		rc, oerr := zf.Open()
+		if oerr != nil {
+			_ = r.Close()
+			return path, oerr
+		}
+		data, rerr := io.ReadAll(rc)
+		_ = rc.Close()
+		if rerr != nil {
+			_ = r.Close()
+			return path, rerr
+		}
+		if strings.Contains(n, ".dist-info/") && strings.HasSuffix(n, "METADATA") {
+			data = rewriteMetadataVersion(data, localVer)
+		}
+		if oldPrefix != "" && strings.HasSuffix(n, "RECORD") {
+			data = bytes.ReplaceAll(data, []byte(oldPrefix), []byte(newPrefix))
+		}
+		ents = append(ents, zipEnt{n, data})
+	}
+	_ = r.Close()
+
+	tmp := wantPath + ".tmp"
+	f, err := os.Create(tmp)
+	if err != nil {
+		return path, err
+	}
+	zw := zip.NewWriter(f)
+	for _, e := range ents {
+		w, cerr := zw.Create(e.name)
+		if cerr != nil {
+			_ = zw.Close()
+			_ = f.Close()
+			_ = os.Remove(tmp)
+			return path, cerr
+		}
+		if _, werr := w.Write(e.data); werr != nil {
+			_ = zw.Close()
+			_ = f.Close()
+			_ = os.Remove(tmp)
+			return path, werr
+		}
+	}
+	_ = zw.Close()
+	_ = f.Close()
+	if path != wantPath {
+		_ = os.Remove(path)
+	}
+	_ = os.Remove(wantPath)
+	if err := os.Rename(tmp, wantPath); err != nil {
+		return path, err
+	}
+	return wantPath, nil
+}
+
+func splitClientWheels(wheels []string) (tools, host []string) {
+	for _, w := range wheels {
+		b := strings.ToLower(filepath.Base(w))
+		switch {
+		case strings.HasPrefix(b, "frida_tools-"), strings.HasPrefix(b, "frida-tools-"):
+			tools = append(tools, w)
+		case strings.HasPrefix(b, "frida-") && strings.HasSuffix(b, ".whl"):
+			host = append(host, w)
+		}
+	}
+	return
+}
+
 // pinFridaToolsPackageVersion patches PKG-INFO / setup.py so the rebuilt wheel
 // reports a local version and pins install_requires to frida==sourceVer.
 // Returns the PEP 440 local version string (e.g. 14.10.4+frida.17.16.4.fridare.abcde).
 // Does NOT overwrite setup.cfg wholesale (that breaks setuptools metadata).
 func pinFridaToolsPackageVersion(pkgRoot, fridaSourceVer, toolsVer, magic string) string {
+	toolsVer = canonicalToolsVersion(toolsVer, pkgRoot, "")
 	if toolsVer == "" {
 		toolsVer = "0"
 	}
@@ -899,7 +1071,7 @@ A) frida-tools（纯 Python，任意宿主机）:
   %s
   - install_requires: frida==%s
 
-B) frida 原生扩展（按宿主机 OS/架构选 python/host/<id>/，共 6 个平台）:
+B) frida 原生扩展（路径相对本 INSTALL.txt 所在目录：python/ 或 host-wheels zip 根）:
   windows-amd64 | windows-arm64
   macos-x86_64  | macos-arm64
   linux-x86_64  | linux-arm64
@@ -907,17 +1079,17 @@ B) frida 原生扩展（按宿主机 OS/架构选 python/host/<id>/，共 6 个�
 %s
 按宿主机选择示例:
   # Windows x64
-  pip install --force-reinstall --no-deps "python/host/windows-amd64/frida-*.whl"
+  pip install --force-reinstall --no-deps "host/windows-amd64/frida-*.whl"
   # Windows ARM64
-  pip install --force-reinstall --no-deps "python/host/windows-arm64/frida-*.whl"
+  pip install --force-reinstall --no-deps "host/windows-arm64/frida-*.whl"
   # macOS Apple Silicon
-  pip install --force-reinstall --no-deps "python/host/macos-arm64/frida-*.whl"
+  pip install --force-reinstall --no-deps "host/macos-arm64/frida-*.whl"
   # macOS Intel
-  pip install --force-reinstall --no-deps "python/host/macos-x86_64/frida-*.whl"
+  pip install --force-reinstall --no-deps "host/macos-x86_64/frida-*.whl"
   # Linux x86_64
-  pip install --force-reinstall --no-deps "python/host/linux-x86_64/frida-*.whl"
+  pip install --force-reinstall --no-deps "host/linux-x86_64/frida-*.whl"
   # Linux aarch64
-  pip install --force-reinstall --no-deps "python/host/linux-arm64/frida-*.whl"
+  pip install --force-reinstall --no-deps "host/linux-arm64/frida-*.whl"
 
   # 再装 frida-tools（纯 Python，任意宿主机）。文件名里的 '+' 是 PEP 440 本地版本，不要改成 '.'。
   pip install --force-reinstall --no-deps "%s"

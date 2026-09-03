@@ -11,6 +11,7 @@
 - 16.x `frida-tools` wheel 文件名把 PyPI 源包 `frida-tools-13.7.1` 解析成版本 `tools`，pip 拒装。已单独挂 `frida_tools-13.7.1+frida.16.7.19.fridare.kxmwp-py3-none-any.whl`，并替换 `frida-kxmwp-16.7.19-host-wheels.zip`（不要用 17 的 `14.10.4+frida.17.17.0` tools）。
 - 17.x `host-wheels.zip` 的 tools 文件名已是 PEP 440（`14.10.4+frida.17.17.0…`），但 `INSTALL.txt` 写了本机绝对路径。已替换 zip，改为 `host/<plat>/` 相对路径。
 - GumJS 全局改名只替换独立 token `Frida`（`Frida.` / `'Frida'`），不再整 ELF `ReplaceAll`（会把 `Friday` 改成 `Kxmwpy`、Vala `FridaScriptOptions` 一并改掉）。
+- 源码重编译流水线把上述修复编进导出：`PatchArtifactBinaryMarkers` 含 dex/`GNU hash`/GumJS token；tools wheel 重写文件名+METADATA 为 PEP 440（含 `frida-tools-*.tar.gz` 版本恢复）；`INSTALL.txt` 用 `host/<plat>/`；完成后打 `catalog/{ver}/_release/` 下的 `frida-{magic}-{ver}-{plat}-server.zip` 与 `host-wheels.zip`。
 
 ## v4.0.8 - 2026-08-13
 

@@ -19,6 +19,9 @@ import (
 //	  README.txt
 //	  binaries/          # server / agent / gadget from compile
 //	  python/            # patched frida-tools wheel + install notes
+//	{work}/catalog/{fridaVersion}/_release/
+//	  frida-{magic}-{ver}-{platform}-server.zip
+//	  frida-{magic}-{ver}-host-wheels.zip
 //
 // Shared with Docker when work root is the parent of the bind-mounted src/.
 
