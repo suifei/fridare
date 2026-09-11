@@ -21,6 +21,8 @@
 [![GitHub followers](https://img.shields.io/github/followers/suifei.svg?style=social&label=Follow&maxAge=2592000)](https://github.com/suifei?tab=followers)
 [![Twitter Follow](https://img.shields.io/twitter/follow/suiflynn?style=social)](https://twitter.com/suiflynn)
 
+**任何问题，请到仓库的 [fridare issues](https://github.com/suifei/fridare/issues) 内提交，会进行反馈和修复bug，也推荐加QQ群，更好的沟通，但请先提交 issue ，作者再忙也会不定期一次性处理问题，更欢迎朋友们推送PR协同解决问题，感谢！☺️**
+
 Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改工具：改名称、端口与协议面标识，降低常见环境检测命中率。提供 **命令行 + 跨平台 GUI**，并支持 **静态补丁** 与 **Docker 源码重编译** 双技术路线。
 
 | 版本 | 要点 | 下载 |
