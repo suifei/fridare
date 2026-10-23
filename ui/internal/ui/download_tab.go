@@ -686,17 +686,22 @@ func (dt *DownloadTab) loadAssetsForVersion(versionName string) {
 
 // parseAssetInfo 解析资源文件名获取平台和文件类型信息
 func (dt *DownloadTab) parseAssetInfo(filename string) (platform, fileType string) {
-	// 简单的文件名解析逻辑
 	lower := strings.ToLower(filename)
+	base := strings.ToLower(filepath.Base(filename))
 
-	// 确定文件类型
-	if strings.Contains(lower, "server") {
-		fileType = "frida-server"
-	} else if strings.Contains(lower, "gadget") {
-		fileType = "frida-gadget"
-	} else if strings.Contains(lower, "tools") || strings.Contains(lower, ".whl") {
+	// 确定文件类型。原生 wheel 是 frida-<ver>-cp*.whl（import frida）。
+	// CLI 的 PyPI 发行名是 frida-tools，文件名/import 是 frida_tools。
+	// 不能把所有 .whl 都标成 frida-tools。
+	switch {
+	case strings.HasPrefix(base, "frida_tools") || strings.HasPrefix(base, "frida-tools"):
 		fileType = "frida-tools"
-	} else {
+	case strings.Contains(lower, "server"):
+		fileType = "frida-server"
+	case strings.Contains(lower, "gadget"):
+		fileType = "frida-gadget"
+	case strings.HasPrefix(base, "frida-") && strings.HasSuffix(base, ".whl"):
+		fileType = "frida"
+	default:
 		fileType = "其他"
 	}
 

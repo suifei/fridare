@@ -162,7 +162,9 @@ func (fc *FridaClient) FindAsset(version *FridaVersion, platform Platform, fileT
 			pattern = fmt.Sprintf(`frida-gadget-.*-%s-%s-%s.*`, version.Version, platform.OS, platform.Arch)
 		}
 	case FileTypeTools:
-		pattern = fmt.Sprintf(`frida-tools-.*-%s.*`, version.Version)
+		// PyPI project is frida-tools; wheel/sdist basenames are frida_tools-* or frida-tools-*.
+		// The tools line has its own version, so do not require the frida server version in the name.
+		pattern = `(?i)(^|/)frida[-_]tools-`
 	default:
 		return nil, fmt.Errorf("不支持的文件类型: %s", fileType)
 	}

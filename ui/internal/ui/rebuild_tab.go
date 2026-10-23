@@ -48,7 +48,7 @@ type RebuildTab struct {
 	enableSource  *widget.Check
 
 	// Step 1
-	bootstrapBtn *widget.Button
+	bootstrapBtn  *widget.Button
 	refreshImgBtn *widget.Button
 
 	// Step 2 form
@@ -59,13 +59,13 @@ type RebuildTab struct {
 	useGrokCheck     *widget.Check
 	useGUIProxyCheck *widget.Check
 	// profileSelect: safe | deep — deep = server+client protocol/API/idents sync
-	profileSelect      *widget.Select
-	stripSymbolsChk    *widget.Check
-	seededJunkChk      *widget.Check
-	stealthMarkersChk  *widget.Check
-	randomAgentChk     *widget.Check
-	developBtn         *widget.Button
-	fullOneShotBtn     *widget.Button
+	profileSelect     *widget.Select
+	stripSymbolsChk   *widget.Check
+	seededJunkChk     *widget.Check
+	stealthMarkersChk *widget.Check
+	randomAgentChk    *widget.Check
+	developBtn        *widget.Button
+	fullOneShotBtn    *widget.Button
 
 	// Agent panel (always visible — not buried under scroll)
 	goalsEntry    *widget.Entry
@@ -379,8 +379,9 @@ func (rt *RebuildTab) setupUI() {
 		rt.catalogSel = int(id)
 		if id >= 0 && id < len(rt.catalogEntries) {
 			e := rt.catalogEntries[id]
-			rt.installHint.SetText(fmt.Sprintf("路径:\n%s\n\nHost frida wheel（按本机 OS/CPU 选目录）:\n  python/host/windows-amd64|windows-arm64\n  python/host/macos-x86_64|macos-arm64\n  python/host/linux-x86_64|linux-arm64\n\npip install --force-reinstall --no-deps python/host/<平台>/frida-*.whl\npip install --force-reinstall --no-deps python/frida_tools-*.whl\n# 版本须 == %s，与 server magic 一致",
-				e.Path, e.Version))
+			pipVer := rebuild.EffectivePipVersion(rebuild.JobConfig{FridaVersion: e.Version})
+			rt.installHint.SetText(fmt.Sprintf("路径:\n%s\n\n不要 pip install frida-tools（那是 PyPI 发行名，会装官方包）。\nwheel 文件名和 import 包名是 frida_tools；原生绑定是 frida。\n产品标签 %s → pip frida==%s（EffectivePipVersion）。\n\npip install --force-reinstall --no-deps python/host/<平台>/frida-*.whl\npip install --force-reinstall --no-deps python/frida_tools-*.whl\npython -c \"import frida; print(frida.__version__)\"  # 须 == %s",
+				e.Path, e.Version, pipVer, pipVer))
 		}
 	}
 	rt.refreshCatBtn = widget.NewButton("刷新产物库", rt.refreshCatalog)
@@ -1007,4 +1008,3 @@ func (rt *RebuildTab) UpdateGlobalConfig(magicName string, port int) {
 		rt.portEntry.SetText(strconv.Itoa(port))
 	}
 }
-

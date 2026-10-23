@@ -27,7 +27,8 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 
 | 版本 | 要点 | 下载 |
 |------|------|------|
-| **v4.0.8**（当前 GUI） | 修 inject 资源改名 / ninja 花指令依赖 / 16.x snapshot；GUI 路径编过 16.7.19 与 17.17.1；**不是免杀** | [v4.0.8](https://github.com/suifei/fridare/releases/tag/v4.0.8) |
+| **v4.0.9**（当前 GUI） | #38：双架构产物不再互相覆盖；Android `backend_class != null`；pip 发行名 `frida-tools` 与 wheel `frida_tools` 分开。**不是免杀** | [v4.0.9](https://github.com/suifei/fridare/releases/tag/v4.0.9) |
+| v4.0.8 | 修 inject 资源改名 / ninja 花指令依赖 / 16.x snapshot；GUI 路径编过 16.7.19 与 17.17.1 | [v4.0.8](https://github.com/suifei/fridare/releases/tag/v4.0.8) |
 | **v4.0.7** | 源码页 stealth 开关（去符号/花指令/行为标记）；静态魔改可去符号；**不是免杀** | [v4.0.7](https://github.com/suifei/fridare/releases/tag/v4.0.7) |
 | **v4.0.6** | Docker **toolchain-v4**（MinGW + aarch64）；监听端口用 `-l` | [v4.0.6](https://github.com/suifei/fridare/releases/tag/v4.0.6) |
 | **kxmwp-17.17.1**（当前 Frida 产物） | 官方 17.17.0；linux-x86_64 GUI 路径 stealth 重编；**不是免杀**；端口用 `-l` | [kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1) |
@@ -38,7 +39,7 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 | v4.0.3 | CLI 多平台静态链接（win/linux/darwin × amd64/arm64）+ Windows GUI 预编译 | [v4.0.3](https://github.com/suifei/fridare/releases/tag/v4.0.3) |
 | v4.0.0 | Fyne GUI + Windows 原生 deb 魔改 | [v4.0.0](https://github.com/suifei/fridare/releases) |
 
-**文档**：[双技术路线](docs/dual-track.md) · [v4.0.8](docs/release-v4.0.8.md) · [16 vs 17](docs/kxmwp-16-vs-17.md) · [16.7.19](docs/kxmwp-16.7.19.md) · [17.17.1](docs/kxmwp-17.17.1.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
+**文档**：[双技术路线](docs/dual-track.md) · [v4.0.9](docs/release-v4.0.9.md) · [16 vs 17](docs/kxmwp-16-vs-17.md) · [16.7.19](docs/kxmwp-16.7.19.md) · [17.17.1](docs/kxmwp-17.17.1.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
 
 ### 双技术路线（v4.0.4）
 
@@ -648,7 +649,7 @@ Fridare automates Frida customization on **iOS / Android / Linux / Windows**: re
 | **A · Static patch (default)** | hex/string replace on official binaries + tools | No Docker |
 | **B · Source rebuild (optional)** | AI/host edits + **Docker-only** `configure/make` (incl. MinGW Windows server) | Docker |
 
-**v4.0.8**: GUI-path rebuild for official 16.7.19 and product-label 17.17.1; inject rename / ninja ARGS-only junk / 16.x snapshot disable. Not AV evasion. See [docs/release-v4.0.8.md](docs/release-v4.0.8.md).
+**v4.0.9**: #38 multi-arch catalog overwrite, Android `backend_class != null`, and `frida-tools` vs `frida_tools` install notes. Not AV evasion. See [docs/release-v4.0.9.md](docs/release-v4.0.9.md).
 
 [CHANGELOG](CHANGELOG) · Chinese docs above · [Windows notes](win/README.md)
 
