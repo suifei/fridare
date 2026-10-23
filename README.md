@@ -25,9 +25,16 @@
 
 Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改工具：改名称、端口与协议面标识，降低常见环境检测命中率。提供 **命令行 + 跨平台 GUI**，并支持 **静态补丁** 与 **Docker 源码重编译** 双技术路线。
 
+> **界面语言 / GUI language — 中文 · English**
+>
+> GUI 可以切换语言。打开 **设置 → 界面配置 → 语言**，在 **中文** 和 **English** 之间选择。切换后窗口立即重建，并写入 `config.json`（`language`: `zh` 或 `en`）。**默认中文。**
+>
+> The GUI can switch language. Open **Settings → Interface configuration → Language** and choose **中文** or **English**. The window rebuilds immediately and the choice is saved. **Chinese is the default.**
+
 | 版本 | 要点 | 下载 |
 |------|------|------|
-| **v4.0.9**（当前 GUI） | #38：双架构产物不再互相覆盖；Android `backend_class != null`；pip 发行名 `frida-tools` 与 wheel `frida_tools` 分开。**不是免杀** | [v4.0.9](https://github.com/suifei/fridare/releases/tag/v4.0.9) |
+| **v4.1.0**（当前 GUI） | 设置里可在 **中文 / English** 之间切换界面语言，默认中文。**不是免杀** | [v4.1.0](https://github.com/suifei/fridare/releases/tag/v4.1.0) |
+| v4.0.9 | #38：双架构产物不再互相覆盖；Android `backend_class != null`；pip 发行名 `frida-tools` 与 wheel `frida_tools` 分开。**不是免杀** | [v4.0.9](https://github.com/suifei/fridare/releases/tag/v4.0.9) |
 | v4.0.8 | 修 inject 资源改名 / ninja 花指令依赖 / 16.x snapshot；GUI 路径编过 16.7.19 与 17.17.1 | [v4.0.8](https://github.com/suifei/fridare/releases/tag/v4.0.8) |
 | **v4.0.7** | 源码页 stealth 开关（去符号/花指令/行为标记）；静态魔改可去符号；**不是免杀** | [v4.0.7](https://github.com/suifei/fridare/releases/tag/v4.0.7) |
 | **v4.0.6** | Docker **toolchain-v4**（MinGW + aarch64）；监听端口用 `-l` | [v4.0.6](https://github.com/suifei/fridare/releases/tag/v4.0.6) |
@@ -39,7 +46,7 @@ Fridare 是面向 **iOS / Android / Linux / Windows** 的 Frida 自动化魔改�
 | v4.0.3 | CLI 多平台静态链接（win/linux/darwin × amd64/arm64）+ Windows GUI 预编译 | [v4.0.3](https://github.com/suifei/fridare/releases/tag/v4.0.3) |
 | v4.0.0 | Fyne GUI + Windows 原生 deb 魔改 | [v4.0.0](https://github.com/suifei/fridare/releases) |
 
-**文档**：[双技术路线](docs/dual-track.md) · [v4.0.9](docs/release-v4.0.9.md) · [16 vs 17](docs/kxmwp-16-vs-17.md) · [16.7.19](docs/kxmwp-16.7.19.md) · [17.17.1](docs/kxmwp-17.17.1.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
+**文档**：[双技术路线](docs/dual-track.md) · [v4.1.0](docs/release-v4.1.0.md) · [16 vs 17](docs/kxmwp-16-vs-17.md) · [16.7.19](docs/kxmwp-16.7.19.md) · [17.17.1](docs/kxmwp-17.17.1.md) · [Windows](win/README.md) · [Android](docs/android.md) · [iOS](docs/ios.md) · [frida-tools](docs/patch-tools.md) · [安装](docs/install.md) · [CHANGELOG](CHANGELOG)
 
 ### 双技术路线（v4.0.4）
 
@@ -648,6 +655,8 @@ Fridare automates Frida customization on **iOS / Android / Linux / Windows**: re
 |-------|------|--------|
 | **A · Static patch (default)** | hex/string replace on official binaries + tools | No Docker |
 | **B · Source rebuild (optional)** | AI/host edits + **Docker-only** `configure/make` (incl. MinGW Windows server) | Docker |
+
+**v4.1.0**: the GUI switches between **中文** and **English** under **Settings → Interface configuration → Language**. Chinese stays the default. See [docs/release-v4.1.0.md](docs/release-v4.1.0.md).
 
 **v4.0.9**: #38 multi-arch catalog overwrite, Android `backend_class != null`, and `frida-tools` vs `frida_tools` install notes. Not AV evasion. See [docs/release-v4.0.9.md](docs/release-v4.0.9.md).
 

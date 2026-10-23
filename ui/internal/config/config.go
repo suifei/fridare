@@ -72,7 +72,7 @@ func DefaultConfig() *Config {
 	homeDir, _ := os.UserHomeDir()
 
 	return &Config{
-		AppVersion: "4.0.9", // keep aligned with internal/appmeta.Version
+		AppVersion: "4.1.0", // keep aligned with internal/appmeta.Version
 		WorkDir:    filepath.Join(homeDir, ".fridare"),
 
 		Proxy:   "",

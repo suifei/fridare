@@ -8,7 +8,7 @@
 #   powershell -File scripts\build-release.ps1 -Version 4.0.7 -Only windows-amd64
 
 param(
-    [string]$Version = "4.0.9",
+    [string]$Version = "4.1.0",
     # Optional: build only one platform dir name, e.g. windows-amd64
     [string]$Only = ""
 )
@@ -132,6 +132,13 @@ Contents (tools are pure-Go static binaries, CGO_ENABLED=0):
 $guiLine
 Magic name must be exactly 5 lowercase letters a-z.
 Device frida-server and PC frida-tools must use the same magic name.
+
+GUI language (fridare-gui):
+  Settings -> Interface configuration -> Language.
+  Chinese (default) or English. The window rebuilds immediately
+  and the choice is saved in config.json.
+
+
 
 Listen port:
   Default 27042 is fine. Start server with -l IP:PORT and connect the
