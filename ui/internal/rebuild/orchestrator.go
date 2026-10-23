@@ -157,7 +157,7 @@ type JobState struct {
 	Branch     string          `json:"branch"`
 	Plan       *ModPlan        `json:"plan,omitempty"`
 	Artifact   string          `json:"artifact_dir,omitempty"`
-	LogPath    string          `json:"log_path,omitempty"`    // full text log for this run
+	LogPath    string          `json:"log_path,omitempty"`   // full text log for this run
 	LatestLog  string          `json:"latest_log,omitempty"` // always-updated latest.log
 	Events     []ProgressEvent `json:"events"`
 	StartedAt  time.Time       `json:"started_at"`
@@ -330,11 +330,11 @@ func RenameArtifactBasenames(dir, magic string) (int, error) {
 
 // Orchestrator runs the clone→branch→mod→build→export pipeline.
 type Orchestrator struct {
-	mu     sync.Mutex
-	state  JobState
-	cancel context.CancelFunc
-	runner Runner
-	agent  AgentDriver
+	mu      sync.Mutex
+	state   JobState
+	cancel  context.CancelFunc
+	runner  Runner
+	agent   AgentDriver
 	fileLog *JobFileLogger
 	// hooks for tests
 	ProbeFn func(cfg JobConfig) DepsReport
@@ -1011,7 +1011,9 @@ func ArtifactDeployTips(artifactDir string, cfg JobConfig) string {
 	var b strings.Builder
 	b.WriteString("Fridare 源码重编译产物\n")
 	b.WriteString("====================\n\n")
-	b.WriteString(fmt.Sprintf("Frida 版本: %s\n", cfg.FridaVersion))
+	b.WriteString(fmt.Sprintf("Frida 产品标签: %s\n", cfg.FridaVersion))
+	b.WriteString(fmt.Sprintf("pip frida 版本: %s（EffectivePipVersion；安装 catalog 里的 wheel 文件，不要 pip install frida-tools）\n", EffectivePipVersion(cfg)))
+	b.WriteString("CLI wheel 文件名 / import 包名是 frida_tools；PyPI 发行名才是 frida-tools。\n")
 	b.WriteString(fmt.Sprintf("魔改名称: %s\n", cfg.MagicName))
 	listen := NormalizeListenPort(cfg.ListenPort)
 	b.WriteString(fmt.Sprintf("端口: %d", listen))

@@ -86,6 +86,38 @@ func TestPerformPatch_ValidMagicPatchesCorePy(t *testing.T) {
 	}
 }
 
+func TestPerformPatch_AlsoPatchesSiblingFridaToolsPackage(t *testing.T) {
+	root := t.TempDir()
+	fridaPkg := filepath.Join(root, "frida")
+	toolsPkg := filepath.Join(root, "frida_tools")
+	if err := os.MkdirAll(fridaPkg, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(toolsPkg, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fridaPkg, "core.py"), []byte("channel = \"frida:rpc\"\nimport _frida\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(toolsPkg, "repl.py"), []byte("import frida\nprint('frida:rpc')\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tt := newTestToolsTab(fridaPkg)
+	if err := tt.performPatch("abcde", "27042"); err != nil {
+		t.Fatal(err)
+	}
+	tools, err := os.ReadFile(filepath.Join(toolsPkg, "repl.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(tools), "abcde:rpc") || strings.Contains(string(tools), "frida:rpc") {
+		t.Fatalf("frida_tools package not patched: %s", tools)
+	}
+	if !strings.Contains(string(tools), "import frida") {
+		t.Fatalf("bare import must stay: %s", tools)
+	}
+}
+
 func TestPatchPythonFiles_InvalidMagicDoesNotReportSuccess(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "core.py"), []byte(`"frida:rpc"`), 0644); err != nil {

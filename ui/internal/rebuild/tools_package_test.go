@@ -33,6 +33,29 @@ func TestFridaToolsInstallNotesRelativeHostPaths(t *testing.T) {
 	}
 }
 
+func TestFridaToolsInstallNotes_ProductLabelIsNotPipVersion(t *testing.T) {
+	cfg := JobConfig{FridaVersion: "17.17.1", MagicName: "kxmwp", ListenPort: 27042}
+	notes := fridaToolsInstallNotes(cfg,
+		[]string{"frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl"},
+		nil,
+	)
+	if !strings.Contains(notes, "pip 的 frida 版本 (EffectivePipVersion): 17.17.0") {
+		t.Fatalf("missing pip version:\n%s", notes)
+	}
+	if !strings.Contains(notes, "install_requires: frida==17.17.0") {
+		t.Fatalf("install_requires must use pip version:\n%s", notes)
+	}
+	if strings.Contains(notes, "frida==17.17.1") || strings.Contains(notes, "须 == 17.17.1") {
+		t.Fatalf("must not tell users to install product label 17.17.1:\n%s", notes)
+	}
+	if !strings.Contains(notes, "不要执行 pip install frida-tools") {
+		t.Fatal("must warn that the PyPI name is not the wheel filename")
+	}
+	if !strings.Contains(notes, "frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl") {
+		t.Fatal("missing wheel filename")
+	}
+}
+
 func TestCanonicalToolsVersionRecoversFromPKGINFO(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "PKG-INFO"), []byte("Name: frida-tools\nVersion: 13.7.1\n"), 0644); err != nil {
@@ -120,11 +143,11 @@ func writeTinyToolsWheel(path, ver string) error {
 
 func TestParseVersionFromArchiveName(t *testing.T) {
 	cases := map[string]string{
-		"frida_tools-14.10.4.tar.gz":             "14.10.4",
-		"frida-tools-13.7.1.tar.gz":              "13.7.1",
-		"frida-tools-13.7.1.zip":                 "13.7.1",
-		"frida_tools-14.10.4-py3-none-any.whl":   "14.10.4",
-		"frida-tools-13.7.1-py3-none-any.whl":    "13.7.1",
+		"frida_tools-14.10.4.tar.gz":                                       "14.10.4",
+		"frida-tools-13.7.1.tar.gz":                                        "13.7.1",
+		"frida-tools-13.7.1.zip":                                           "13.7.1",
+		"frida_tools-14.10.4-py3-none-any.whl":                             "14.10.4",
+		"frida-tools-13.7.1-py3-none-any.whl":                              "13.7.1",
 		"frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl": "14.10.4+frida.17.17.0.fridare.kxmwp",
 	}
 	for in, want := range cases {
