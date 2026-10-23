@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"fridare-gui/internal/i18n"
 )
 
 // textFileExts are extensions considered for tree-wide text replace (source mods).
@@ -78,7 +80,7 @@ func RequireGUIProxyForAgent(cfg JobConfig) error {
 		return nil
 	}
 	if strings.TrimSpace(cfg.Proxy) == "" {
-		return fmt.Errorf("Host AI agent 已勾选「使用 GUI 代理出口」，请先在设置/工具栏配置上游代理")
+		return fmt.Errorf("%s", i18n.T("Host AI agent 已勾选「使用 GUI 代理出口」，请先在设置/工具栏配置上游代理"))
 	}
 	return nil
 }
@@ -360,9 +362,9 @@ func skipBroadModCandidate(relSlash string) bool {
 }
 
 // PlanMods implements AgentDriver.
-// 1) Build tree-aware concrete plan from DefaultModOps scan
-// 2) If UseExistingGrok (or explicit GrokBinary), invoke agent to refine plan file;
-//    parse is best-effort — tree plan remains the reliable base.
+//  1. Build tree-aware concrete plan from DefaultModOps scan
+//  2. If UseExistingGrok (or explicit GrokBinary), invoke agent to refine plan file;
+//     parse is best-effort — tree plan remains the reliable base.
 func (g *GrokAgent) PlanMods(ctx context.Context, cfg JobConfig, branch string) (*ModPlan, error) {
 	// sourceDir is not in signature; orchestrator plans before we know clone dest
 	// relative to work dir. Prefer empty scan → baseline, ApplyMods will re-scan.
@@ -509,9 +511,9 @@ func parseAgentOpsFile(path string, base *ModPlan) *ModPlan {
 }
 
 // ApplyMods implements AgentDriver.
-// - If UseExistingGrok / GrokBinary: invoke grok WITH EnvForAgent, then always
-//   applyPlanNaive as a reliable tree-wide apply of the plan (agent may have edited too).
-// - If user declined local grok and no explicit binary: tree-wide naive apply only.
+//   - If UseExistingGrok / GrokBinary: invoke grok WITH EnvForAgent, then always
+//     applyPlanNaive as a reliable tree-wide apply of the plan (agent may have edited too).
+//   - If user declined local grok and no explicit binary: tree-wide naive apply only.
 func (g *GrokAgent) ApplyMods(ctx context.Context, cfg JobConfig, plan *ModPlan, sourceDir string) error {
 	if plan == nil {
 		return fmt.Errorf("plan is nil")
@@ -570,12 +572,12 @@ func (g *GrokAgent) ApplyMods(ctx context.Context, cfg JobConfig, plan *ModPlan,
 
 	// Always run tree-wide naive apply so mods are guaranteed even if agent no-ops
 	if nerr := applyPlanNaive(sourceDir, plan); nerr != nil {
-		return fmt.Errorf("应用魔改失败: %w", nerr)
+		return fmt.Errorf(i18n.T("应用魔改失败: %w"), nerr)
 	}
 	// After content replace, rename asset basenames meson references by path
 	// (e.g. frida-agent-android.version → {magic}-agent-android.version).
 	if n, rerr := RenameMagicAssetFiles(sourceDir, cfg.MagicName); rerr != nil {
-		return fmt.Errorf("重命名魔改资源文件失败: %w", rerr)
+		return fmt.Errorf(i18n.T("重命名魔改资源文件失败: %w"), rerr)
 	} else if n > 0 && g.PromptDir != "" {
 		_ = os.WriteFile(filepath.Join(g.PromptDir, "renamed-assets.txt"),
 			[]byte(fmt.Sprintf("renamed %d asset files for magic=%s\n", n, cfg.MagicName)), 0644)
@@ -833,7 +835,7 @@ func matchGlob(pattern, name string) bool {
 			}
 		}
 		if right != "" {
-			// right may still have * 
+			// right may still have *
 			if strings.ContainsAny(right, "*?[") {
 				// match against basename or full remaining
 				if ok, _ := filepath.Match(right, filepath.Base(name)); ok {

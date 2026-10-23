@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"fridare-gui/internal/i18n"
 )
 
 // ExecutableFormat represents the type of executable file
@@ -47,7 +49,7 @@ func (hr *HexReplacer) PatchFile(inputFilePath, fridaNewName, outputFilePath str
 	}
 
 	if progressCallback != nil {
-		progressCallback(0.1, "正在复制文件...")
+		progressCallback(0.1, i18n.T("正在复制文件..."))
 	}
 
 	// Copy input file to output file
@@ -56,7 +58,7 @@ func (hr *HexReplacer) PatchFile(inputFilePath, fridaNewName, outputFilePath str
 	}
 
 	if progressCallback != nil {
-		progressCallback(0.3, "正在检测文件格式...")
+		progressCallback(0.3, i18n.T("正在检测文件格式..."))
 	}
 
 	// Detect and open file
@@ -66,29 +68,29 @@ func (hr *HexReplacer) PatchFile(inputFilePath, fridaNewName, outputFilePath str
 	}
 
 	if progressCallback != nil {
-		progressCallback(0.5, fmt.Sprintf("正在处理 %s 格式文件...", formatToString(format)))
+		progressCallback(0.5, fmt.Sprintf(i18n.T("正在处理 %s 格式文件..."), formatToString(format)))
 	}
 
 	// Process based on file format
 	switch f := file.(type) {
 	case *macho.File:
 		if progressCallback != nil {
-			progressCallback(0.7, "正在修改 MachO 单架构文件...")
+			progressCallback(0.7, i18n.T("正在修改 MachO 单架构文件..."))
 		}
 		return hr.handleSingleArchitecture(f, outputFilePath, fridaNewName, format)
 	case *macho.FatFile:
 		if progressCallback != nil {
-			progressCallback(0.7, "正在修改 MachO 多架构文件...")
+			progressCallback(0.7, i18n.T("正在修改 MachO 多架构文件..."))
 		}
 		return hr.handleMultipleArchitectures(f, outputFilePath, fridaNewName, format)
 	case *elf.File:
 		if progressCallback != nil {
-			progressCallback(0.7, "正在修改 ELF 文件...")
+			progressCallback(0.7, i18n.T("正在修改 ELF 文件..."))
 		}
 		return hr.handleELFFile(f, outputFilePath, fridaNewName, format)
 	case *pe.File:
 		if progressCallback != nil {
-			progressCallback(0.7, "正在修改 PE 文件...")
+			progressCallback(0.7, i18n.T("正在修改 PE 文件..."))
 		}
 		return hr.handlePEFile(f, outputFilePath, fridaNewName, format)
 	default:

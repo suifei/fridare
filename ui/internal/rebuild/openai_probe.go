@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"fridare-gui/internal/i18n"
 )
 
 // OpenAIProbeOptions drives a real HTTP connectivity check against an
@@ -57,10 +59,10 @@ func ProbeOpenAIEndpoint(ctx context.Context, opts OpenAIProbeOptions) OpenAIPro
 	base := NormalizeOpenAIBaseURL(opts.BaseURL)
 	key := strings.TrimSpace(opts.APIKey)
 	if base == "" {
-		return OpenAIProbeResult{OK: false, Detail: "OpenAI base URL 为空"}
+		return OpenAIProbeResult{OK: false, Detail: i18n.T("OpenAI base URL 为空")}
 	}
 	if key == "" {
-		return OpenAIProbeResult{OK: false, Endpoint: base, Detail: "API Key 为空"}
+		return OpenAIProbeResult{OK: false, Endpoint: base, Detail: i18n.T("API Key 为空")}
 	}
 	timeout := opts.Timeout
 	if timeout <= 0 {
@@ -82,7 +84,7 @@ func ProbeOpenAIEndpoint(ctx context.Context, opts OpenAIProbeOptions) OpenAIPro
 			if err != nil {
 				return OpenAIProbeResult{
 					OK: false, Endpoint: base, UsedProxy: true, ProxyURL: p,
-					Detail: "代理 URL 无效: " + err.Error(),
+					Detail: i18n.T("代理 URL 无效: ") + err.Error(),
 				}
 			}
 			transport.Proxy = http.ProxyURL(u)
@@ -91,7 +93,7 @@ func ProbeOpenAIEndpoint(ctx context.Context, opts OpenAIProbeOptions) OpenAIPro
 		} else {
 			return OpenAIProbeResult{
 				OK: false, Endpoint: base, UsedProxy: true,
-				Detail: "已启用「端点走 GUI 代理」但代理地址为空",
+				Detail: i18n.T("已启用「端点走 GUI 代理」但代理地址为空"),
 			}
 		}
 	} else {
@@ -105,7 +107,7 @@ func ProbeOpenAIEndpoint(ctx context.Context, opts OpenAIProbeOptions) OpenAIPro
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, modelsURL, nil)
 	if err != nil {
 		return OpenAIProbeResult{OK: false, Endpoint: modelsURL, UsedProxy: usedProxy, ProxyURL: proxyURL,
-			Detail: "构造请求失败: " + err.Error(), DurationMs: time.Since(start).Milliseconds()}
+			Detail: i18n.T("构造请求失败: ") + err.Error(), DurationMs: time.Since(start).Milliseconds()}
 	}
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("User-Agent", "fridare-openai-probe/1.0")
@@ -114,7 +116,7 @@ func ProbeOpenAIEndpoint(ctx context.Context, opts OpenAIProbeOptions) OpenAIPro
 	if err != nil {
 		return OpenAIProbeResult{
 			OK: false, Endpoint: modelsURL, Method: "GET", UsedProxy: usedProxy, ProxyURL: proxyURL,
-			Detail: RedactSecret("HTTP 失败: "+err.Error(), key), DurationMs: time.Since(start).Milliseconds(),
+			Detail: RedactSecret(i18n.T("HTTP 失败: ")+err.Error(), key), DurationMs: time.Since(start).Milliseconds(),
 		}
 	}
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
@@ -126,7 +128,7 @@ func ProbeOpenAIEndpoint(ctx context.Context, opts OpenAIProbeOptions) OpenAIPro
 		return OpenAIProbeResult{
 			OK: true, StatusCode: resp.StatusCode, Endpoint: modelsURL, Method: "GET",
 			UsedProxy: usedProxy, ProxyURL: proxyURL, DurationMs: elapsed,
-			Detail: fmt.Sprintf("GET /models 成功 HTTP %d body≈%s", resp.StatusCode, snippet),
+			Detail: fmt.Sprintf(i18n.T("GET /models 成功 HTTP %d body≈%s"), resp.StatusCode, snippet),
 		}
 	}
 
@@ -165,7 +167,7 @@ func tryChatProbe(ctx context.Context, client *http.Client, base, key, model str
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, chatURL, bytes.NewReader(raw))
 	if err != nil {
 		return OpenAIProbeResult{OK: false, Endpoint: chatURL, Method: "POST", UsedProxy: usedProxy, ProxyURL: proxyURL,
-			Detail: "构造 chat 请求失败: " + err.Error(), DurationMs: time.Since(start).Milliseconds()}
+			Detail: i18n.T("构造 chat 请求失败: ") + err.Error(), DurationMs: time.Since(start).Milliseconds()}
 	}
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
@@ -174,7 +176,7 @@ func tryChatProbe(ctx context.Context, client *http.Client, base, key, model str
 	if err != nil {
 		return OpenAIProbeResult{
 			OK: false, Endpoint: chatURL, Method: "POST", UsedProxy: usedProxy, ProxyURL: proxyURL,
-			Detail: RedactSecret("chat HTTP 失败: "+err.Error(), key), DurationMs: time.Since(start).Milliseconds(),
+			Detail: RedactSecret(i18n.T("chat HTTP 失败: ")+err.Error(), key), DurationMs: time.Since(start).Milliseconds(),
 		}
 	}
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))

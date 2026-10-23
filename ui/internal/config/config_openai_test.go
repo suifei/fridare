@@ -138,6 +138,20 @@ func TestApplyMissingFieldDefaults_AgentProxyOff(t *testing.T) {
 	}
 }
 
+func TestDefaultConfig_LanguageIsChinese(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.Language != "zh" {
+		t.Fatalf("language %q", cfg.Language)
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"language":"zh"`) && !strings.Contains(string(data), `"language": "zh"`) {
+		t.Fatalf("config json missing language: %s", data)
+	}
+}
+
 func TestConfig_WriteTempFileRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")

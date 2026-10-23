@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"fridare-gui/internal/i18n"
 )
 
 // Config 应用程序配置结构
@@ -24,7 +26,8 @@ type Config struct {
 	AutoConfirm bool   `json:"auto_confirm"`
 
 	// UI 配置
-	Theme        string `json:"theme"` // "light", "dark", "auto"
+	Theme        string `json:"theme"`    // "light", "dark", "auto"
+	Language     string `json:"language"` // "zh" (default) or "en"
 	WindowWidth  int    `json:"window_width"`
 	WindowHeight int    `json:"window_height"`
 	DebugMode    bool   `json:"debug_mode"`
@@ -44,8 +47,8 @@ type Config struct {
 	OpenAIModel   string `json:"openai_model"`
 
 	// 源码重编译（可选；不启用则不影响默认静态补丁路径）
-	RebuildMinDiskGB    float64 `json:"rebuild_min_disk_gb"`
-	RebuildDockerImage  string  `json:"rebuild_docker_image"`
+	RebuildMinDiskGB   float64 `json:"rebuild_min_disk_gb"`
+	RebuildDockerImage string  `json:"rebuild_docker_image"`
 	// Docker Hub 镜像前缀，如 docker.1ms.run → library/ubuntu:22.04 变为 docker.1ms.run/library/ubuntu:22.04
 	RebuildDockerMirror string `json:"rebuild_docker_mirror"`
 	// 拉取/构建基础镜像时直连（不走 GUI 代理）；docker.1ms.run 必须为 true
@@ -56,10 +59,10 @@ type Config struct {
 	// 用户确认已知悉源码路径需要代理/磁盘（非系统强制）
 	RebuildAcknowledged bool `json:"rebuild_acknowledged"`
 	// Stealth 与源码流水线对等（缺省字段按 ApplyMissingFieldDefaults）
-	RebuildStripSymbols    bool `json:"rebuild_strip_symbols"`
-	RebuildSeededJunk      bool `json:"rebuild_seeded_junk"`
-	RebuildStealthMarkers  bool `json:"rebuild_stealth_markers"`
-	RebuildRandomAgent     bool `json:"rebuild_random_agent"`
+	RebuildStripSymbols   bool `json:"rebuild_strip_symbols"`
+	RebuildSeededJunk     bool `json:"rebuild_seeded_junk"`
+	RebuildStealthMarkers bool `json:"rebuild_stealth_markers"`
+	RebuildRandomAgent    bool `json:"rebuild_random_agent"`
 	// 静态「frida 魔改」导出后去符号
 	PatchStripSymbols bool `json:"patch_strip_symbols"`
 }
@@ -81,6 +84,7 @@ func DefaultConfig() *Config {
 		AutoConfirm: false,
 
 		Theme:        "auto",
+		Language:     i18n.LangZh,
 		WindowWidth:  1200,
 		WindowHeight: 800,
 		DebugMode:    false,
@@ -131,7 +135,7 @@ func ConfigPath() (string, error) {
 func LoadConfig() (*Config, error) {
 	configPath, err := ConfigPath()
 	if err != nil {
-		return nil, fmt.Errorf("获取配置路径失败: %w", err)
+		return nil, fmt.Errorf(i18n.T("获取配置路径失败: %w"), err)
 	}
 
 	// 如果配置文件不存在，返回默认配置
@@ -140,19 +144,19 @@ func LoadConfig() (*Config, error) {
 		// 尝试保存默认配置
 		if saveErr := cfg.Save(); saveErr != nil {
 			// 保存失败但不影响使用默认配置
-			fmt.Printf("保存默认配置失败: %v\n", saveErr)
+			fmt.Printf(i18n.T("保存默认配置失败: %v\n"), saveErr)
 		}
 		return cfg, nil
 	}
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("读取配置文件失败: %w", err)
+		return nil, fmt.Errorf(i18n.T("读取配置文件失败: %w"), err)
 	}
 
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("解析配置文件失败: %w", err)
+		return nil, fmt.Errorf(i18n.T("解析配置文件失败: %w"), err)
 	}
 
 	// 旧配置缺省字段迁移
@@ -203,16 +207,16 @@ func ApplyMissingFieldDefaults(cfg *Config, raw map[string]json.RawMessage) {
 func (c *Config) Save() error {
 	configPath, err := ConfigPath()
 	if err != nil {
-		return fmt.Errorf("获取配置路径失败: %w", err)
+		return fmt.Errorf(i18n.T("获取配置路径失败: %w"), err)
 	}
 
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
-		return fmt.Errorf("序列化配置失败: %w", err)
+		return fmt.Errorf(i18n.T("序列化配置失败: %w"), err)
 	}
 
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("写入配置文件失败: %w", err)
+		return fmt.Errorf(i18n.T("写入配置文件失败: %w"), err)
 	}
 
 	return nil
@@ -241,6 +245,7 @@ func (c *Config) validate() {
 	if c.Theme == "" {
 		c.Theme = "auto"
 	}
+	c.Language = i18n.Normalize(c.Language)
 	if c.WorkDir == "" {
 		homeDir, _ := os.UserHomeDir()
 		c.WorkDir = filepath.Join(homeDir, ".fridare")
@@ -264,9 +269,9 @@ func (c *Config) validate() {
 // OpenAIRecommendedHelp returns the recommended endpoint guidance text for UI.
 // QQ group QR is shown as an image in Settings (assets.QQGroupQR), not as a URL.
 func OpenAIRecommendedHelp() string {
-	return "推荐站点：https://claudegpt.org/\n" +
-		"API 端点：https://claudegpt.org/v1\n" +
-		"体验额度：扫码加入 QQ 群 555354813 后，可申请一次性体验额度。"
+	return i18n.T("推荐站点：https://claudegpt.org/\n") +
+		i18n.T("API 端点：https://claudegpt.org/v1\n") +
+		i18n.T("体验额度：扫码加入 QQ 群 555354813 后，可申请一次性体验额度。")
 }
 
 // AddRecentVersion 添加最近使用的版本

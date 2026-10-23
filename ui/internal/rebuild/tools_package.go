@@ -5,12 +5,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"fridare-gui/internal/core"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"fridare-gui/internal/core"
+	"fridare-gui/internal/i18n"
 )
 
 // BuildPatchedFridaToolsWheels builds host client packages aligned with the Frida source tag:
@@ -35,7 +37,7 @@ func BuildPatchedFridaToolsWheels(cfg JobConfig, catalogRoot string, entryDirs [
 	}
 	version := strings.TrimSpace(cfg.FridaVersion)
 	if version == "" {
-		return nil, fmt.Errorf("Frida 版本为空，无法下载 host frida/frida-tools")
+		return nil, fmt.Errorf(i18n.T("Frida 版本为空，无法下载 host frida/frida-tools"))
 	}
 	// Catalog stays on the product label (17.17.1); pip needs the official tag.
 	pipVer := EffectivePipVersion(cfg)
@@ -395,7 +397,7 @@ func findPython() (string, error) {
 			return p, nil
 		}
 	}
-	return "", fmt.Errorf("未找到 python（需用于 pip download / wheel 打包 frida-tools）")
+	return "", fmt.Errorf(i18n.T("未找到 python（需用于 pip download / wheel 打包 frida-tools）"))
 }
 
 func runPython(runner Runner, py string, opts *runOpts, args ...string) error {
@@ -438,7 +440,7 @@ func extractArchive(arch, dest string) error {
 		}
 		return nil
 	default:
-		return fmt.Errorf("未知包格式: %s", filepath.Base(arch))
+		return fmt.Errorf(i18n.T("未知包格式: %s"), filepath.Base(arch))
 	}
 }
 
@@ -472,7 +474,7 @@ func findFridaToolsPackageRoot(srcDir string) (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("解压后未找到 frida_tools 包目录")
+	return "", fmt.Errorf(i18n.T("解压后未找到 frida_tools 包目录"))
 }
 
 // patchFridaToolsTree applies safe RPC renames under a frida-tools source/wheel extract.
@@ -545,7 +547,7 @@ func downloadFridaToolsForFrida(runner Runner, py string, env []string, dlDir, f
 		}
 	}
 	if len(toolsFiles) == 0 {
-		return "", "", fmt.Errorf("未下载到 frida-tools 包（目录: %s）", dlDir)
+		return "", "", fmt.Errorf(i18n.T("未下载到 frida-tools 包（目录: %s）"), dlDir)
 	}
 	// Prefer sdist .tar.gz for patching
 	archPath = toolsFiles[0]
@@ -1053,18 +1055,18 @@ func fridaToolsInstallNotes(cfg JobConfig, toolsWheels, hostFridaWheels []string
 		pipVer = strings.TrimSpace(cfg.FridaVersion)
 	}
 	if len(hostFridaWheels) == 0 {
-		hostList.WriteString("  (未下载到多平台 frida 原生 wheel)\n")
+		hostList.WriteString(i18n.T("  (未下载到多平台 frida 原生 wheel)\n"))
 	} else {
 		for _, w := range hostFridaWheels {
 			hostList.WriteString("  - " + hostWheelRelPath(w) + "\n")
 		}
 	}
 	product := strings.TrimSpace(cfg.FridaVersion)
-	verNote := "产品标签与 pip 的 frida 版本相同"
+	verNote := i18n.T("产品标签与 pip 的 frida 版本相同")
 	if product != pipVer {
-		verNote = "产品标签 " + product + " 不是 PyPI 版本；wheel 与 frida.__version__ 使用 " + pipVer
+		verNote = i18n.T("产品标签 ") + product + i18n.T(" 不是 PyPI 版本；wheel 与 frida.__version__ 使用 ") + pipVer
 	}
-	return fmt.Sprintf(`Fridare 魔改客户端 wheel（与源码 tag 对齐）
+	return fmt.Sprintf(i18n.T(`Fridare 魔改客户端 wheel（与源码 tag 对齐）
 ============================================================
 产品标签 / catalog 目录名: %s
 pip 的 frida 版本 (EffectivePipVersion): %s
@@ -1116,7 +1118,7 @@ B) frida 原生 wheel（路径相对本 INSTALL.txt 所在目录：python/ 或 h
 
 连接魔改 server:
   frida -H <device-ip> -p %d -f <package>
-`, product, pipVer, verNote, cfg.MagicName, cfg.ListenPort, pipVer,
+`), product, pipVer, verNote, cfg.MagicName, cfg.ListenPort, pipVer,
 		cfg.MagicName, cfg.MagicName, cfg.MagicName, strings.ToUpper(cfg.MagicName[:1])+cfg.MagicName[1:],
 		strings.Join(toolsNames, ", "), pipVer,
 		hostList.String(), whl, pipVer, cfg.ListenPort)

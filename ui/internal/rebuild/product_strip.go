@@ -8,14 +8,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"fridare-gui/internal/i18n"
 )
 
 // StripResult is the outcome of StripProductBinary.
 type StripResult struct {
-	BytesIn          int  `json:"bytes_in"`
-	BytesOut         int  `json:"bytes_out"`
-	ExportsRewritten int  `json:"exports_rewritten"`
-	DebugStripped    bool `json:"debug_stripped"`
+	BytesIn          int    `json:"bytes_in"`
+	BytesOut         int    `json:"bytes_out"`
+	ExportsRewritten int    `json:"exports_rewritten"`
+	DebugStripped    bool   `json:"debug_stripped"`
 	Format           string `json:"format"`
 }
 
@@ -38,7 +40,7 @@ func ShouldStripProductSymbols(cfg JobConfig) bool {
 
 // FormatStealthJobSummary is the one-line job/README note for GUI + catalog.
 func FormatStealthJobSummary(cfg JobConfig) string {
-	return fmt.Sprintf("stealth: strip=%v junk=%v markers=%v random_agent=%v（行为隐身≠免杀，不能保证杀软/加固效果）",
+	return fmt.Sprintf(i18n.T("stealth: strip=%v junk=%v markers=%v random_agent=%v（行为隐身≠免杀，不能保证杀软/加固效果）"),
 		ShouldStripProductSymbols(cfg), !cfg.DisableJunk, !cfg.DisableStealthMarkers, cfg.RandomAgentPrefix)
 }
 

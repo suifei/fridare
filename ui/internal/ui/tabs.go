@@ -4,11 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"fridare-gui/internal/assets"
-	"fridare-gui/internal/config"
-	"fridare-gui/internal/core"
-	"fridare-gui/internal/rebuild"
-	"fridare-gui/internal/utils"
 	"io"
 	"net/url"
 	"os"
@@ -19,6 +14,13 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"fridare-gui/internal/assets"
+	"fridare-gui/internal/config"
+	"fridare-gui/internal/core"
+	"fridare-gui/internal/i18n"
+	"fridare-gui/internal/rebuild"
+	"fridare-gui/internal/utils"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -74,7 +76,7 @@ func NewModifyTab(app fyne.App, cfg *config.Config, statusUpdater StatusUpdater,
 func (mt *ModifyTab) setupUI() {
 	// 输入文件选择区域
 	mt.filePathEntry = widget.NewEntry()
-	mt.filePathEntry.SetPlaceHolder("选择要修改的 Frida 二进制文件...")
+	mt.filePathEntry.SetPlaceHolder(i18n.T("选择要修改的 Frida 二进制文件..."))
 	mt.filePathEntry.OnChanged = func(path string) {
 		if path != "" {
 			mt.analyzeFile(path)
@@ -85,7 +87,7 @@ func (mt *ModifyTab) setupUI() {
 		mt.validateInput(mt.magicNameEntry.Text, mt.filePathEntry.Text)
 	}
 
-	browseInputBtn := widget.NewButton("浏览", func() {
+	browseInputBtn := widget.NewButton(i18n.T("浏览"), func() {
 		mt.selectInputFile()
 	})
 
@@ -95,7 +97,7 @@ func (mt *ModifyTab) setupUI() {
 
 	// 魔改选项
 	mt.magicNameEntry = widget.NewEntry()
-	mt.magicNameEntry.SetPlaceHolder("输入5个小写字母")
+	mt.magicNameEntry.SetPlaceHolder(i18n.T("输入5个小写字母"))
 	if mt.config.MagicName != "" && len(mt.config.MagicName) == 5 {
 		mt.magicNameEntry.SetText(mt.config.MagicName)
 	} else {
@@ -107,7 +109,7 @@ func (mt *ModifyTab) setupUI() {
 	}
 
 	// 随机生成按钮
-	randomBtn := widget.NewButton("随机", func() {
+	randomBtn := widget.NewButton(i18n.T("随机"), func() {
 		randomName := mt.generateRandomName()
 		mt.magicNameEntry.SetText(randomName)
 		mt.validateInput(randomName, mt.filePathEntry.Text)
@@ -117,7 +119,7 @@ func (mt *ModifyTab) setupUI() {
 		nil, nil, nil, randomBtn, mt.magicNameEntry,
 	)
 
-	mt.stripAfterChk = widget.NewCheck("导出后去符号（ELF/PE 的 frida_ / _frida_ → magic；不是免杀）", func(on bool) {
+	mt.stripAfterChk = widget.NewCheck(i18n.T("导出后去符号（ELF/PE 的 frida_ / _frida_ → magic；不是免杀）"), func(on bool) {
 		if mt.config != nil {
 			mt.config.PatchStripSymbols = on
 			_ = mt.config.Save()
@@ -130,10 +132,10 @@ func (mt *ModifyTab) setupUI() {
 	}
 
 	optionsForm := container.NewVBox(
-		widget.NewLabel("魔改名称 (必须5个小写字母):"),
+		widget.NewLabel(i18n.T("魔改名称 (必须5个小写字母):")),
 		magicNameArea,
 		mt.stripAfterChk,
-		widget.NewLabel("花指令 / SELinux / zymbiote 只有「源码重编译」能做；本页是静态 hex。"),
+		widget.NewLabel(i18n.T("花指令 / SELinux / zymbiote 只有「源码重编译」能做；本页是静态 hex。")),
 	)
 
 	// 文件信息显示区域
@@ -143,10 +145,10 @@ func (mt *ModifyTab) setupUI() {
 	fileInfoScroll := container.NewScroll(mt.fileInfoText)
 	fileInfoScroll.SetMinSize(fyne.NewSize(0, 200))
 
-	fileInfoCard := widget.NewCard("文件信息", "二进制文件格式和架构信息", fileInfoScroll)
+	fileInfoCard := widget.NewCard(i18n.T("文件信息"), i18n.T("二进制文件格式和架构信息"), fileInfoScroll)
 
 	// 修改按钮
-	mt.patchBtn = widget.NewButton("开始魔改", func() {
+	mt.patchBtn = widget.NewButton(i18n.T("开始魔改"), func() {
 		mt.startPatching()
 	})
 	mt.patchBtn.Importance = widget.HighImportance
@@ -162,7 +164,7 @@ func (mt *ModifyTab) setupUI() {
 	// 主布局
 	mainContent := container.NewVBox(
 		container.NewVBox(
-			widget.NewLabel("输入文件:"),
+			widget.NewLabel(i18n.T("输入文件:")),
 			fileSelectArea,
 		),
 		widget.NewSeparator(),
@@ -175,7 +177,7 @@ func (mt *ModifyTab) setupUI() {
 
 	// 使用水平分割布局
 	splitContainer := container.NewHSplit(
-		widget.NewCard("二进制魔改器", "修改 Frida 二进制文件的特征字符串", mainContent),
+		widget.NewCard(i18n.T("二进制魔改器"), i18n.T("修改 Frida 二进制文件的特征字符串"), mainContent),
 		fileInfoCard,
 	)
 	splitContainer.Offset = 0.6 // 左侧占60%
@@ -207,24 +209,24 @@ func (mt *ModifyTab) selectInputFile() {
 func (mt *ModifyTab) analyzeFile(filePath string) {
 	go func() {
 		fyne.Do(func() {
-			mt.updateStatus("正在分析文件...")
+			mt.updateStatus(i18n.T("正在分析文件..."))
 		})
 
 		description, err := mt.hexReplacer.DescribeFile(filePath)
 		if err != nil {
 			errMsg := err.Error()
 			fyne.Do(func() {
-				mt.fileInfoText.ParseMarkdown(fmt.Sprintf("**错误:** %s", errMsg))
-				mt.updateStatus("文件分析失败: " + errMsg)
+				mt.fileInfoText.ParseMarkdown(fmt.Sprintf(i18n.T("**错误:** %s"), errMsg))
+				mt.updateStatus(i18n.T("文件分析失败: ") + errMsg)
 			})
 			return
 		}
 
 		// 格式化显示信息
-		markdown := fmt.Sprintf("**文件路径:** %s\n\n**文件信息:**\n```\n%s\n```", filePath, description)
+		markdown := fmt.Sprintf(i18n.T("**文件路径:** %s\n\n**文件信息:**\n```\n%s\n```"), filePath, description)
 		fyne.Do(func() {
 			mt.fileInfoText.ParseMarkdown(markdown)
-			mt.updateStatus("文件分析完成")
+			mt.updateStatus(i18n.T("文件分析完成"))
 		})
 	}()
 }
@@ -272,7 +274,7 @@ func (mt *ModifyTab) startPatching() {
 	mt.progressBar.Show()
 	mt.progressLabel.Show()
 	mt.progressBar.SetValue(0)
-	mt.progressLabel.SetText("正在初始化...")
+	mt.progressLabel.SetText(i18n.T("正在初始化..."))
 	mt.patchBtn.Disable()
 
 	go func() {
@@ -285,11 +287,11 @@ func (mt *ModifyTab) startPatching() {
 		}()
 
 		fyne.Do(func() {
-			mt.updateStatus("开始魔改二进制文件...")
-			mt.addLog("INFO: 开始魔改二进制文件")
-			mt.addLog(fmt.Sprintf("INFO: 输入文件: %s", inputPath))
-			mt.addLog(fmt.Sprintf("INFO: 输出文件: %s", outputPath))
-			mt.addLog(fmt.Sprintf("INFO: 魔改名称: %s", magicName))
+			mt.updateStatus(i18n.T("开始魔改二进制文件..."))
+			mt.addLog(i18n.T("INFO: 开始魔改二进制文件"))
+			mt.addLog(fmt.Sprintf(i18n.T("INFO: 输入文件: %s"), inputPath))
+			mt.addLog(fmt.Sprintf(i18n.T("INFO: 输出文件: %s"), outputPath))
+			mt.addLog(fmt.Sprintf(i18n.T("INFO: 魔改名称: %s"), magicName))
 		})
 
 		// 进度回调必须在 UI 线程更新控件
@@ -310,26 +312,26 @@ func (mt *ModifyTab) startPatching() {
 				err = fmt.Errorf("Android helper: %w", perr)
 			} else if changed {
 				fyne.Do(func() {
-					mt.addLog("INFO: 已套用协议面 + Android helper dex/hash（backend_class != null）")
+					mt.addLog(i18n.T("INFO: 已套用协议面 + Android helper dex/hash（backend_class != null）"))
 				})
 			}
 		}
 		if err == nil && mt.stripAfterChk != nil && mt.stripAfterChk.Checked {
 			if res, serr := rebuild.StripProductBinary(outputPath, magicName); serr != nil {
-				err = fmt.Errorf("去符号: %w", serr)
+				err = fmt.Errorf(i18n.T("去符号: %w"), serr)
 			} else {
 				fyne.Do(func() {
-					mt.addLog(fmt.Sprintf("INFO: 去符号 format=%s exports=%d debug=%v", res.Format, res.ExportsRewritten, res.DebugStripped))
+					mt.addLog(fmt.Sprintf(i18n.T("INFO: 去符号 format=%s exports=%d debug=%v"), res.Format, res.ExportsRewritten, res.DebugStripped))
 				})
 			}
 		}
 		if err != nil {
-			errorMsg := "魔改失败: " + err.Error()
+			errorMsg := i18n.T("魔改失败: ") + err.Error()
 			fyne.Do(func() {
 				mt.updateStatus(errorMsg)
-				mt.progressLabel.SetText("魔改失败!")
+				mt.progressLabel.SetText(i18n.T("魔改失败!"))
 				mt.addLog("ERROR: " + errorMsg)
-				dialog.ShowError(fmt.Errorf("魔改失败: %v", err), fyne.CurrentApp().Driver().AllWindows()[0])
+				dialog.ShowError(fmt.Errorf(i18n.T("魔改失败: %v"), err), fyne.CurrentApp().Driver().AllWindows()[0])
 			})
 			return
 		}
@@ -337,19 +339,19 @@ func (mt *ModifyTab) startPatching() {
 		mt.config.MagicName = magicName
 		_ = mt.config.Save()
 
-		successMsg := fmt.Sprintf("魔改完成! 输出文件: %s", outputPath)
+		successMsg := fmt.Sprintf(i18n.T("魔改完成! 输出文件: %s"), outputPath)
 		inputBaseName := filepath.Base(inputPath)
 		outputBaseName := filepath.Base(outputPath)
-		contentText := fmt.Sprintf("魔改完成!\n\n输入文件: %s\n输出文件: %s\n魔改名称: %s\n\n文件已保存到与输入文件相同的目录",
+		contentText := fmt.Sprintf(i18n.T("魔改完成!\n\n输入文件: %s\n输出文件: %s\n魔改名称: %s\n\n文件已保存到与输入文件相同的目录"),
 			inputBaseName, outputBaseName, magicName)
 
 		fyne.Do(func() {
 			mt.progressBar.SetValue(1.0)
-			mt.progressLabel.SetText("魔改完成!")
+			mt.progressLabel.SetText(i18n.T("魔改完成!"))
 			mt.updateStatus(successMsg)
 			mt.addLog("SUCCESS: " + successMsg)
-			mt.addLog("INFO: 配置已保存")
-			dialog.ShowInformation("魔改完成", contentText, fyne.CurrentApp().Driver().AllWindows()[0])
+			mt.addLog(i18n.T("INFO: 配置已保存"))
+			dialog.ShowInformation(i18n.T("魔改完成"), contentText, fyne.CurrentApp().Driver().AllWindows()[0])
 		})
 	}()
 }
@@ -406,42 +408,42 @@ func NewPackageTab(app fyne.App, cfg *config.Config, statusUpdater StatusUpdater
 func (pt *PackageTab) setupUI() {
 	// 直接设置为修改现有DEB包模式，不需要模式选择
 	pt.debFileEntry = widget.NewEntry()
-	pt.debFileEntry.SetPlaceHolder("选择要修改的 DEB 包文件...")
+	pt.debFileEntry.SetPlaceHolder(i18n.T("选择要修改的 DEB 包文件..."))
 	pt.debFileEntry.OnChanged = func(path string) {
 		pt.validateInput()
 	}
 
 	// 设置DEB文件选择区域
-	browseDebBtn := widget.NewButton("浏览", func() {
+	browseDebBtn := widget.NewButton(i18n.T("浏览"), func() {
 		pt.selectDebFile()
 	})
 
 	debFileArea := container.NewBorder(
-		nil, nil, widget.NewLabel("DEB文件:"), browseDebBtn, pt.debFileEntry,
+		nil, nil, widget.NewLabel(i18n.T("DEB文件:")), browseDebBtn, pt.debFileEntry,
 	)
 
 	// 包信息显示区域
 	infoText := widget.NewRichText()
-	infoText.ParseMarkdown("**DEB包修改器**\n\n" +
-		"• 选择现有的Frida DEB包文件\n" +
-		"• 自动读取包元数据\n" +
-		"• 使用指定的魔改名称和端口进行修改\n" +
-		"• 生成修改后的DEB包\n\n" +
-		"**支持的修改：**\n" +
-		"• 修改Frida服务名称\n" +
-		"• 修改默认监听端口\n" +
-		"• 保持原包的所有其他设置")
+	infoText.ParseMarkdown(i18n.T("**DEB包修改器**\n\n") +
+		i18n.T("• 选择现有的Frida DEB包文件\n") +
+		i18n.T("• 自动读取包元数据\n") +
+		i18n.T("• 使用指定的魔改名称和端口进行修改\n") +
+		i18n.T("• 生成修改后的DEB包\n\n") +
+		i18n.T("**支持的修改：**\n") +
+		i18n.T("• 修改Frida服务名称\n") +
+		i18n.T("• 修改默认监听端口\n") +
+		i18n.T("• 保持原包的所有其他设置"))
 
-	packageInfoCard := widget.NewCard("操作说明", "", infoText)
+	packageInfoCard := widget.NewCard(i18n.T("操作说明"), "", infoText)
 
 	// 输出路径选择
 	pt.outputPathEntry = widget.NewEntry()
-	pt.outputPathEntry.SetPlaceHolder("DEB 包输出路径...")
+	pt.outputPathEntry.SetPlaceHolder(i18n.T("DEB 包输出路径..."))
 	pt.outputPathEntry.OnChanged = func(path string) {
 		pt.validateInput()
 	}
 
-	browseOutputBtn := widget.NewButton("浏览", func() {
+	browseOutputBtn := widget.NewButton(i18n.T("浏览"), func() {
 		pt.selectOutputPath()
 	})
 
@@ -456,7 +458,7 @@ func (pt *PackageTab) setupUI() {
 	} else {
 		pt.portEntry.SetText("27042")
 	}
-	pt.portEntry.SetPlaceHolder("Frida 服务器端口")
+	pt.portEntry.SetPlaceHolder(i18n.T("Frida 服务器端口"))
 
 	pt.magicNameEntry = widget.NewEntry()
 	if pt.config.MagicName != "" && len(pt.config.MagicName) == 5 {
@@ -464,7 +466,7 @@ func (pt *PackageTab) setupUI() {
 	} else {
 		pt.magicNameEntry.SetText("frida")
 	}
-	pt.magicNameEntry.SetPlaceHolder("魔改名称 (5个字符)")
+	pt.magicNameEntry.SetPlaceHolder(i18n.T("魔改名称 (5个字符)"))
 
 	// 验证输入
 	pt.magicNameEntry.OnChanged = func(text string) {
@@ -475,7 +477,7 @@ func (pt *PackageTab) setupUI() {
 	}
 
 	// 随机生成魔改名称按钮
-	randomMagicBtn := widget.NewButton("随机", func() {
+	randomMagicBtn := widget.NewButton(i18n.T("随机"), func() {
 		randomName := utils.GenerateRandomName()
 		pt.magicNameEntry.SetText(randomName)
 	})
@@ -491,7 +493,7 @@ func (pt *PackageTab) setupUI() {
 	pt.progressLabel.Hide()
 
 	// 操作按钮
-	pt.packageBtn = widget.NewButton("修改 DEB 包", func() {
+	pt.packageBtn = widget.NewButton(i18n.T("修改 DEB 包"), func() {
 		pt.startPackaging()
 	})
 	pt.packageBtn.Disable()
@@ -510,14 +512,14 @@ func (pt *PackageTab) setupUI() {
 		debFileArea,
 		widget.NewSeparator(),
 		container.NewBorder(
-			nil, nil, widget.NewLabel("输出路径:"), nil, outputArea,
+			nil, nil, widget.NewLabel(i18n.T("输出路径:")), nil, outputArea,
 		),
 		widget.NewSeparator(),
 		container.NewBorder(
-			nil, nil, widget.NewLabel("魔改名称:"), nil, magicNameArea,
+			nil, nil, widget.NewLabel(i18n.T("魔改名称:")), nil, magicNameArea,
 		),
 		container.NewBorder(
-			nil, nil, widget.NewLabel("服务端口:"), nil, pt.portEntry,
+			nil, nil, widget.NewLabel(i18n.T("服务端口:")), nil, pt.portEntry,
 		),
 		widget.NewSeparator(),
 		packageInfoCard,
@@ -637,8 +639,8 @@ func (pt *PackageTab) startPackaging() {
 	// 解析端口
 	port, err := strconv.Atoi(pt.portEntry.Text)
 	if err != nil {
-		pt.updateStatus("端口号无效")
-		pt.addLog("ERROR: 端口号无效: " + pt.portEntry.Text)
+		pt.updateStatus(i18n.T("端口号无效"))
+		pt.addLog(i18n.T("ERROR: 端口号无效: ") + pt.portEntry.Text)
 		return
 	}
 
@@ -648,7 +650,7 @@ func (pt *PackageTab) startPackaging() {
 	pt.progressBar.Show()
 	pt.progressLabel.Show()
 	pt.progressBar.SetValue(0)
-	pt.progressLabel.SetText("正在初始化...")
+	pt.progressLabel.SetText(i18n.T("正在初始化..."))
 	pt.packageBtn.Disable()
 
 	go func() {
@@ -666,12 +668,12 @@ func (pt *PackageTab) startPackaging() {
 func (pt *PackageTab) modifyExistingDebPackage(outputPath string, port int, magicName string, debFile string) {
 
 	fyne.Do(func() {
-		pt.updateStatus("开始修改DEB包...")
-		pt.addLog("INFO: 开始修改现有DEB包")
-		pt.addLog(fmt.Sprintf("INFO: 输入DEB文件: %s", debFile))
-		pt.addLog(fmt.Sprintf("INFO: 输出路径: %s", outputPath))
-		pt.addLog(fmt.Sprintf("INFO: 魔改名称: %s", magicName))
-		pt.addLog(fmt.Sprintf("INFO: 端口: %d", port))
+		pt.updateStatus(i18n.T("开始修改DEB包..."))
+		pt.addLog(i18n.T("INFO: 开始修改现有DEB包"))
+		pt.addLog(fmt.Sprintf(i18n.T("INFO: 输入DEB文件: %s"), debFile))
+		pt.addLog(fmt.Sprintf(i18n.T("INFO: 输出路径: %s"), outputPath))
+		pt.addLog(fmt.Sprintf(i18n.T("INFO: 魔改名称: %s"), magicName))
+		pt.addLog(fmt.Sprintf(i18n.T("INFO: 端口: %d"), port))
 	})
 
 	// 创建DEB修改器
@@ -690,12 +692,12 @@ func (pt *PackageTab) modifyExistingDebPackage(outputPath string, port int, magi
 	// 执行修改
 	err := debModifier.ModifyDebPackage(progressCallback)
 	if err != nil {
-		errorMsg := "DEB包修改失败: " + err.Error()
+		errorMsg := i18n.T("DEB包修改失败: ") + err.Error()
 		fyne.Do(func() {
 			pt.updateStatus(errorMsg)
-			pt.progressLabel.SetText("修改失败!")
+			pt.progressLabel.SetText(i18n.T("修改失败!"))
 			pt.addLog("ERROR: " + errorMsg)
-			dialog.ShowError(fmt.Errorf("DEB包修改失败: %v", err), fyne.CurrentApp().Driver().AllWindows()[0])
+			dialog.ShowError(fmt.Errorf(i18n.T("DEB包修改失败: %v"), err), fyne.CurrentApp().Driver().AllWindows()[0])
 		})
 		return
 	}
@@ -705,19 +707,19 @@ func (pt *PackageTab) modifyExistingDebPackage(outputPath string, port int, magi
 	pt.config.DefaultPort = port
 	_ = pt.config.Save()
 
-	successMsg := fmt.Sprintf("DEB包修改完成! 输出文件: %s", outputPath)
+	successMsg := fmt.Sprintf(i18n.T("DEB包修改完成! 输出文件: %s"), outputPath)
 	outputBaseName := filepath.Base(outputPath)
 	inputBaseName := filepath.Base(debFile)
-	contentText := fmt.Sprintf("DEB包修改完成!\n\n原始文件: %s\n输出文件: %s\n魔改名称: %s\n端口: %d\n\n修改后的文件已保存到指定位置",
+	contentText := fmt.Sprintf(i18n.T("DEB包修改完成!\n\n原始文件: %s\n输出文件: %s\n魔改名称: %s\n端口: %d\n\n修改后的文件已保存到指定位置"),
 		inputBaseName, outputBaseName, magicName, port)
 
 	fyne.Do(func() {
 		pt.progressBar.SetValue(1.0)
-		pt.progressLabel.SetText("DEB包修改完成!")
+		pt.progressLabel.SetText(i18n.T("DEB包修改完成!"))
 		pt.updateStatus(successMsg)
 		pt.addLog("SUCCESS: " + successMsg)
-		pt.addLog("INFO: 配置已保存")
-		dialog.ShowInformation("DEB包修改完成", contentText, fyne.CurrentApp().Driver().AllWindows()[0])
+		pt.addLog(i18n.T("INFO: 配置已保存"))
+		dialog.ShowInformation(i18n.T("DEB包修改完成"), contentText, fyne.CurrentApp().Driver().AllWindows()[0])
 	})
 }
 
@@ -792,21 +794,21 @@ func (tt *ToolsTab) SetLogFunction(addLog func(string)) {
 
 func (tt *ToolsTab) setupUI() {
 	// Python环境选择区域
-	tt.pythonEnvSelect = widget.NewSelect([]string{"点击刷新扫描Python环境..."}, func(selected string) {
+	tt.pythonEnvSelect = widget.NewSelect([]string{i18n.T("点击刷新扫描Python环境...")}, func(selected string) {
 		tt.onPythonEnvSelected(selected)
 	})
 	tt.pythonEnvSelect.Resize(fyne.NewSize(300, 0))
 
-	tt.refreshEnvBtn = widget.NewButton("刷新环境", func() {
+	tt.refreshEnvBtn = widget.NewButton(i18n.T("刷新环境"), func() {
 		tt.scanPythonEnvironments()
 	})
 
-	tt.envInfoLabel = widget.NewLabel("未选择Python环境")
+	tt.envInfoLabel = widget.NewLabel(i18n.T("未选择Python环境"))
 	tt.envInfoLabel.Wrapping = fyne.TextWrapWord
 
-	environmentArea := widget.NewCard("Python环境", "", container.NewVBox(
+	environmentArea := widget.NewCard(i18n.T("Python环境"), "", container.NewVBox(
 		container.NewHBox(
-			widget.NewLabel("选择Python环境:"),
+			widget.NewLabel(i18n.T("选择Python环境:")),
 			tt.pythonEnvSelect,
 			tt.refreshEnvBtn,
 		),
@@ -814,16 +816,16 @@ func (tt *ToolsTab) setupUI() {
 	))
 
 	// frida-tools信息区域
-	tt.fridaInfoLabel = widget.NewLabel("请先选择Python环境")
-	tt.fridaVersionLabel = widget.NewLabel("版本: 未知")
-	tt.fridaPathLabel = widget.NewLabel("路径: 未知")
-	tt.patchStatusLabel = widget.NewLabel("状态: 未检测")
+	tt.fridaInfoLabel = widget.NewLabel(i18n.T("请先选择Python环境"))
+	tt.fridaVersionLabel = widget.NewLabel(i18n.T("版本: 未知"))
+	tt.fridaPathLabel = widget.NewLabel(i18n.T("路径: 未知"))
+	tt.patchStatusLabel = widget.NewLabel(i18n.T("状态: 未检测"))
 
-	detectBtn := widget.NewButton("检测frida-tools", func() {
+	detectBtn := widget.NewButton(i18n.T("检测frida-tools"), func() {
 		tt.detectFridaTools()
 	})
 
-	fridaInfoArea := widget.NewCard("frida-tools信息", "", container.NewVBox(
+	fridaInfoArea := widget.NewCard(i18n.T("frida-tools信息"), "", container.NewVBox(
 		container.NewHBox(detectBtn, tt.fridaInfoLabel),
 		tt.fridaVersionLabel,
 		tt.fridaPathLabel,
@@ -831,7 +833,7 @@ func (tt *ToolsTab) setupUI() {
 	))
 
 	// 魔改配置区域（必须与 hexreplace 一致：恰好 5 个小写 a-z；禁止默认 6 字符 "fridare"）
-	tt.magicNameEntry = fixedWidthEntry(180, "5个小写字母 a-z")
+	tt.magicNameEntry = fixedWidthEntry(180, i18n.T("5个小写字母 a-z"))
 	if tt.config != nil && core.ValidateMagicName(tt.config.MagicName) == nil {
 		tt.magicNameEntry.SetText(tt.config.MagicName)
 	} else {
@@ -843,33 +845,33 @@ func (tt *ToolsTab) setupUI() {
 		return core.ValidateMagicName(strings.TrimSpace(text))
 	}
 
-	tt.portEntry = fixedWidthEntry(160, "端口")
+	tt.portEntry = fixedWidthEntry(160, i18n.T("端口"))
 	tt.portEntry.SetText("27042")
 	tt.portEntry.Validator = func(text string) error {
 		if port, err := strconv.Atoi(text); err != nil || port < 1 || port > 65535 {
-			return fmt.Errorf("端口必须在1-65535范围内")
+			return fmt.Errorf(i18n.T("端口必须在1-65535范围内"))
 		}
 		return nil
 	}
 
 	// 操作按钮区域
-	tt.patchBtn = widget.NewButton("执行魔改", func() {
+	tt.patchBtn = widget.NewButton(i18n.T("执行魔改"), func() {
 		tt.patchFridaTools()
 	})
 	tt.patchBtn.Importance = widget.HighImportance
 	tt.patchBtn.Disable()
 
-	tt.restoreBtn = widget.NewButton("恢复原版", func() {
+	tt.restoreBtn = widget.NewButton(i18n.T("恢复原版"), func() {
 		tt.restoreFridaTools()
 	})
 	tt.restoreBtn.Disable()
 
-	tt.backupBtn = widget.NewButton("手动备份", func() {
+	tt.backupBtn = widget.NewButton(i18n.T("手动备份"), func() {
 		tt.backupFridaTools()
 	})
 	tt.backupBtn.Disable()
 
-	tt.stripAfterChk = widget.NewCheck("原生库导出后去符号（_frida*.so/.pyd/.dll）", func(on bool) {
+	tt.stripAfterChk = widget.NewCheck(i18n.T("原生库导出后去符号（_frida*.so/.pyd/.dll）"), func(on bool) {
 		if tt.config != nil {
 			tt.config.PatchStripSymbols = on
 			_ = tt.config.Save()
@@ -881,10 +883,10 @@ func (tt *ToolsTab) setupUI() {
 		tt.stripAfterChk.SetChecked(true)
 	}
 
-	configArea := widget.NewCard("魔改配置", "", container.NewVBox(
+	configArea := widget.NewCard(i18n.T("魔改配置"), "", container.NewVBox(
 		container.NewHBox(
-			widget.NewLabel("魔改名称:"), tt.magicNameEntry,
-			widget.NewLabel("默认端口:"), tt.portEntry,
+			widget.NewLabel(i18n.T("魔改名称:")), tt.magicNameEntry,
+			widget.NewLabel(i18n.T("默认端口:")), tt.portEntry,
 			tt.patchBtn,
 			tt.restoreBtn,
 			tt.backupBtn),
@@ -917,8 +919,8 @@ func (tt *ToolsTab) setupUI() {
 
 // scanPythonEnvironments 扫描Python环境
 func (tt *ToolsTab) scanPythonEnvironments() {
-	tt.updateStatus("正在扫描Python环境...")
-	tt.addLog("INFO: 开始扫描Python环境")
+	tt.updateStatus(i18n.T("正在扫描Python环境..."))
+	tt.addLog(i18n.T("INFO: 开始扫描Python环境"))
 
 	var envs []PythonEnv
 
@@ -939,9 +941,9 @@ func (tt *ToolsTab) scanPythonEnvironments() {
 	// 更新UI
 	fyne.Do(func() {
 		if len(envs) == 0 {
-			tt.pythonEnvSelect.Options = []string{"未找到Python环境"}
-			tt.envInfoLabel.SetText("未找到可用的Python环境")
-			tt.updateStatus("未找到Python环境")
+			tt.pythonEnvSelect.Options = []string{i18n.T("未找到Python环境")}
+			tt.envInfoLabel.SetText(i18n.T("未找到可用的Python环境"))
+			tt.updateStatus(i18n.T("未找到Python环境"))
 		} else {
 			options := make([]string, len(envs))
 			for i, env := range envs {
@@ -949,8 +951,8 @@ func (tt *ToolsTab) scanPythonEnvironments() {
 			}
 			tt.pythonEnvSelect.Options = options
 			tt.pythonEnvSelect.Refresh()
-			tt.updateStatus(fmt.Sprintf("找到 %d 个Python环境", len(envs)))
-			tt.addLog(fmt.Sprintf("INFO: 找到 %d 个Python环境", len(envs)))
+			tt.updateStatus(fmt.Sprintf(i18n.T("找到 %d 个Python环境"), len(envs)))
+			tt.addLog(fmt.Sprintf(i18n.T("INFO: 找到 %d 个Python环境"), len(envs)))
 		}
 	})
 }
@@ -964,7 +966,7 @@ func (tt *ToolsTab) scanCondaEnvironments() []PythonEnv {
 	hideConsoleCmd(cmd)
 	output, err := cmd.Output()
 	if err != nil {
-		tt.addLog("INFO: 未找到conda环境")
+		tt.addLog(i18n.T("INFO: 未找到conda环境"))
 		return envs
 	}
 
@@ -974,7 +976,7 @@ func (tt *ToolsTab) scanCondaEnvironments() []PythonEnv {
 	}
 
 	if err := json.Unmarshal(output, &condaInfo); err != nil {
-		tt.addLog("ERROR: 解析conda环境信息失败: " + err.Error())
+		tt.addLog(i18n.T("ERROR: 解析conda环境信息失败: ") + err.Error())
 		return envs
 	}
 
@@ -1000,7 +1002,7 @@ func (tt *ToolsTab) scanCondaEnvironments() []PythonEnv {
 		versionCmd := exec.Command(pythonPath, "--version")
 		hideConsoleCmd(versionCmd)
 		versionOutput, err := versionCmd.Output()
-		version := "未知"
+		version := i18n.T("未知")
 		if err == nil {
 			version = strings.TrimSpace(string(versionOutput))
 		}
@@ -1012,7 +1014,7 @@ func (tt *ToolsTab) scanCondaEnvironments() []PythonEnv {
 			Type:    "conda",
 		}
 		envs = append(envs, env)
-		tt.addLog(fmt.Sprintf("INFO: 找到conda环境: %s (%s)", envName, version))
+		tt.addLog(fmt.Sprintf(i18n.T("INFO: 找到conda环境: %s (%s)"), envName, version))
 	}
 
 	return envs
@@ -1033,7 +1035,7 @@ func (tt *ToolsTab) scanSystemPython() *PythonEnv {
 		versionCmd := exec.Command(pythonPath, "--version")
 		hideConsoleCmd(versionCmd)
 		versionOutput, err := versionCmd.Output()
-		version := "未知"
+		version := i18n.T("未知")
 		if err == nil {
 			version = strings.TrimSpace(string(versionOutput))
 		}
@@ -1045,7 +1047,7 @@ func (tt *ToolsTab) scanSystemPython() *PythonEnv {
 			Type:    "system",
 		}
 
-		tt.addLog(fmt.Sprintf("INFO: 找到系统Python: %s", version))
+		tt.addLog(fmt.Sprintf(i18n.T("INFO: 找到系统Python: %s"), version))
 		return env
 	}
 
@@ -1054,7 +1056,7 @@ func (tt *ToolsTab) scanSystemPython() *PythonEnv {
 
 // onPythonEnvSelected Python环境选择回调
 func (tt *ToolsTab) onPythonEnvSelected(selected string) {
-	if selected == "" || selected == "未找到Python环境" {
+	if selected == "" || selected == i18n.T("未找到Python环境") {
 		return
 	}
 
@@ -1065,11 +1067,11 @@ func (tt *ToolsTab) onPythonEnvSelected(selected string) {
 			tt.currentEnv = &env
 
 			// 更新环境信息显示
-			tt.envInfoLabel.SetText(fmt.Sprintf("环境: %s\n版本: %s\n路径: %s",
+			tt.envInfoLabel.SetText(fmt.Sprintf(i18n.T("环境: %s\n版本: %s\n路径: %s"),
 				env.Name, env.Version, env.Path))
 
-			tt.updateStatus(fmt.Sprintf("已选择Python环境: %s", env.Name))
-			tt.addLog(fmt.Sprintf("INFO: 切换到Python环境: %s", env.Name))
+			tt.updateStatus(fmt.Sprintf(i18n.T("已选择Python环境: %s"), env.Name))
+			tt.addLog(fmt.Sprintf(i18n.T("INFO: 切换到Python环境: %s"), env.Name))
 
 			// 启用检测按钮
 			// 自动检测frida-tools
@@ -1082,21 +1084,21 @@ func (tt *ToolsTab) onPythonEnvSelected(selected string) {
 // detectFridaTools 检测frida-tools信息
 func (tt *ToolsTab) detectFridaTools() {
 	if tt.currentEnv == nil {
-		tt.updateStatus("请先选择Python环境")
+		tt.updateStatus(i18n.T("请先选择Python环境"))
 		return
 	}
 
 	fyne.Do(func() {
-		tt.fridaInfoLabel.SetText("未安装frida-tools")
-		tt.fridaVersionLabel.SetText("版本: 未安装")
-		tt.fridaPathLabel.SetText("路径: 无")
-		tt.patchStatusLabel.SetText("状态: 未安装")
+		tt.fridaInfoLabel.SetText(i18n.T("未安装frida-tools"))
+		tt.fridaVersionLabel.SetText(i18n.T("版本: 未安装"))
+		tt.fridaPathLabel.SetText(i18n.T("路径: 无"))
+		tt.patchStatusLabel.SetText(i18n.T("状态: 未安装"))
 		tt.patchBtn.Disable()
 		tt.restoreBtn.Disable()
 		tt.backupBtn.Disable()
 	})
-	tt.updateStatus("正在检测frida-tools...")
-	tt.addLog("INFO: 开始检测frida-tools")
+	tt.updateStatus(i18n.T("正在检测frida-tools..."))
+	tt.addLog(i18n.T("INFO: 开始检测frida-tools"))
 
 	// 使用选定的Python环境执行pip show frida
 	var cmd *exec.Cmd
@@ -1117,8 +1119,8 @@ func (tt *ToolsTab) detectFridaTools() {
 	output, err := cmd.Output()
 	if err != nil {
 		// pip show frida 查的是原生绑定（import frida），不是 PyPI 发行名 frida-tools。
-		tt.updateStatus("未检测到原生包 frida（import frida）。frida-tools 是另一个发行名，wheel 文件名是 frida_tools-*.whl")
-		tt.addLog("ERROR: pip show frida 失败（这不是 frida-tools）: " + err.Error())
+		tt.updateStatus(i18n.T("未检测到原生包 frida（import frida）。frida-tools 是另一个发行名，wheel 文件名是 frida_tools-*.whl"))
+		tt.addLog(i18n.T("ERROR: pip show frida 失败（这不是 frida-tools）: ") + err.Error())
 		return
 	}
 
@@ -1136,8 +1138,8 @@ func (tt *ToolsTab) detectFridaTools() {
 	}
 
 	if version == "" || location == "" {
-		tt.updateStatus("无法获取frida-tools信息")
-		tt.addLog("ERROR: 无法解析frida-tools信息")
+		tt.updateStatus(i18n.T("无法获取frida-tools信息"))
+		tt.addLog(i18n.T("ERROR: 无法解析frida-tools信息"))
 		return
 	}
 
@@ -1155,10 +1157,10 @@ func (tt *ToolsTab) detectFridaTools() {
 
 	// 更新UI
 	fyne.Do(func() {
-		tt.fridaInfoLabel.SetText("已检测到 frida 原生包（import frida，不是发行名 frida-tools）")
-		tt.fridaVersionLabel.SetText("版本: " + version)
-		tt.fridaPathLabel.SetText("路径: " + fridaPath)
-		tt.patchStatusLabel.SetText("状态: " + patchStatus)
+		tt.fridaInfoLabel.SetText(i18n.T("已检测到 frida 原生包（import frida，不是发行名 frida-tools）"))
+		tt.fridaVersionLabel.SetText(i18n.T("版本: ") + version)
+		tt.fridaPathLabel.SetText(i18n.T("路径: ") + fridaPath)
+		tt.patchStatusLabel.SetText(i18n.T("状态: ") + patchStatus)
 
 		// 根据状态启用/禁用按钮
 		if patchStatus == "original" {
@@ -1176,8 +1178,8 @@ func (tt *ToolsTab) detectFridaTools() {
 		}
 	})
 
-	tt.updateStatus("frida 原生包检测完成")
-	tt.addLog(fmt.Sprintf("INFO: 原生包 frida v%s（import frida）。PyPI 发行名 frida-tools 的 wheel/import 是 frida_tools。状态: %s", version, patchStatus))
+	tt.updateStatus(i18n.T("frida 原生包检测完成"))
+	tt.addLog(fmt.Sprintf(i18n.T("INFO: 原生包 frida v%s（import frida）。PyPI 发行名 frida-tools 的 wheel/import 是 frida_tools。状态: %s"), version, patchStatus))
 }
 
 // checkPatchStatus 检查patch状态
@@ -1209,7 +1211,7 @@ func (tt *ToolsTab) checkPatchStatus(fridaPath string) string {
 // patchFridaTools 执行frida-tools魔改
 func (tt *ToolsTab) patchFridaTools() {
 	if tt.currentEnv == nil || tt.fridaInfo == nil {
-		tt.updateStatus("请先选择Python环境并检测frida-tools")
+		tt.updateStatus(i18n.T("请先选择Python环境并检测frida-tools"))
 		return
 	}
 
@@ -1218,22 +1220,22 @@ func (tt *ToolsTab) patchFridaTools() {
 
 	// 验证输入
 	if err := tt.magicNameEntry.Validator(magicName); err != nil {
-		tt.updateStatus("魔改名称错误: " + err.Error())
+		tt.updateStatus(i18n.T("魔改名称错误: ") + err.Error())
 		return
 	}
 	if err := tt.portEntry.Validator(port); err != nil {
-		tt.updateStatus("端口错误: " + err.Error())
+		tt.updateStatus(i18n.T("端口错误: ") + err.Error())
 		return
 	}
 
-	tt.updateStatus("开始执行frida-tools魔改...")
-	tt.addLog(fmt.Sprintf("INFO: 开始魔改frida-tools，魔改名称: %s, 端口: %s", magicName, port))
+	tt.updateStatus(i18n.T("开始执行frida-tools魔改..."))
+	tt.addLog(fmt.Sprintf(i18n.T("INFO: 开始魔改frida-tools，魔改名称: %s, 端口: %s"), magicName, port))
 
 	// 显示进度
 	fyne.Do(func() {
 		tt.progressBar.Show()
 		tt.progressLabel.Show()
-		tt.progressLabel.SetText("正在创建备份...")
+		tt.progressLabel.SetText(i18n.T("正在创建备份..."))
 		tt.progressBar.SetValue(0.1)
 		tt.patchBtn.Disable()
 	})
@@ -1246,13 +1248,13 @@ func (tt *ToolsTab) patchFridaTools() {
 				tt.progressLabel.Hide()
 				tt.patchBtn.Enable()
 			})
-			tt.updateStatus("创建备份失败: " + err.Error())
-			tt.addLog("ERROR: 创建备份失败: " + err.Error())
+			tt.updateStatus(i18n.T("创建备份失败: ") + err.Error())
+			tt.addLog(i18n.T("ERROR: 创建备份失败: ") + err.Error())
 			return
 		}
 
 		fyne.Do(func() {
-			tt.progressLabel.SetText("正在执行魔改...")
+			tt.progressLabel.SetText(i18n.T("正在执行魔改..."))
 			tt.progressBar.SetValue(0.5)
 		})
 
@@ -1263,13 +1265,13 @@ func (tt *ToolsTab) patchFridaTools() {
 				tt.progressLabel.Hide()
 				tt.patchBtn.Enable()
 			})
-			tt.updateStatus("魔改失败: " + err.Error())
-			tt.addLog("ERROR: 魔改失败: " + err.Error())
+			tt.updateStatus(i18n.T("魔改失败: ") + err.Error())
+			tt.addLog(i18n.T("ERROR: 魔改失败: ") + err.Error())
 			return
 		}
 
 		fyne.Do(func() {
-			tt.progressLabel.SetText("魔改完成!")
+			tt.progressLabel.SetText(i18n.T("魔改完成!"))
 			tt.progressBar.SetValue(1.0)
 
 			// 延迟隐藏进度条
@@ -1286,11 +1288,11 @@ func (tt *ToolsTab) patchFridaTools() {
 			tt.backupBtn.Disable()
 
 			// 更新状态显示
-			tt.patchStatusLabel.SetText("状态: patched")
+			tt.patchStatusLabel.SetText(i18n.T("状态: patched"))
 		})
 
-		tt.updateStatus("frida-tools魔改完成!")
-		tt.addLog("SUCCESS: frida-tools魔改完成")
+		tt.updateStatus(i18n.T("frida-tools魔改完成!"))
+		tt.addLog(i18n.T("SUCCESS: frida-tools魔改完成"))
 	}()
 }
 
@@ -1300,13 +1302,13 @@ func (tt *ToolsTab) createBackup() error {
 
 	// 如果备份已存在，跳过
 	if _, err := os.Stat(backupPath); err == nil {
-		tt.addLog("INFO: 备份已存在，跳过创建备份")
+		tt.addLog(i18n.T("INFO: 备份已存在，跳过创建备份"))
 		return nil
 	}
 
 	// 创建备份目录
 	if err := os.MkdirAll(backupPath, 0755); err != nil {
-		return fmt.Errorf("创建备份目录失败: %v", err)
+		return fmt.Errorf(i18n.T("创建备份目录失败: %v"), err)
 	}
 
 	// 复制关键 Python 文件（不备份 __init__.py：我们不再修改它）
@@ -1320,9 +1322,9 @@ func (tt *ToolsTab) createBackup() error {
 
 		if _, err := os.Stat(srcPath); err == nil {
 			if err := tt.copyFile(srcPath, dstPath); err != nil {
-				return fmt.Errorf("备份文件 %s 失败: %v", file, err)
+				return fmt.Errorf(i18n.T("备份文件 %s 失败: %v"), file, err)
 			}
-			tt.addLog(fmt.Sprintf("INFO: 已备份文件: %s", file))
+			tt.addLog(fmt.Sprintf(i18n.T("INFO: 已备份文件: %s"), file))
 		}
 	}
 
@@ -1332,14 +1334,14 @@ func (tt *ToolsTab) createBackup() error {
 		for _, soFile := range soFiles {
 			dstPath := filepath.Join(backupPath, filepath.Base(soFile))
 			if err := tt.copyFile(soFile, dstPath); err != nil {
-				tt.addLog(fmt.Sprintf("WARN: 备份原生库失败 %s: %v", soFile, err))
+				tt.addLog(fmt.Sprintf(i18n.T("WARN: 备份原生库失败 %s: %v"), soFile, err))
 				continue
 			}
-			tt.addLog(fmt.Sprintf("INFO: 已备份原生库: %s", soFile))
+			tt.addLog(fmt.Sprintf(i18n.T("INFO: 已备份原生库: %s"), soFile))
 		}
 	}
 
-	tt.addLog("INFO: 备份创建完成")
+	tt.addLog(i18n.T("INFO: 备份创建完成"))
 	return nil
 }
 
@@ -1369,12 +1371,12 @@ func (tt *ToolsTab) performPatch(magicName, port string) error {
 
 	// 1. Python代码字符串魔改
 	if err := tt.patchPythonFiles(magicName, port); err != nil {
-		return fmt.Errorf("Python文件魔改失败: %v", err)
+		return fmt.Errorf(i18n.T("Python文件魔改失败: %v"), err)
 	}
 
 	// 2. SO文件二进制魔改
 	if err := tt.patchSOFiles(magicName, port); err != nil {
-		return fmt.Errorf("SO文件魔改失败: %v", err)
+		return fmt.Errorf(i18n.T("SO文件魔改失败: %v"), err)
 	}
 
 	return nil
@@ -1414,18 +1416,18 @@ func (tt *ToolsTab) patchPythonFiles(magicName, port string) error {
 		}
 	}
 
-	tt.addLog("INFO: 已跳过 __init__.py 全局替换（避免破坏 import _frida）；协议/API 已按前缀同步")
+	tt.addLog(i18n.T("INFO: 已跳过 __init__.py 全局替换（避免破坏 import _frida）；协议/API 已按前缀同步"))
 	return nil
 }
 
 func (tt *ToolsTab) patchOnePython(filePath, magicName string) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		tt.addLog("WARN: 跳过不存在的 Python 文件: " + filepath.Base(filePath))
+		tt.addLog(i18n.T("WARN: 跳过不存在的 Python 文件: ") + filepath.Base(filePath))
 		return nil
 	}
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("读取文件 %s 失败: %v", filePath, err)
+		return fmt.Errorf(i18n.T("读取文件 %s 失败: %v"), filePath, err)
 	}
 	contentStr, n, err := core.PatchClientProtocolSurface(string(content), magicName, true)
 	if err != nil {
@@ -1434,12 +1436,12 @@ func (tt *ToolsTab) patchOnePython(filePath, magicName string) error {
 	base := filepath.Base(filePath)
 	if n > 0 {
 		if err := os.WriteFile(filePath, []byte(contentStr), 0644); err != nil {
-			return fmt.Errorf("写入文件 %s 失败: %v", base, err)
+			return fmt.Errorf(i18n.T("写入文件 %s 失败: %v"), base, err)
 		}
-		tt.addLog(fmt.Sprintf("INFO: 客户端协议面已同步 magic=%s（rpc/re.frida./Frida.*）共 %d 处 → %s", magicName, n, base))
-		tt.addLog("SUCCESS: 已魔改Python文件: " + base)
+		tt.addLog(fmt.Sprintf(i18n.T("INFO: 客户端协议面已同步 magic=%s（rpc/re.frida./Frida.*）共 %d 处 → %s"), magicName, n, base))
+		tt.addLog(i18n.T("SUCCESS: 已魔改Python文件: ") + base)
 	} else {
-		tt.addLog("INFO: " + base + " 中未找到可替换协议标记，可能已魔改或版本结构不同")
+		tt.addLog("INFO: " + base + i18n.T(" 中未找到可替换协议标记，可能已魔改或版本结构不同"))
 	}
 	return nil
 }
@@ -1449,26 +1451,26 @@ func (tt *ToolsTab) patchSOFiles(magicName, port string) error {
 	// 查找SO文件
 	soFiles, err := tt.findSOFiles()
 	if err != nil {
-		return fmt.Errorf("查找SO文件失败: %v", err)
+		return fmt.Errorf(i18n.T("查找SO文件失败: %v"), err)
 	}
 
 	if len(soFiles) == 0 {
-		tt.addLog("INFO: 未找到SO文件，跳过二进制魔改")
+		tt.addLog(i18n.T("INFO: 未找到SO文件，跳过二进制魔改"))
 		return nil
 	}
 
 	// 使用hexreplace工具进行二进制替换
 	for _, soFile := range soFiles {
 		if err := tt.patchSingleSOFile(soFile, magicName, port); err != nil {
-			tt.addLog(fmt.Sprintf("WARN: SO文件魔改失败: %s, 错误: %v", soFile, err))
+			tt.addLog(fmt.Sprintf(i18n.T("WARN: SO文件魔改失败: %s, 错误: %v"), soFile, err))
 			continue
 		}
-		tt.addLog(fmt.Sprintf("SUCCESS: 已魔改SO文件: %s", soFile))
+		tt.addLog(fmt.Sprintf(i18n.T("SUCCESS: 已魔改SO文件: %s"), soFile))
 		if tt.stripAfterChk != nil && tt.stripAfterChk.Checked {
 			if res, serr := rebuild.StripProductBinary(soFile, magicName); serr != nil {
-				tt.addLog(fmt.Sprintf("WARN: 去符号失败: %s: %v", soFile, serr))
+				tt.addLog(fmt.Sprintf(i18n.T("WARN: 去符号失败: %s: %v"), soFile, serr))
 			} else {
-				tt.addLog(fmt.Sprintf("INFO: 去符号 %s format=%s exports=%d", filepath.Base(soFile), res.Format, res.ExportsRewritten))
+				tt.addLog(fmt.Sprintf(i18n.T("INFO: 去符号 %s format=%s exports=%d"), filepath.Base(soFile), res.Format, res.ExportsRewritten))
 			}
 		}
 	}
@@ -1538,10 +1540,10 @@ func (tt *ToolsTab) patchSingleSOFile(soFile, magicName, port string) error {
 	// 使用HexReplacer进行专业的二进制魔改
 	// HexReplacer会自动处理所有frida相关的字符串替换
 	if err := tt.hexReplace(soFile, "", magicName); err != nil {
-		return fmt.Errorf("魔改SO文件失败: %v", err)
+		return fmt.Errorf(i18n.T("魔改SO文件失败: %v"), err)
 	}
 
-	tt.addLog(fmt.Sprintf("SUCCESS: 已魔改SO文件: %s", soFile))
+	tt.addLog(fmt.Sprintf(i18n.T("SUCCESS: 已魔改SO文件: %s"), soFile))
 	return nil
 }
 
@@ -1563,13 +1565,13 @@ func (tt *ToolsTab) hexReplace(filePath, oldStr, newStr string) error {
 	if err != nil {
 		// 清理临时文件
 		os.Remove(tempFile)
-		return fmt.Errorf("HexReplacer魔改失败: %v", err)
+		return fmt.Errorf(i18n.T("HexReplacer魔改失败: %v"), err)
 	}
 
 	// 替换原文件
 	if err := os.Rename(tempFile, filePath); err != nil {
 		os.Remove(tempFile)
-		return fmt.Errorf("替换原文件失败: %v", err)
+		return fmt.Errorf(i18n.T("替换原文件失败: %v"), err)
 	}
 	// HexReplace only edits named sections. Android helper dex uses Lre/frida/
 	// and needs a checksum repair or the server aborts: backend_class != null.
@@ -1583,18 +1585,18 @@ func (tt *ToolsTab) hexReplace(filePath, oldStr, newStr string) error {
 // restoreFridaTools 恢复原版frida-tools
 func (tt *ToolsTab) restoreFridaTools() {
 	if tt.fridaInfo == nil {
-		tt.updateStatus("请先检测frida-tools")
+		tt.updateStatus(i18n.T("请先检测frida-tools"))
 		return
 	}
 
-	tt.updateStatus("开始恢复原版frida-tools...")
-	tt.addLog("INFO: 开始恢复原版frida-tools")
+	tt.updateStatus(i18n.T("开始恢复原版frida-tools..."))
+	tt.addLog(i18n.T("INFO: 开始恢复原版frida-tools"))
 
 	// 显示进度
 	fyne.Do(func() {
 		tt.progressBar.Show()
 		tt.progressLabel.Show()
-		tt.progressLabel.SetText("正在恢复原版...")
+		tt.progressLabel.SetText(i18n.T("正在恢复原版..."))
 		tt.progressBar.SetValue(0.2)
 		tt.restoreBtn.Disable()
 	})
@@ -1606,13 +1608,13 @@ func (tt *ToolsTab) restoreFridaTools() {
 				tt.progressLabel.Hide()
 				tt.restoreBtn.Enable()
 			})
-			tt.updateStatus("恢复失败: " + err.Error())
-			tt.addLog("ERROR: 恢复失败: " + err.Error())
+			tt.updateStatus(i18n.T("恢复失败: ") + err.Error())
+			tt.addLog(i18n.T("ERROR: 恢复失败: ") + err.Error())
 			return
 		}
 
 		fyne.Do(func() {
-			tt.progressLabel.SetText("恢复完成!")
+			tt.progressLabel.SetText(i18n.T("恢复完成!"))
 			tt.progressBar.SetValue(1.0)
 
 			// 延迟隐藏进度条
@@ -1629,11 +1631,11 @@ func (tt *ToolsTab) restoreFridaTools() {
 			tt.backupBtn.Enable()
 
 			// 更新状态显示
-			tt.patchStatusLabel.SetText("状态: original")
+			tt.patchStatusLabel.SetText(i18n.T("状态: original"))
 		})
 
-		tt.updateStatus("frida-tools恢复完成!")
-		tt.addLog("SUCCESS: frida-tools恢复完成")
+		tt.updateStatus(i18n.T("frida-tools恢复完成!"))
+		tt.addLog(i18n.T("SUCCESS: frida-tools恢复完成"))
 	}()
 }
 
@@ -1643,13 +1645,13 @@ func (tt *ToolsTab) performRestore() error {
 
 	// 检查备份是否存在
 	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
-		return fmt.Errorf("备份不存在: %s", backupPath)
+		return fmt.Errorf(i18n.T("备份不存在: %s"), backupPath)
 	}
 
 	// 恢复备份的文件
 	files, err := os.ReadDir(backupPath)
 	if err != nil {
-		return fmt.Errorf("读取备份目录失败: %v", err)
+		return fmt.Errorf(i18n.T("读取备份目录失败: %v"), err)
 	}
 
 	fyne.Do(func() {
@@ -1683,16 +1685,16 @@ func (tt *ToolsTab) performRestore() error {
 		}
 
 		if err := tt.copyFile(srcPath, dstPath); err != nil {
-			return fmt.Errorf("恢复文件 %s 失败: %v", name, err)
+			return fmt.Errorf(i18n.T("恢复文件 %s 失败: %v"), name, err)
 		}
-		tt.addLog(fmt.Sprintf("INFO: 已恢复文件: %s -> %s", name, dstPath))
+		tt.addLog(fmt.Sprintf(i18n.T("INFO: 已恢复文件: %s -> %s"), name, dstPath))
 	}
 
 	// 删除备份目录
 	if err := os.RemoveAll(backupPath); err != nil {
-		tt.addLog(fmt.Sprintf("WARN: 删除备份目录失败: %v", err))
+		tt.addLog(fmt.Sprintf(i18n.T("WARN: 删除备份目录失败: %v"), err))
 	} else {
-		tt.addLog("INFO: 已删除备份目录")
+		tt.addLog(i18n.T("INFO: 已删除备份目录"))
 	}
 
 	return nil
@@ -1701,20 +1703,20 @@ func (tt *ToolsTab) performRestore() error {
 // backupFridaTools 手动备份
 func (tt *ToolsTab) backupFridaTools() {
 	if tt.fridaInfo == nil {
-		tt.updateStatus("请先检测frida-tools")
+		tt.updateStatus(i18n.T("请先检测frida-tools"))
 		return
 	}
 
-	tt.updateStatus("开始手动备份...")
-	tt.addLog("INFO: 开始手动备份")
+	tt.updateStatus(i18n.T("开始手动备份..."))
+	tt.addLog(i18n.T("INFO: 开始手动备份"))
 
 	go func() {
 		if err := tt.createBackup(); err != nil {
-			tt.updateStatus("手动备份失败: " + err.Error())
-			tt.addLog("ERROR: 手动备份失败: " + err.Error())
+			tt.updateStatus(i18n.T("手动备份失败: ") + err.Error())
+			tt.addLog(i18n.T("ERROR: 手动备份失败: ") + err.Error())
 		} else {
-			tt.updateStatus("手动备份完成")
-			tt.addLog("SUCCESS: 手动备份完成")
+			tt.updateStatus(i18n.T("手动备份完成"))
+			tt.addLog(i18n.T("SUCCESS: 手动备份完成"))
 		}
 	}()
 }
@@ -1739,11 +1741,12 @@ func (tt *ToolsTab) UpdateGlobalConfig(magicName string, port int) {
 
 // SettingsTab 设置标签页
 type SettingsTab struct {
-	config       *config.Config
-	updateStatus StatusUpdater
-	applyTheme   func()
-	content      *fyne.Container
-	window       fyne.Window // 添加窗口引用
+	config        *config.Config
+	updateStatus  StatusUpdater
+	applyTheme    func()
+	applyLanguage func()
+	content       *fyne.Container
+	window        fyne.Window // 添加窗口引用
 
 	// 全局配置组件
 	appVersionEntry *FixedWidthEntry
@@ -1761,6 +1764,7 @@ type SettingsTab struct {
 
 	// UI配置组件
 	themeSelect       *widget.Select
+	langSelect        *widget.Select
 	windowWidthEntry  *FixedWidthEntry
 	windowHeightEntry *FixedWidthEntry
 	debugModeCheck    *widget.Check
@@ -1793,12 +1797,13 @@ type SettingsTab struct {
 	exportBtn *widget.Button
 }
 
-func NewSettingsTab(cfg *config.Config, statusUpdater StatusUpdater, themeApplier func(), window fyne.Window) *SettingsTab {
+func NewSettingsTab(cfg *config.Config, statusUpdater StatusUpdater, themeApplier func(), languageApplier func(), window fyne.Window) *SettingsTab {
 	st := &SettingsTab{
-		config:       cfg,
-		updateStatus: statusUpdater,
-		applyTheme:   themeApplier,
-		window:       window,
+		config:        cfg,
+		updateStatus:  statusUpdater,
+		applyTheme:    themeApplier,
+		applyLanguage: languageApplier,
+		window:        window,
 	}
 
 	st.setupUI()
@@ -1832,6 +1837,9 @@ func (st *SettingsTab) RefreshConfigDisplay() {
 	}
 	if st.themeSelect != nil {
 		st.themeSelect.SetSelected(st.config.Theme)
+	}
+	if st.langSelect != nil {
+		st.langSelect.SetSelected(i18n.LabelFor(st.config.Language))
 	}
 	if st.windowWidthEntry != nil {
 		st.windowWidthEntry.SetText(fmt.Sprintf("%d", st.config.WindowWidth))
@@ -1876,21 +1884,21 @@ func (st *SettingsTab) RefreshConfigDisplay() {
 
 func (st *SettingsTab) setupUI() {
 	// 全局配置区域
-	st.appVersionEntry = fixedWidthEntry(120, "版本号")
+	st.appVersionEntry = fixedWidthEntry(120, i18n.T("版本号"))
 	st.appVersionEntry.SetText(st.config.AppVersion)
 	st.appVersionEntry.Disable() // 版本号只读
-	st.workDirEntry = fixedWidthEntry(300, "工作目录路径")
+	st.workDirEntry = fixedWidthEntry(300, i18n.T("工作目录路径"))
 	st.workDirEntry.SetText(st.config.WorkDir)
 
-	workDirBtn := widget.NewButton("选择", st.selectWorkDir)
+	workDirBtn := widget.NewButton(i18n.T("选择"), st.selectWorkDir)
 
-	globalConfigSection := widget.NewCard("🔧 全局配置", "", container.NewVBox(
+	globalConfigSection := widget.NewCard(i18n.T("🔧 全局配置"), "", container.NewVBox(
 		container.NewHBox(
-			widget.NewLabel("应用版本:"), st.appVersionEntry,
+			widget.NewLabel(i18n.T("应用版本:")), st.appVersionEntry,
 			widget.NewLabel("   "), // 间距
 		),
 		container.NewHBox(
-			widget.NewLabel("工作目录:"), st.workDirEntry, workDirBtn,
+			widget.NewLabel(i18n.T("工作目录:")), st.workDirEntry, workDirBtn,
 		),
 	))
 
@@ -1898,58 +1906,58 @@ func (st *SettingsTab) setupUI() {
 	st.proxyEntry = fixedWidthEntry(300, "http://proxy:port")
 	st.proxyEntry.SetText(st.config.Proxy)
 
-	st.timeoutEntry = fixedWidthEntry(80, "秒")
+	st.timeoutEntry = fixedWidthEntry(80, i18n.T("秒"))
 	st.timeoutEntry.SetText(fmt.Sprintf("%d", st.config.Timeout))
 	st.timeoutEntry.Validator = func(text string) error {
 		if val, err := strconv.Atoi(text); err != nil || val < 5 || val > 300 {
-			return fmt.Errorf("超时时间必须在5-300秒之间")
+			return fmt.Errorf(i18n.T("超时时间必须在5-300秒之间"))
 		}
 		return nil
 	}
 
-	st.retriesEntry = fixedWidthEntry(80, "次")
+	st.retriesEntry = fixedWidthEntry(80, i18n.T("次"))
 	st.retriesEntry.SetText(fmt.Sprintf("%d", st.config.Retries))
 	st.retriesEntry.Validator = func(text string) error {
 		if val, err := strconv.Atoi(text); err != nil || val < 0 || val > 10 {
-			return fmt.Errorf("重试次数必须在0-10次之间")
+			return fmt.Errorf(i18n.T("重试次数必须在0-10次之间"))
 		}
 		return nil
 	}
 
-	proxyTestBtn := widget.NewButton("测试", st.testProxy)
+	proxyTestBtn := widget.NewButton(i18n.T("测试"), st.testProxy)
 
-	networkConfigSection := widget.NewCard("🌐 网络配置", "", container.NewVBox(
+	networkConfigSection := widget.NewCard(i18n.T("🌐 网络配置"), "", container.NewVBox(
 		container.NewHBox(
-			widget.NewLabel("代理服务器:"), st.proxyEntry, proxyTestBtn,
+			widget.NewLabel(i18n.T("代理服务器:")), st.proxyEntry, proxyTestBtn,
 		),
 		container.NewHBox(
-			widget.NewLabel("超时时间:"), st.timeoutEntry,
-			widget.NewLabel("   重试次数:"), st.retriesEntry,
+			widget.NewLabel(i18n.T("超时时间:")), st.timeoutEntry,
+			widget.NewLabel(i18n.T("   重试次数:")), st.retriesEntry,
 		),
-		widget.NewLabel("说明: 代理设置影响frida下载，超时和重试用于网络请求"),
+		widget.NewLabel(i18n.T("说明: 代理设置影响frida下载，超时和重试用于网络请求")),
 	))
 
 	// Frida配置区域
-	st.defaultPortEntry = fixedWidthEntry(80, "端口")
+	st.defaultPortEntry = fixedWidthEntry(80, i18n.T("端口"))
 	st.defaultPortEntry.SetText(fmt.Sprintf("%d", st.config.DefaultPort))
 
-	st.magicNameEntry = fixedWidthEntry(100, "5字符")
+	st.magicNameEntry = fixedWidthEntry(100, i18n.T("5字符"))
 	st.magicNameEntry.SetText(st.config.MagicName)
 
-	st.autoConfirmCheck = widget.NewCheck("自动确认操作", nil)
+	st.autoConfirmCheck = widget.NewCheck(i18n.T("自动确认操作"), nil)
 	st.autoConfirmCheck.SetChecked(st.config.AutoConfirm)
 
 	// 添加说明标签
-	autoConfirmLabel := widget.NewLabel("(启用后将跳过确认对话框，直接执行魔改操作)")
+	autoConfirmLabel := widget.NewLabel(i18n.T("(启用后将跳过确认对话框，直接执行魔改操作)"))
 	autoConfirmLabel.TextStyle = fyne.TextStyle{Italic: true}
 	autoConfirmLabel.Importance = widget.LowImportance
 
-	randomNameBtn := widget.NewButton("随机", st.generateRandomMagicName)
+	randomNameBtn := widget.NewButton(i18n.T("随机"), st.generateRandomMagicName)
 
-	fridaConfigSection := widget.NewCard("🎯 Frida配置", "", container.NewVBox(
+	fridaConfigSection := widget.NewCard(i18n.T("🎯 Frida配置"), "", container.NewVBox(
 		container.NewHBox(
-			widget.NewLabel("默认端口:"), st.defaultPortEntry,
-			widget.NewLabel("   魔改名称:"), st.magicNameEntry, randomNameBtn,
+			widget.NewLabel(i18n.T("默认端口:")), st.defaultPortEntry,
+			widget.NewLabel(i18n.T("   魔改名称:")), st.magicNameEntry, randomNameBtn,
 		),
 		container.NewHBox(
 			st.autoConfirmCheck, autoConfirmLabel,
@@ -1963,57 +1971,72 @@ func (st *SettingsTab) setupUI() {
 		if st.applyTheme != nil {
 			st.applyTheme()
 		}
-		st.updateStatus(fmt.Sprintf("主题已切换为: %s", selected))
+		st.updateStatus(fmt.Sprintf(i18n.T("主题已切换为: %s"), selected))
 	})
 	st.themeSelect.SetSelected(st.config.Theme)
 
-	st.windowWidthEntry = fixedWidthEntry(80, "宽度")
+	st.langSelect = widget.NewSelect(i18n.LanguageLabels(), nil)
+	st.langSelect.SetSelected(i18n.LabelFor(st.config.Language))
+	st.langSelect.OnChanged = func(selected string) {
+		code := i18n.CodeFromLabel(selected)
+		if code == i18n.Normalize(st.config.Language) && code == i18n.Current() {
+			return
+		}
+		st.config.Language = code
+		if st.applyLanguage != nil {
+			st.applyLanguage()
+		}
+	}
+
+	st.windowWidthEntry = fixedWidthEntry(80, i18n.T("宽度"))
 	st.windowWidthEntry.SetText(fmt.Sprintf("%d", st.config.WindowWidth))
 
-	st.windowHeightEntry = fixedWidthEntry(80, "高度")
+	st.windowHeightEntry = fixedWidthEntry(80, i18n.T("高度"))
 	st.windowHeightEntry.SetText(fmt.Sprintf("%d", st.config.WindowHeight))
 
-	st.debugModeCheck = widget.NewCheck("调试模式", nil)
+	st.debugModeCheck = widget.NewCheck(i18n.T("调试模式"), nil)
 	st.debugModeCheck.SetChecked(st.config.DebugMode)
 
-	st.noShowNoticeCheck = widget.NewCheck("启动时不显示公告", nil)
+	st.noShowNoticeCheck = widget.NewCheck(i18n.T("启动时不显示公告"), nil)
 	st.noShowNoticeCheck.SetChecked(st.config.NoShowNotice)
 
-	uiConfigSection := widget.NewCard("🎨 界面配置", "", container.NewVBox(
+	uiConfigSection := widget.NewCard(i18n.T("🎨 界面配置"), "", container.NewVBox(
 		container.NewHBox(
-			widget.NewLabel("主题:"), st.themeSelect,
+			widget.NewLabel(i18n.T("语言:")), st.langSelect,
+			widget.NewLabel(i18n.T("主题:")), st.themeSelect,
 			st.debugModeCheck,
 		),
 		container.NewHBox(
-			widget.NewLabel("窗口大小:"), st.windowWidthEntry,
+			widget.NewLabel(i18n.T("窗口大小:")), st.windowWidthEntry,
 			widget.NewLabel("x"), st.windowHeightEntry,
 			st.noShowNoticeCheck,
 		),
+		widget.NewLabel(i18n.T("说明: 语言立即生效并写入配置。中文为默认语言。")),
 	))
 
 	// 下载配置区域
-	st.downloadDirEntry = fixedWidthEntry(300, "下载目录路径")
+	st.downloadDirEntry = fixedWidthEntry(300, i18n.T("下载目录路径"))
 	st.downloadDirEntry.SetText(st.config.DownloadDir)
 
-	st.concurrentDownloadsEntry = fixedWidthEntry(80, "并发数")
+	st.concurrentDownloadsEntry = fixedWidthEntry(80, i18n.T("并发数"))
 	st.concurrentDownloadsEntry.SetText(fmt.Sprintf("%d", st.config.ConcurrentDownloads))
 	st.concurrentDownloadsEntry.Validator = func(text string) error {
 		if val, err := strconv.Atoi(text); err != nil || val < 1 || val > 10 {
-			return fmt.Errorf("并发下载数必须在1-10之间")
+			return fmt.Errorf(i18n.T("并发下载数必须在1-10之间"))
 		}
 		return nil
 	}
 
-	downloadDirBtn := widget.NewButton("选择", st.selectDownloadDir)
+	downloadDirBtn := widget.NewButton(i18n.T("选择"), st.selectDownloadDir)
 
-	downloadConfigSection := widget.NewCard("📥 下载配置", "", container.NewVBox(
+	downloadConfigSection := widget.NewCard(i18n.T("📥 下载配置"), "", container.NewVBox(
 		container.NewHBox(
-			widget.NewLabel("下载目录:"), st.downloadDirEntry, downloadDirBtn,
+			widget.NewLabel(i18n.T("下载目录:")), st.downloadDirEntry, downloadDirBtn,
 		),
 		container.NewHBox(
-			widget.NewLabel("并发下载:"), st.concurrentDownloadsEntry,
+			widget.NewLabel(i18n.T("并发下载:")), st.concurrentDownloadsEntry,
 		),
-		widget.NewLabel("说明: 并发下载数影响同时下载的文件数量，过大可能导致网络堵塞"),
+		widget.NewLabel(i18n.T("说明: 并发下载数影响同时下载的文件数量，过大可能导致网络堵塞")),
 	))
 
 	// OpenAI 兼容端点 — 驱动源码重编译 AI agent（可选功能）
@@ -2022,33 +2045,33 @@ func (st *SettingsTab) setupUI() {
 	st.openaiKeyEntry = fixedWidthEntry(280, "API Key")
 	st.openaiKeyEntry.SetText(st.config.OpenAIAPIKey)
 	st.openaiKeyEntry.Password = true
-	st.openaiModelEntry = fixedWidthEntry(160, "模型名（可选）")
+	st.openaiModelEntry = fixedWidthEntry(160, i18n.T("模型名（可选）"))
 	st.openaiModelEntry.SetText(st.config.OpenAIModel)
 
 	st.openaiHelpLabel = widget.NewLabel(config.OpenAIRecommendedHelp())
 	st.openaiHelpLabel.Wrapping = fyne.TextWrapWord
-	applyRecommendBtn := widget.NewButton("填入推荐端点", func() {
+	applyRecommendBtn := widget.NewButton(i18n.T("填入推荐端点"), func() {
 		st.openaiBaseEntry.SetText("https://claudegpt.org/v1")
-		st.updateStatus("已填入推荐 API 端点 https://claudegpt.org/v1")
+		st.updateStatus(i18n.T("已填入推荐 API 端点 https://claudegpt.org/v1"))
 	})
-	openSiteBtn := widget.NewButton("打开推荐站点", func() {
+	openSiteBtn := widget.NewButton(i18n.T("打开推荐站点"), func() {
 		if u, err := url.Parse("https://claudegpt.org/"); err == nil {
 			_ = fyne.CurrentApp().OpenURL(u)
 		}
 	})
-	st.openaiAgentProxyChk = widget.NewCheck("OpenAI 端点走 GUI 代理出口（默认不走）", nil)
+	st.openaiAgentProxyChk = widget.NewCheck(i18n.T("OpenAI 端点走 GUI 代理出口（默认不走）"), nil)
 	st.openaiAgentProxyChk.SetChecked(st.config.RebuildAgentUseGUIProxy)
-	st.openaiProbeResult = widget.NewLabel("端点探测：未测试")
+	st.openaiProbeResult = widget.NewLabel(i18n.T("端点探测：未测试"))
 	st.openaiProbeResult.Wrapping = fyne.TextWrapWord
-	st.openaiProbeBtn = widget.NewButton("测试端点连接", st.testOpenAIEndpoint)
+	st.openaiProbeBtn = widget.NewButton(i18n.T("测试端点连接"), st.testOpenAIEndpoint)
 
 	// QQ 群二维码：内嵌图片直接显示（非文本链接）
 	qqQR := canvas.NewImageFromResource(assets.QQGroupQR)
 	qqQR.FillMode = canvas.ImageFillContain
 	qqQR.SetMinSize(fyne.NewSize(160, 160))
-	qqTitle := widget.NewLabel("QQ 群 " + assets.QQGroupNumber)
+	qqTitle := widget.NewLabel(i18n.T("QQ 群 ") + assets.QQGroupNumber)
 	qqTitle.TextStyle = fyne.TextStyle{Bold: true}
-	qqHint := widget.NewLabel("扫码入群申请体验额度")
+	qqHint := widget.NewLabel(i18n.T("扫码入群申请体验额度"))
 	qqHint.Importance = widget.MediumImportance
 	qqPanel := container.NewVBox(
 		qqTitle,
@@ -2057,56 +2080,56 @@ func (st *SettingsTab) setupUI() {
 	)
 
 	openaiLeft := container.NewVBox(
-		container.NewHBox(widget.NewLabel("API 端点:"), st.openaiBaseEntry, applyRecommendBtn),
+		container.NewHBox(widget.NewLabel(i18n.T("API 端点:")), st.openaiBaseEntry, applyRecommendBtn),
 		container.NewHBox(widget.NewLabel("API Key:"), st.openaiKeyEntry),
-		container.NewHBox(widget.NewLabel("模型:"), st.openaiModelEntry),
+		container.NewHBox(widget.NewLabel(i18n.T("模型:")), st.openaiModelEntry),
 		st.openaiAgentProxyChk,
 		container.NewHBox(st.openaiProbeBtn, openSiteBtn),
 		st.openaiProbeResult,
 		st.openaiHelpLabel,
 	)
-	openaiConfigSection := widget.NewCard("🤖 OpenAI 兼容端点（AI Agent）", "源码重编译可选；静态魔改路径不需要；端点默认不走代理",
+	openaiConfigSection := widget.NewCard(i18n.T("🤖 OpenAI 兼容端点（AI Agent）"), i18n.T("源码重编译可选；静态魔改路径不需要；端点默认不走代理"),
 		container.NewBorder(nil, nil, nil, qqPanel, openaiLeft))
 
 	// 源码重编译资源阈值 + 国内 Docker 镜像源
 	st.rebuildDiskEntry = fixedWidthEntry(80, "GB")
 	st.rebuildDiskEntry.SetText(fmt.Sprintf("%.0f", st.config.RebuildMinDiskGB))
-	st.rebuildImageEntry = fixedWidthEntry(220, "本地 builder 标签")
+	st.rebuildImageEntry = fixedWidthEntry(220, i18n.T("本地 builder 标签"))
 	st.rebuildImageEntry.SetText(st.config.RebuildDockerImage)
 	st.rebuildMirrorEntry = fixedWidthEntry(180, "docker.1ms.run")
 	st.rebuildMirrorEntry.SetText(st.config.RebuildDockerMirror)
-	st.rebuildPullDirectChk = widget.NewCheck("镜像源直连（不走代理；docker.1ms.run 必开）", nil)
+	st.rebuildPullDirectChk = widget.NewCheck(i18n.T("镜像源直连（不走代理；docker.1ms.run 必开）"), nil)
 	st.rebuildPullDirectChk.SetChecked(st.config.RebuildDockerPullDirect)
-	st.rebuildUseGrokChk = widget.NewCheck("优先使用本机 grok-build（端点仍用上方 OpenAI 配置）", nil)
+	st.rebuildUseGrokChk = widget.NewCheck(i18n.T("优先使用本机 grok-build（端点仍用上方 OpenAI 配置）"), nil)
 	st.rebuildUseGrokChk.SetChecked(st.config.RebuildUseLocalGrok)
-	fillMirrorBtn := widget.NewButton("填入 1ms.run", func() {
+	fillMirrorBtn := widget.NewButton(i18n.T("填入 1ms.run"), func() {
 		st.rebuildMirrorEntry.SetText("docker.1ms.run")
 		st.rebuildPullDirectChk.SetChecked(true)
-		st.updateStatus("已填入 docker.1ms.run，并启用镜像直连")
+		st.updateStatus(i18n.T("已填入 docker.1ms.run，并启用镜像直连"))
 	})
-	mirrorHelp := widget.NewLabel("Hub 失败时: ubuntu:22.04 → docker.1ms.run/library/ubuntu:22.04；容器内 git 仍可用上方代理")
+	mirrorHelp := widget.NewLabel(i18n.T("Hub 失败时: ubuntu:22.04 → docker.1ms.run/library/ubuntu:22.04；容器内 git 仍可用上方代理"))
 	mirrorHelp.Wrapping = fyne.TextWrapWord
 	mirrorHelp.Importance = widget.MediumImportance
 
-	rebuildConfigSection := widget.NewCard("🧬 源码重编译 / Docker（可选）", "不强制装 Docker；镜像源默认 docker.1ms.run",
+	rebuildConfigSection := widget.NewCard(i18n.T("🧬 源码重编译 / Docker（可选）"), i18n.T("不强制装 Docker；镜像源默认 docker.1ms.run"),
 		container.NewVBox(
-			container.NewHBox(widget.NewLabel("磁盘阈值(GB):"), st.rebuildDiskEntry),
-			container.NewHBox(widget.NewLabel("本地镜像名:"), st.rebuildImageEntry),
-			container.NewHBox(widget.NewLabel("Hub 镜像源:"), st.rebuildMirrorEntry, fillMirrorBtn),
+			container.NewHBox(widget.NewLabel(i18n.T("磁盘阈值(GB):")), st.rebuildDiskEntry),
+			container.NewHBox(widget.NewLabel(i18n.T("本地镜像名:")), st.rebuildImageEntry),
+			container.NewHBox(widget.NewLabel(i18n.T("Hub 镜像源:")), st.rebuildMirrorEntry, fillMirrorBtn),
 			st.rebuildPullDirectChk,
 			st.rebuildUseGrokChk,
 			mirrorHelp,
 		))
 
 	// 操作按钮区域
-	st.saveBtn = widget.NewButton("💾 保存设置", st.saveSettings)
+	st.saveBtn = widget.NewButton(i18n.T("💾 保存设置"), st.saveSettings)
 	st.saveBtn.Importance = widget.HighImportance
 
-	st.resetBtn = widget.NewButton("🔄 重置默认", st.resetToDefaults)
-	st.importBtn = widget.NewButton("📁 导入配置", st.importSettings)
-	st.exportBtn = widget.NewButton("💾 导出配置", st.exportSettings)
+	st.resetBtn = widget.NewButton(i18n.T("🔄 重置默认"), st.resetToDefaults)
+	st.importBtn = widget.NewButton(i18n.T("📁 导入配置"), st.importSettings)
+	st.exportBtn = widget.NewButton(i18n.T("💾 导出配置"), st.exportSettings)
 
-	actionSection := widget.NewCard("⚡ 操作", "", container.NewGridWithColumns(2,
+	actionSection := widget.NewCard(i18n.T("⚡ 操作"), "", container.NewGridWithColumns(2,
 		container.NewHBox(st.saveBtn, st.resetBtn),
 		container.NewHBox(st.importBtn, st.exportBtn),
 	))
@@ -2171,16 +2194,16 @@ func (st *SettingsTab) selectDownloadDir() {
 func (st *SettingsTab) testProxy() {
 	proxy := strings.TrimSpace(st.proxyEntry.Text)
 	if proxy == "" {
-		st.updateStatus("请先输入代理地址")
+		st.updateStatus(i18n.T("请先输入代理地址"))
 		return
 	}
 
-	st.updateStatus("正在测试代理...")
+	st.updateStatus(i18n.T("正在测试代理..."))
 	// 这里可以重用MainWindow的代理测试逻辑
 	// 简化实现
 	go func() {
 		time.Sleep(2 * time.Second) // 模拟测试
-		st.updateStatus("代理测试完成")
+		st.updateStatus(i18n.T("代理测试完成"))
 	}()
 }
 
@@ -2194,13 +2217,13 @@ func (st *SettingsTab) generateRandomMagicName() {
 func (st *SettingsTab) saveSettings() {
 	// 验证和更新配置
 	if err := st.validateAndUpdateConfig(); err != nil {
-		st.updateStatus("配置验证失败: " + err.Error())
+		st.updateStatus(i18n.T("配置验证失败: ") + err.Error())
 		return
 	}
 
 	// 保存配置
 	if err := st.config.Save(); err != nil {
-		st.updateStatus("保存配置失败: " + err.Error())
+		st.updateStatus(i18n.T("保存配置失败: ") + err.Error())
 		return
 	}
 
@@ -2209,7 +2232,108 @@ func (st *SettingsTab) saveSettings() {
 		st.applyTheme()
 	}
 
-	st.updateStatus("设置已保存")
+	st.updateStatus(i18n.T("设置已保存"))
+}
+
+// snapshotInto copies the settings form into cfg without failing on half-typed numbers.
+func (st *SettingsTab) snapshotInto(cfg *config.Config) {
+	if st == nil || cfg == nil {
+		return
+	}
+	if st.workDirEntry != nil {
+		if v := strings.TrimSpace(st.workDirEntry.Text); v != "" {
+			cfg.WorkDir = v
+		}
+	}
+	if st.proxyEntry != nil {
+		cfg.Proxy = strings.TrimSpace(st.proxyEntry.Text)
+	}
+	if st.timeoutEntry != nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(st.timeoutEntry.Text)); err == nil && n > 0 {
+			cfg.Timeout = n
+		}
+	}
+	if st.retriesEntry != nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(st.retriesEntry.Text)); err == nil && n >= 0 {
+			cfg.Retries = n
+		}
+	}
+	if st.defaultPortEntry != nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(st.defaultPortEntry.Text)); err == nil && n > 0 && n <= 65535 {
+			cfg.DefaultPort = n
+		}
+	}
+	if st.magicNameEntry != nil {
+		if v := strings.TrimSpace(st.magicNameEntry.Text); v != "" {
+			cfg.MagicName = v
+		}
+	}
+	if st.autoConfirmCheck != nil {
+		cfg.AutoConfirm = st.autoConfirmCheck.Checked
+	}
+	if st.themeSelect != nil && st.themeSelect.Selected != "" {
+		cfg.Theme = st.themeSelect.Selected
+	}
+	if st.langSelect != nil && st.langSelect.Selected != "" {
+		cfg.Language = i18n.CodeFromLabel(st.langSelect.Selected)
+	}
+	if st.debugModeCheck != nil {
+		cfg.DebugMode = st.debugModeCheck.Checked
+	}
+	if st.noShowNoticeCheck != nil {
+		cfg.NoShowNotice = st.noShowNoticeCheck.Checked
+	}
+	if st.windowWidthEntry != nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(st.windowWidthEntry.Text)); err == nil && n > 0 {
+			cfg.WindowWidth = n
+		}
+	}
+	if st.windowHeightEntry != nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(st.windowHeightEntry.Text)); err == nil && n > 0 {
+			cfg.WindowHeight = n
+		}
+	}
+	if st.downloadDirEntry != nil {
+		if v := strings.TrimSpace(st.downloadDirEntry.Text); v != "" {
+			cfg.DownloadDir = v
+		}
+	}
+	if st.concurrentDownloadsEntry != nil {
+		if n, err := strconv.Atoi(strings.TrimSpace(st.concurrentDownloadsEntry.Text)); err == nil && n > 0 {
+			cfg.ConcurrentDownloads = n
+		}
+	}
+	if st.openaiBaseEntry != nil {
+		cfg.OpenAIBaseURL = strings.TrimSpace(st.openaiBaseEntry.Text)
+	}
+	if st.openaiKeyEntry != nil {
+		cfg.OpenAIAPIKey = strings.TrimSpace(st.openaiKeyEntry.Text)
+	}
+	if st.openaiModelEntry != nil {
+		cfg.OpenAIModel = strings.TrimSpace(st.openaiModelEntry.Text)
+	}
+	if st.openaiAgentProxyChk != nil {
+		cfg.RebuildAgentUseGUIProxy = st.openaiAgentProxyChk.Checked
+	}
+	if st.rebuildDiskEntry != nil {
+		if gb, err := strconv.ParseFloat(strings.TrimSpace(st.rebuildDiskEntry.Text), 64); err == nil && gb > 0 {
+			cfg.RebuildMinDiskGB = gb
+		}
+	}
+	if st.rebuildImageEntry != nil {
+		if v := strings.TrimSpace(st.rebuildImageEntry.Text); v != "" {
+			cfg.RebuildDockerImage = v
+		}
+	}
+	if st.rebuildMirrorEntry != nil {
+		cfg.RebuildDockerMirror = strings.TrimSpace(st.rebuildMirrorEntry.Text)
+	}
+	if st.rebuildPullDirectChk != nil {
+		cfg.RebuildDockerPullDirect = st.rebuildPullDirectChk.Checked
+	}
+	if st.rebuildUseGrokChk != nil {
+		cfg.RebuildUseLocalGrok = st.rebuildUseGrokChk.Checked
+	}
 }
 
 // validateAndUpdateConfig 验证并更新配置
@@ -2220,20 +2344,20 @@ func (st *SettingsTab) validateAndUpdateConfig() error {
 	if timeout, err := strconv.Atoi(st.timeoutEntry.Text); err == nil && timeout > 0 {
 		st.config.Timeout = timeout
 	} else {
-		return fmt.Errorf("超时时间必须是正整数")
+		return fmt.Errorf(i18n.T("超时时间必须是正整数"))
 	}
 
 	if retries, err := strconv.Atoi(st.retriesEntry.Text); err == nil && retries >= 0 {
 		st.config.Retries = retries
 	} else {
-		return fmt.Errorf("重试次数必须是非负整数")
+		return fmt.Errorf(i18n.T("重试次数必须是非负整数"))
 	}
 
 	// 更新Frida配置
 	if port, err := strconv.Atoi(st.defaultPortEntry.Text); err == nil && port > 0 && port <= 65535 {
 		st.config.DefaultPort = port
 	} else {
-		return fmt.Errorf("端口必须在1-65535范围内")
+		return fmt.Errorf(i18n.T("端口必须在1-65535范围内"))
 	}
 
 	magicName := strings.TrimSpace(st.magicNameEntry.Text)
@@ -2246,19 +2370,22 @@ func (st *SettingsTab) validateAndUpdateConfig() error {
 
 	// 更新UI配置
 	st.config.Theme = st.themeSelect.Selected
+	if st.langSelect != nil {
+		st.config.Language = i18n.CodeFromLabel(st.langSelect.Selected)
+	}
 	st.config.DebugMode = st.debugModeCheck.Checked
 	st.config.NoShowNotice = st.noShowNoticeCheck.Checked
 
 	if width, err := strconv.Atoi(st.windowWidthEntry.Text); err == nil && width >= 800 {
 		st.config.WindowWidth = width
 	} else {
-		return fmt.Errorf("窗口宽度必须大于等于800")
+		return fmt.Errorf(i18n.T("窗口宽度必须大于等于800"))
 	}
 
 	if height, err := strconv.Atoi(st.windowHeightEntry.Text); err == nil && height >= 600 {
 		st.config.WindowHeight = height
 	} else {
-		return fmt.Errorf("窗口高度必须大于等于600")
+		return fmt.Errorf(i18n.T("窗口高度必须大于等于600"))
 	}
 
 	// 更新下载配置
@@ -2268,7 +2395,7 @@ func (st *SettingsTab) validateAndUpdateConfig() error {
 	if concurrent, err := strconv.Atoi(st.concurrentDownloadsEntry.Text); err == nil && concurrent > 0 && concurrent <= 10 {
 		st.config.ConcurrentDownloads = concurrent
 	} else {
-		return fmt.Errorf("并发下载数必须在1-10范围内")
+		return fmt.Errorf(i18n.T("并发下载数必须在1-10范围内"))
 	}
 
 	// OpenAI / 源码重编译
@@ -2285,7 +2412,7 @@ func (st *SettingsTab) validateAndUpdateConfig() error {
 		if gb, err := strconv.ParseFloat(strings.TrimSpace(st.rebuildDiskEntry.Text), 64); err == nil && gb > 0 {
 			st.config.RebuildMinDiskGB = gb
 		} else {
-			return fmt.Errorf("源码重编译磁盘阈值必须是正数 GB")
+			return fmt.Errorf(i18n.T("源码重编译磁盘阈值必须是正数 GB"))
 		}
 	}
 	if st.rebuildImageEntry != nil {
@@ -2309,17 +2436,21 @@ func (st *SettingsTab) validateAndUpdateConfig() error {
 
 // resetToDefaults 重置为默认值
 func (st *SettingsTab) resetToDefaults() {
-	dialog.ShowConfirm("确认重置", "确定要重置所有设置为默认值吗？", func(confirmed bool) {
+	dialog.ShowConfirm(i18n.T("确认重置"), i18n.T("确定要重置所有设置为默认值吗？"), func(confirmed bool) {
 		if !confirmed {
 			return
 		}
 
 		defaultConfig := config.DefaultConfig()
 		*st.config = *defaultConfig
+		if st.applyLanguage != nil && i18n.Current() != i18n.Normalize(st.config.Language) {
+			st.applyLanguage()
+			return
+		}
 
 		// 重新加载UI
 		st.loadConfigToUI()
-		st.updateStatus("已重置为默认设置")
+		st.updateStatus(i18n.T("已重置为默认设置"))
 	}, st.window)
 }
 
@@ -2333,6 +2464,9 @@ func (st *SettingsTab) loadConfigToUI() {
 	st.magicNameEntry.SetText(st.config.MagicName)
 	st.autoConfirmCheck.SetChecked(st.config.AutoConfirm)
 	st.themeSelect.SetSelected(st.config.Theme)
+	if st.langSelect != nil {
+		st.langSelect.SetSelected(i18n.LabelFor(st.config.Language))
+	}
 	st.windowWidthEntry.SetText(fmt.Sprintf("%d", st.config.WindowWidth))
 	st.windowHeightEntry.SetText(fmt.Sprintf("%d", st.config.WindowHeight))
 	st.debugModeCheck.SetChecked(st.config.DebugMode)
@@ -2390,9 +2524,9 @@ func (st *SettingsTab) testOpenAIEndpoint() {
 		proxy = st.config.Proxy
 	}
 	if st.openaiProbeResult != nil {
-		st.openaiProbeResult.SetText("端点探测：进行中…")
+		st.openaiProbeResult.SetText(i18n.T("端点探测：进行中…"))
 	}
-	st.updateStatus("正在测试 OpenAI 端点…")
+	st.updateStatus(i18n.T("正在测试 OpenAI 端点…"))
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -2405,15 +2539,15 @@ func (st *SettingsTab) testOpenAIEndpoint() {
 			Timeout:     25 * time.Second,
 		})
 		detail := rebuild.RedactSecret(res.Detail, key)
-		msg := fmt.Sprintf("端点探测：ok=%v HTTP %d %s\n%s", res.OK, res.StatusCode, res.Method, detail)
+		msg := fmt.Sprintf(i18n.T("端点探测：ok=%v HTTP %d %s\n%s"), res.OK, res.StatusCode, res.Method, detail)
 		fyne.Do(func() {
 			if st.openaiProbeResult != nil {
 				st.openaiProbeResult.SetText(msg)
 			}
 			if res.OK {
-				st.updateStatus("OpenAI 端点连接成功")
+				st.updateStatus(i18n.T("OpenAI 端点连接成功"))
 			} else {
-				st.updateStatus("OpenAI 端点连接失败（见探测结果）")
+				st.updateStatus(i18n.T("OpenAI 端点连接失败（见探测结果）"))
 			}
 		})
 	}()
@@ -2428,7 +2562,7 @@ func (st *SettingsTab) importSettings() {
 		defer file.Close()
 
 		// 这里可以实现配置文件导入逻辑
-		st.updateStatus("配置导入功能待实现")
+		st.updateStatus(i18n.T("配置导入功能待实现"))
 	}, st.window)
 }
 
@@ -2441,7 +2575,7 @@ func (st *SettingsTab) exportSettings() {
 		defer file.Close()
 
 		// 这里可以实现配置文件导出逻辑
-		st.updateStatus("配置导出功能待实现")
+		st.updateStatus(i18n.T("配置导出功能待实现"))
 	}, st.window)
 }
 
@@ -2492,24 +2626,24 @@ func NewCreateTab(app fyne.App, cfg *config.Config, statusUpdater StatusUpdater,
 // setupUI 设置UI界面
 func (ct *CreateTab) setupUI() {
 	// 使用固定宽度Entry组件 - 增加宽度
-	ct.fridaServerEntry = fixedWidthEntry(200, "选择frida-server文件...")
-	ct.fridaAgentEntry = fixedWidthEntry(200, "选择frida-agent.dylib文件 (可选)...")
-	ct.outputPathEntry = fixedWidthEntry(180, "选择输出DEB文件路径...")
+	ct.fridaServerEntry = fixedWidthEntry(200, i18n.T("选择frida-server文件..."))
+	ct.fridaAgentEntry = fixedWidthEntry(200, i18n.T("选择frida-agent.dylib文件 (可选)..."))
+	ct.outputPathEntry = fixedWidthEntry(180, i18n.T("选择输出DEB文件路径..."))
 
-	ct.magicNameEntry = fixedWidthEntry(100, "5字符")
-	ct.portEntry = fixedWidthEntry(100, "端口")
-	ct.packageNameEntry = fixedWidthEntry(300, "包名 (自动生成)")
-	ct.versionEntry = fixedWidthEntry(200, "版本")
-	ct.maintainerEntry = fixedWidthEntry(300, "维护者")
-	ct.descriptionEntry = fixedWidthEntry(300, "包描述")
-	ct.dependsEntry = fixedWidthEntry(200, "依赖")
-	ct.sectionEntry = fixedWidthEntry(200, "分类")
-	ct.homepageEntry = fixedWidthEntry(300, "主页")
+	ct.magicNameEntry = fixedWidthEntry(100, i18n.T("5字符"))
+	ct.portEntry = fixedWidthEntry(100, i18n.T("端口"))
+	ct.packageNameEntry = fixedWidthEntry(300, i18n.T("包名 (自动生成)"))
+	ct.versionEntry = fixedWidthEntry(200, i18n.T("版本"))
+	ct.maintainerEntry = fixedWidthEntry(300, i18n.T("维护者"))
+	ct.descriptionEntry = fixedWidthEntry(300, i18n.T("包描述"))
+	ct.dependsEntry = fixedWidthEntry(200, i18n.T("依赖"))
+	ct.sectionEntry = fixedWidthEntry(200, i18n.T("分类"))
+	ct.homepageEntry = fixedWidthEntry(300, i18n.T("主页"))
 
 	// 设置按钮
-	serverSelectBtn := widget.NewButton("选择", ct.selectFridaServer)
-	agentSelectBtn := widget.NewButton("选择", ct.selectFridaAgent)
-	outputSelectBtn := widget.NewButton("选择", ct.selectOutputPath)
+	serverSelectBtn := widget.NewButton(i18n.T("选择"), ct.selectFridaServer)
+	agentSelectBtn := widget.NewButton(i18n.T("选择"), ct.selectFridaAgent)
+	outputSelectBtn := widget.NewButton(i18n.T("选择"), ct.selectOutputPath)
 
 	// 基本配置验证器和事件（与 hexreplace / ToolsTab 一致：恰好 5 个小写 a-z）
 	ct.magicNameEntry.Validator = func(text string) error {
@@ -2520,7 +2654,7 @@ func (ct *CreateTab) setupUI() {
 		reservedNames := []string{"frida", "admin", "root", "user", "guest"}
 		for _, reserved := range reservedNames {
 			if text == reserved {
-				return fmt.Errorf("'%s'是保留名称，请使用其他名称", text)
+				return fmt.Errorf(i18n.T("'%s'是保留名称，请使用其他名称"), text)
 			}
 		}
 		return nil
@@ -2539,21 +2673,21 @@ func (ct *CreateTab) setupUI() {
 
 		// 实时验证显示
 		if err := ct.magicNameEntry.Validator(text); err != nil {
-			ct.updateStatus(fmt.Sprintf("魔改名称错误: %v", err))
+			ct.updateStatus(fmt.Sprintf(i18n.T("魔改名称错误: %v"), err))
 		} else if len(text) == 5 {
-			ct.updateStatus("魔改名称验证通过")
+			ct.updateStatus(i18n.T("魔改名称验证通过"))
 		}
 	}
 
 	ct.portEntry.SetText("27042")
 	ct.portEntry.Validator = func(text string) error {
 		if port, err := strconv.Atoi(text); err != nil || port < 1 || port > 65535 {
-			return fmt.Errorf("端口必须在1-65535范围内")
+			return fmt.Errorf(i18n.T("端口必须在1-65535范围内"))
 		}
 		return nil
 	}
 
-	ct.isRootlessCheck = widget.NewCheck("Rootless结构", nil)
+	ct.isRootlessCheck = widget.NewCheck(i18n.T("Rootless结构"), nil)
 
 	// 包信息配置
 	ct.packageNameEntry.Disable() // 设置为只读
@@ -2569,7 +2703,7 @@ func (ct *CreateTab) setupUI() {
 	ct.architectureSelect.Resize(fyne.NewSize(200, 0))
 
 	ct.maintainerEntry.SetText("Fridare Team <support@fridare.com>")
-	ct.descriptionEntry.SetPlaceHolder("包描述 (自动生成)")
+	ct.descriptionEntry.SetPlaceHolder(i18n.T("包描述 (自动生成)"))
 	ct.dependsEntry.SetText("firmware (>= 12.0)")
 	ct.sectionEntry.SetText("Development")
 
@@ -2586,10 +2720,10 @@ func (ct *CreateTab) setupUI() {
 
 	// 进度显示
 	ct.progressBar = widget.NewProgressBar()
-	ct.progressLabel = widget.NewLabel("准备就绪")
+	ct.progressLabel = widget.NewLabel(i18n.T("准备就绪"))
 
 	// 创建按钮
-	ct.createBtn = widget.NewButton("创建DEB包", ct.createDebPackage)
+	ct.createBtn = widget.NewButton(i18n.T("创建DEB包"), ct.createDebPackage)
 	ct.createBtn.Importance = widget.HighImportance
 
 	// 简化的紧凑布局 - 使用Border布局避免重叠
@@ -2605,49 +2739,49 @@ func (ct *CreateTab) setupUI() {
 		ct.fridaAgentEntry)
 
 	outputRow := container.NewBorder(nil, nil,
-		widget.NewLabel("     输出路径:"),
+		widget.NewLabel(i18n.T("     输出路径:")),
 		outputSelectBtn,
 		ct.outputPathEntry)
 
-	fileSection := widget.NewCard("文件选择", "", container.NewVBox(
+	fileSection := widget.NewCard(i18n.T("文件选择"), "", container.NewVBox(
 		serverRow,
 		agentRow,
 		outputRow,
 	))
 
 	// 基本配置区域 - 使用HBox横向排列
-	configSection := widget.NewCard("基本配置", "", container.NewHBox(
-		widget.NewLabel("魔改名称:"), ct.magicNameEntry,
-		widget.NewLabel("　　端口:"), ct.portEntry,
+	configSection := widget.NewCard(i18n.T("基本配置"), "", container.NewHBox(
+		widget.NewLabel(i18n.T("魔改名称:")), ct.magicNameEntry,
+		widget.NewLabel(i18n.T("　　端口:")), ct.portEntry,
 		widget.NewLabel("　　　　"), ct.isRootlessCheck,
 	))
 
 	// 包信息区域 - 分两行显示
 	packageRow1 := container.NewHBox(
-		widget.NewLabel("　　包名:"), ct.packageNameEntry,
-		widget.NewLabel("　　版本:"), ct.versionEntry,
-		widget.NewLabel("　　架构:"), ct.architectureSelect,
+		widget.NewLabel(i18n.T("　　包名:")), ct.packageNameEntry,
+		widget.NewLabel(i18n.T("　　版本:")), ct.versionEntry,
+		widget.NewLabel(i18n.T("　　架构:")), ct.architectureSelect,
 	)
 
 	packageRow2 := container.NewHBox(
-		widget.NewLabel("　维护者:"), ct.maintainerEntry,
-		widget.NewLabel("　　分类:"), ct.sectionEntry,
-		widget.NewLabel("　优先级:"), ct.prioritySelect,
+		widget.NewLabel(i18n.T("　维护者:")), ct.maintainerEntry,
+		widget.NewLabel(i18n.T("　　分类:")), ct.sectionEntry,
+		widget.NewLabel(i18n.T("　优先级:")), ct.prioritySelect,
 	)
 
-	packageSection := widget.NewCard("　包信息", "", container.NewVBox(
+	packageSection := widget.NewCard(i18n.T("　包信息"), "", container.NewVBox(
 		packageRow1,
 		packageRow2,
 	))
 
 	// 详细信息区域 - 一行显示
 	detailRow := container.NewHBox(
-		widget.NewLabel("　　描述:"), ct.descriptionEntry,
-		widget.NewLabel("　　依赖:"), ct.dependsEntry,
-		widget.NewLabel("　　主页:"), ct.homepageEntry,
+		widget.NewLabel(i18n.T("　　描述:")), ct.descriptionEntry,
+		widget.NewLabel(i18n.T("　　依赖:")), ct.dependsEntry,
+		widget.NewLabel(i18n.T("　　主页:")), ct.homepageEntry,
 	)
 
-	detailSection := widget.NewCard("详细信息", "", detailRow)
+	detailSection := widget.NewCard(i18n.T("详细信息"), "", detailRow)
 
 	// 操作区域 - 使用Border布局
 	actionSection := container.NewBorder(nil, nil,
@@ -2681,7 +2815,7 @@ func (ct *CreateTab) selectFridaServer() {
 
 		filePath := reader.URI().Path()
 		ct.fridaServerEntry.SetText(filePath)
-		ct.addLog(fmt.Sprintf("选择frida-server文件: %s", filePath))
+		ct.addLog(fmt.Sprintf(i18n.T("选择frida-server文件: %s"), filePath))
 	}, ct.app.Driver().AllWindows()[0])
 }
 
@@ -2695,7 +2829,7 @@ func (ct *CreateTab) selectFridaAgent() {
 
 		filePath := reader.URI().Path()
 		ct.fridaAgentEntry.SetText(filePath)
-		ct.addLog(fmt.Sprintf("选择frida-agent文件: %s", filePath))
+		ct.addLog(fmt.Sprintf(i18n.T("选择frida-agent文件: %s"), filePath))
 	}, ct.app.Driver().AllWindows()[0])
 }
 
@@ -2712,7 +2846,7 @@ func (ct *CreateTab) selectOutputPath() {
 			filePath += ".deb"
 		}
 		ct.outputPathEntry.SetText(filePath)
-		ct.addLog(fmt.Sprintf("选择输出路径: %s", filePath))
+		ct.addLog(fmt.Sprintf(i18n.T("选择输出路径: %s"), filePath))
 	}, ct.app.Driver().AllWindows()[0])
 }
 
@@ -2748,35 +2882,35 @@ func (ct *CreateTab) updatePackageName(magicName string) {
 func (ct *CreateTab) createDebPackage() {
 	// 验证输入
 	if ct.fridaServerEntry.Text == "" {
-		ct.showError("请选择frida-server文件")
+		ct.showError(i18n.T("请选择frida-server文件"))
 		return
 	}
 
 	if ct.outputPathEntry.Text == "" {
-		ct.showError("请选择输出路径")
+		ct.showError(i18n.T("请选择输出路径"))
 		return
 	}
 
 	if ct.magicNameEntry.Text == "" {
-		ct.showError("请输入魔改名称")
+		ct.showError(i18n.T("请输入魔改名称"))
 		return
 	}
 
 	if err := ct.magicNameEntry.Validator(ct.magicNameEntry.Text); err != nil {
-		ct.showError(fmt.Sprintf("魔改名称格式错误: %v", err))
+		ct.showError(fmt.Sprintf(i18n.T("魔改名称格式错误: %v"), err))
 		return
 	}
 
 	port, err := strconv.Atoi(ct.portEntry.Text)
 	if err != nil {
-		ct.showError("端口格式错误")
+		ct.showError(i18n.T("端口格式错误"))
 		return
 	}
 
 	// 禁用按钮
 	ct.createBtn.Disable()
 	ct.progressBar.SetValue(0)
-	ct.progressLabel.SetText("开始创建...")
+	ct.progressLabel.SetText(i18n.T("开始创建..."))
 
 	// 异步执行
 	go ct.performCreate(port)
@@ -2810,28 +2944,28 @@ func (ct *CreateTab) performCreate(port int) {
 		creator.FridaAgentPath = ct.fridaAgentEntry.Text
 	}
 
-	ct.addLog("开始创建DEB包...")
-	ct.addLog(fmt.Sprintf("魔改名称: %s, 端口: %d, 结构: %s",
+	ct.addLog(i18n.T("开始创建DEB包..."))
+	ct.addLog(fmt.Sprintf(i18n.T("魔改名称: %s, 端口: %d, 结构: %s"),
 		packageInfo.MagicName, packageInfo.Port,
 		map[bool]string{true: "Rootless", false: "Root"}[packageInfo.IsRootless]))
 
 	// 执行创建
 	err := creator.CreateDebPackage()
 	if err != nil {
-		ct.progressLabel.SetText("创建失败")
-		ct.showError(fmt.Sprintf("创建DEB包失败: %v", err))
-		ct.addLog(fmt.Sprintf("错误: %v", err))
+		ct.progressLabel.SetText(i18n.T("创建失败"))
+		ct.showError(fmt.Sprintf(i18n.T("创建DEB包失败: %v"), err))
+		ct.addLog(fmt.Sprintf(i18n.T("错误: %v"), err))
 		return
 	}
 
 	ct.progressBar.SetValue(1.0)
-	ct.progressLabel.SetText("创建完成")
-	ct.addLog("DEB包创建成功!")
+	ct.progressLabel.SetText(i18n.T("创建完成"))
+	ct.addLog(i18n.T("DEB包创建成功!"))
 
 	// 显示成功信息
-	ct.showSuccess("DEB包创建成功!", fmt.Sprintf("输出文件: %s", ct.outputPathEntry.Text))
+	ct.showSuccess(i18n.T("DEB包创建成功!"), fmt.Sprintf(i18n.T("输出文件: %s"), ct.outputPathEntry.Text))
 
-	ct.updateStatus("DEB包创建完成")
+	ct.updateStatus(i18n.T("DEB包创建完成"))
 }
 
 // showError 显示错误信息
@@ -2904,9 +3038,9 @@ func NewHelpTab() *HelpTab {
 func (ht *HelpTab) setupHelpData() {
 	ht.helpSections = []HelpSection{
 		{
-			Title: "双技术路线",
+			Title: i18n.T("双技术路线"),
 			Icon:  "🧬",
-			Content: `# 双技术路线说明
+			Content: i18n.T(`# 双技术路线说明
 
 Fridare 提供两条**独立**的 Frida 魔改技术线。默认路径不依赖 Docker / AI。
 
@@ -2931,13 +3065,13 @@ Fridare 提供两条**独立**的 Frida 魔改技术线。默认路径不依赖 
 
 1. 探测 Docker / 磁盘 / 代理 / grok-build / OpenAI 端点  
 2. 步骤① 基础镜像（工具链）  
-3. 浅克隆：` + "`git clone --depth=1 --branch <版本>`" + `  
+3. 浅克隆：`) + i18n.T("`git clone --depth=1 --branch <版本>`") + i18n.T(`  
 4. AI / 朴素源码魔改（Host 改挂载树，不编译）  
-5. 容器内 ` + "`configure --host=… && make`" + `  
+5. 容器内 `) + "`configure --host=… && make`" + i18n.T(`  
 6. 导出 catalog：binaries + **已协议同步的 host wheel** + PROTOCOL-SYNC  
 
 **deep（默认）**：服务端+客户端同步  
-` + "re.frida.* / /re/frida/（DBus 对象路径）/ frida:rpc / Frida.* API → magic；缺对象路径会 UNKNOWN_METHOD。须用 catalog 内 wheel，勿用官方 pip。\n" + `
+`) + i18n.T("re.frida.* / /re/frida/（DBus 对象路径）/ frida:rpc / Frida.* API → magic；缺对象路径会 UNKNOWN_METHOD。须用 catalog 内 wheel，勿用官方 pip。\n") + i18n.T(`
 
 ### 系统不予置
 
@@ -2952,12 +3086,12 @@ Fridare 提供两条**独立**的 Frida 魔改技术线。默认路径不依赖 
 - QQ 群 **555354813** 可申请体验额度  
 - **二维码请在「设置」页 OpenAI 区域直接扫码**（软件内嵌显示）
 
-完整说明见仓库 ` + "`docs/dual-track.md`" + `。`,
+完整说明见仓库 `) + "`docs/dual-track.md`" + `。`,
 		},
 		{
-			Title: "快速开始",
+			Title: i18n.T("快速开始"),
 			Icon:  "🚀",
-			Content: `# 快速开始指南
+			Content: i18n.T(`# 快速开始指南
 
 ## 欢迎使用 Fridare GUI
 
@@ -2977,12 +3111,12 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 3. **执行魔改**：使用「frida 魔改」等静态路径；需要源码级时再打开「源码重编译」
 4. **部署使用**：将处理后的文件部署到目标设备
 
-> 💡 **提示**：首次使用建议先查看"设置"页面进行基本配置。源码重编译为可选增强，见「双技术路线」。`,
+> 💡 **提示**：首次使用建议先查看"设置"页面进行基本配置。源码重编译为可选增强，见「双技术路线」。`),
 		},
 		{
-			Title: "下载功能",
+			Title: i18n.T("下载功能"),
 			Icon:  "📥",
-			Content: `# 下载功能详解
+			Content: i18n.T(`# 下载功能详解
 
 ## 功能概述
 下载页面提供了完整的 Frida 组件下载和管理功能。
@@ -3017,12 +3151,12 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 ## 使用技巧
 - 建议下载后立即进行魔改处理
 - 可同时下载多个版本备用
-- 定期清理不需要的旧版本文件`,
+- 定期清理不需要的旧版本文件`),
 		},
 		{
-			Title: "源码重编译",
+			Title: i18n.T("源码重编译"),
 			Icon:  "🐳",
-			Content: `# 源码重编译 + AI 魔改（可选）
+			Content: i18n.T(`# 源码重编译 + AI 魔改（可选）
 
 ## 何时使用
 当静态二进制补丁不够用、需要源码级标识/行为修改，或要针对任意官方 Frida 版本从源码产出时。
@@ -3045,25 +3179,25 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 5. 默认 profile=**deep**；或点「一键深度定制（①+② deep）」  
 6. 填写官方版本（depth=1）、5 字母 magic、目标平台、对话目标  
 7. **Stealth 开关**（与流水线对等，默认开去符号 / 花指令 / 行为标记）：可单独关；随机 agent 落盘默认关  
-8. 完成后到 **catalog** 产物目录：安装 ` + "`python/host/.../frida-*.whl`" + `（已含协议同步）+ frida_tools  
+8. 完成后到 **catalog** 产物目录：安装 `) + "`python/host/.../frida-*.whl`" + i18n.T(`（已含协议同步）+ frida_tools  
 
 **不是免杀。** 花指令/SELinux/zymbiote 只有本页源码重编译能做；静态「frida 魔改」只能勾导出后去符号。端口用 -l。
 
 ## deep 协议面（须成对）
-` + "- re.frida.* → re.{magic}.*\n- /re/frida/ → /re/{magic}/（对象路径；缺则 UNKNOWN_METHOD）\n- frida:rpc → {magic}:rpc\n- \"Frida. → \"{Magic}.\n" + `产物含 PROTOCOL-SYNC.json 交叉核对结果。
+`) + i18n.T("- re.frida.* → re.{magic}.*\n- /re/frida/ → /re/{magic}/（对象路径；缺则 UNKNOWN_METHOD）\n- frida:rpc → {magic}:rpc\n- \"Frida. → \"{Magic}.\n") + i18n.T(`产物含 PROTOCOL-SYNC.json 交叉核对结果。
 
 ## 编译目标
 支持选择 Android / iOS / Windows / macOS 等常见架构。  
 **诚实限制**：iOS/macOS 官方工具链偏 Apple 宿主；Linux Docker 上可能仅能完整交叉编译 Android/Linux/Windows 子集。
 
 ## 产物
-` + "`catalog/{version}/{platform}/{magic}/`" + `（binaries + python/host wheels + INSTALL.txt + PROTOCOL-SYNC）。  
-工作区 artifacts 另有 README-DEPLOY.txt。`,
+`) + "`catalog/{version}/{platform}/{magic}/`" + i18n.T(`（binaries + python/host wheels + INSTALL.txt + PROTOCOL-SYNC）。  
+工作区 artifacts 另有 README-DEPLOY.txt。`),
 		},
 		{
-			Title: "Frida 魔改",
+			Title: i18n.T("Frida 魔改"),
 			Icon:  "🔧",
-			Content: `# Frida 二进制魔改详解
+			Content: i18n.T(`# Frida 二进制魔改详解
 
 ## 功能目的
 通过修改 Frida 二进制文件的特征字符串，绕过应用的 Frida 检测机制。  
@@ -3106,12 +3240,12 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 ## 高级功能
 - **随机名称生成**：自动生成安全的随机名称
 - **批量处理**：同时处理多个文件
-- **预览模式**：处理前预览修改内容`,
+- **预览模式**：处理前预览修改内容`),
 		},
 		{
-			Title: "DEB 包魔改",
+			Title: i18n.T("DEB 包魔改"),
 			Icon:  "📦",
-			Content: `# DEB 包魔改功能
+			Content: i18n.T(`# DEB 包魔改功能
 
 ## 功能概述
 对已有的 iOS DEB 安装包进行深度魔改，修改其中的 Frida 组件。
@@ -3156,12 +3290,12 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 ## 使用建议
 - 处理前备份原始 DEB 包
 - 测试魔改后的包是否正常工作
-- 建议在沙盒环境中先行测试`,
+- 建议在沙盒环境中先行测试`),
 		},
 		{
-			Title: "DEB 包创建",
+			Title: i18n.T("DEB 包创建"),
 			Icon:  "🆕",
-			Content: `# DEB 包创建功能
+			Content: i18n.T(`# DEB 包创建功能
 
 ## 功能介绍
 从零开始创建全新的 iOS DEB 安装包，集成魔改后的 Frida 组件。
@@ -3208,12 +3342,12 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 ## 质量保证
 - 包结构验证
 - 文件完整性检查
-- 兼容性测试建议`,
+- 兼容性测试建议`),
 		},
 		{
-			Title: "frida-tools 魔改",
+			Title: i18n.T("frida-tools 魔改"),
 			Icon:  "🛠️",
-			Content: `# frida-tools 魔改功能
+			Content: i18n.T(`# frida-tools 魔改功能
 
 ## 功能目标
 对PC中安装的 frida-tools Python 包进行魔改，避免无法访问魔改过的 frida-server。
@@ -3267,12 +3401,12 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 - 魔改会影响该环境中的所有 frida 工具
 - 建议在专用环境中进行魔改
 - 魔改后的工具与原版不兼容
-- 可以随时恢复到原始状态`,
+- 可以随时恢复到原始状态`),
 		},
 		{
-			Title: "设置",
+			Title: i18n.T("设置"),
 			Icon:  "⚙️",
-			Content: `# 设置详解
+			Content: i18n.T(`# 设置详解
 
 ## 全局配置
 ### 应用版本
@@ -3358,12 +3492,12 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 ### 导入/导出
 - 支持配置文件的导入导出
 - 便于在多台设备间同步配置
-- 使用 JSON 格式存储`,
+- 使用 JSON 格式存储`),
 		},
 		{
-			Title: "故障排除",
+			Title: i18n.T("故障排除"),
 			Icon:  "🔍",
-			Content: `# 故障排除指南
+			Content: i18n.T(`# 故障排除指南
 
 ## 常见问题
 
@@ -3492,12 +3626,12 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 - 检查已存在的进程
 - 重启相关服务
 
-如需更多帮助，请访问项目GitHub页面或加入QQ技术交流群获取支持。`,
+如需更多帮助，请访问项目GitHub页面或加入QQ技术交流群获取支持。`),
 		},
 		{
-			Title: "最佳实践",
+			Title: i18n.T("最佳实践"),
 			Icon:  "📋",
-			Content: `# 最佳实践指南
+			Content: i18n.T(`# 最佳实践指南
 
 ## 使用流程建议
 
@@ -3567,7 +3701,7 @@ Fridare 是一个强大的 Frida 工具集，专为 iOS 逆向工程和安全研
 - 每月检查配置设置
 - 清理不需要的下载文件
 - 更新到最新程序版本
-- 备份重要配置和操作日志`,
+- 备份重要配置和操作日志`),
 		},
 	}
 }
@@ -3620,7 +3754,7 @@ func (ht *HelpTab) setupUI() {
 	ht.indexList.Refresh()
 
 	// 创建左侧面板 - 使用Border布局让列表自适应高度
-	titleLabel := widget.NewLabel("📖 帮助目录")
+	titleLabel := widget.NewLabel(i18n.T("📖 帮助目录"))
 	titleLabel.TextStyle = fyne.TextStyle{Bold: true}
 
 	leftPanel := container.NewBorder(
@@ -3717,20 +3851,20 @@ func NewAnalysisTab(app fyne.App, cfg *config.Config, statusUpdater StatusUpdate
 func (at *AnalysisTab) setupUI() {
 	// 文件选择区域
 	at.filePathEntry = widget.NewEntry()
-	at.filePathEntry.SetPlaceHolder("选择要分析的二进制文件 (Mach-O, PE, ELF)...")
+	at.filePathEntry.SetPlaceHolder(i18n.T("选择要分析的二进制文件 (Mach-O, PE, ELF)..."))
 
-	at.browseBtn = widget.NewButton("浏览", func() {
+	at.browseBtn = widget.NewButton(i18n.T("浏览"), func() {
 		at.selectFile()
 	})
 
-	at.analyzeBtn = widget.NewButton("分析文件", func() {
+	at.analyzeBtn = widget.NewButton(i18n.T("分析文件"), func() {
 		at.analyzeFile()
 	})
 	at.analyzeBtn.Importance = widget.HighImportance
 	at.analyzeBtn.Disable()
 
 	at.searchEntry = widget.NewEntry()
-	at.searchEntry.SetPlaceHolder("搜字符串...")
+	at.searchEntry.SetPlaceHolder(i18n.T("搜字符串..."))
 	at.searchEntry.OnChanged = func(text string) {
 		at.filterSectionData(text)
 	}
@@ -3803,12 +3937,12 @@ func (at *AnalysisTab) setupUI() {
 	// 创建分割容器 - 直接使用表格，不需要容器
 	splitContainer := container.NewHSplit(
 		container.NewBorder(
-			widget.NewLabel("文件结构"),
+			widget.NewLabel(i18n.T("文件结构")),
 			nil, nil, nil,
 			container.NewScroll(at.tree),
 		),
 		container.NewBorder(
-			widget.NewLabel("详细信息"),
+			widget.NewLabel(i18n.T("详细信息")),
 			nil, nil, nil,
 			container.NewStack(
 				container.NewScroll(at.sectionListTable),
@@ -3821,7 +3955,7 @@ func (at *AnalysisTab) setupUI() {
 	// 主布局
 
 	at.content = container.NewBorder(
-		widget.NewCard("文件选择", "", fileSelectArea),
+		widget.NewCard(i18n.T("文件选择"), "", fileSelectArea),
 		nil, nil, nil,
 		splitContainer,
 	)
@@ -3862,16 +3996,16 @@ func (at *AnalysisTab) fileExists(path string) bool {
 func (at *AnalysisTab) analyzeFile() {
 	filePath := at.filePathEntry.Text
 	if filePath == "" {
-		at.updateStatus("请选择要分析的文件")
+		at.updateStatus(i18n.T("请选择要分析的文件"))
 		return
 	}
 
-	at.updateStatus("正在分析文件...")
-	at.addLog(fmt.Sprintf("INFO: 开始分析文件: %s", filePath))
+	at.updateStatus(i18n.T("正在分析文件..."))
+	at.addLog(fmt.Sprintf(i18n.T("INFO: 开始分析文件: %s"), filePath))
 
 	go func() {
 		defer func() {
-			at.updateStatus("文件分析完成")
+			at.updateStatus(i18n.T("文件分析完成"))
 		}()
 
 		// 清理旧的缓存数据
@@ -3885,16 +4019,16 @@ func (at *AnalysisTab) analyzeFile() {
 		// 分析文件
 		fileInfo, err := at.analyzer.AnalyzeFile()
 		if err != nil {
-			at.addLog(fmt.Sprintf("ERROR: 文件分析失败: %v", err))
+			at.addLog(fmt.Sprintf(i18n.T("ERROR: 文件分析失败: %v"), err))
 			return
 		}
 
 		at.currentFile = filePath
 		at.fileInfo = fileInfo
-		at.addLog(fmt.Sprintf("INFO: 检测到文件类型: %s", fileInfo.FileType))
-		at.addLog(fmt.Sprintf("INFO: 架构: %s", fileInfo.Architecture))
-		at.addLog(fmt.Sprintf("INFO: 段数量: %d", len(fileInfo.Sections)))
-		at.addLog(fmt.Sprintf("INFO: 段数量: %d", len(fileInfo.Sections)))
+		at.addLog(fmt.Sprintf(i18n.T("INFO: 检测到文件类型: %s"), fileInfo.FileType))
+		at.addLog(fmt.Sprintf(i18n.T("INFO: 架构: %s"), fileInfo.Architecture))
+		at.addLog(fmt.Sprintf(i18n.T("INFO: 段数量: %d"), len(fileInfo.Sections)))
+		at.addLog(fmt.Sprintf(i18n.T("INFO: 段数量: %d"), len(fileInfo.Sections)))
 
 		// 刷新UI
 		fyne.Do(func() {
@@ -4017,12 +4151,12 @@ func (at *AnalysisTab) getNodeText(uid widget.TreeNodeID) string {
 	case "":
 		return "Root"
 	case "file_info":
-		return "文件信息"
+		return i18n.T("文件信息")
 	case "sections":
 		if at.fileInfo != nil {
-			return fmt.Sprintf("段信息 (%d)", len(at.fileInfo.Sections))
+			return fmt.Sprintf(i18n.T("段信息 (%d)"), len(at.fileInfo.Sections))
 		}
-		return "段信息 (0)"
+		return i18n.T("段信息 (0)")
 	default:
 		// 文件信息多行节点
 		if strings.HasPrefix(string(uid), "info_type_") {
@@ -4032,11 +4166,11 @@ func (at *AnalysisTab) getNodeText(uid widget.TreeNodeID) string {
 				if index < len(typeLines) {
 					line := strings.TrimSpace(typeLines[index])
 					if line != "" {
-						return fmt.Sprintf("文件类型: %s", line)
+						return fmt.Sprintf(i18n.T("文件类型: %s"), line)
 					}
 				}
 			}
-			return "文件类型: 未知"
+			return i18n.T("文件类型: 未知")
 		}
 		if strings.HasPrefix(string(uid), "info_size_") {
 			indexStr := strings.TrimPrefix(string(uid), "info_size_")
@@ -4046,11 +4180,11 @@ func (at *AnalysisTab) getNodeText(uid widget.TreeNodeID) string {
 				if index < len(sizeLines) {
 					line := strings.TrimSpace(sizeLines[index])
 					if line != "" {
-						return fmt.Sprintf("文件大小: %s", line)
+						return fmt.Sprintf(i18n.T("文件大小: %s"), line)
 					}
 				}
 			}
-			return "文件大小: 未知"
+			return i18n.T("文件大小: 未知")
 		}
 		if strings.HasPrefix(string(uid), "info_arch_") {
 			indexStr := strings.TrimPrefix(string(uid), "info_arch_")
@@ -4059,11 +4193,11 @@ func (at *AnalysisTab) getNodeText(uid widget.TreeNodeID) string {
 				if index < len(archLines) {
 					// line := strings.TrimSpace(archLines[index])
 					// if line != "" {
-					return "架构:"
+					return i18n.T("架构:")
 					// }
 				}
 			}
-			return "架构: 未知"
+			return i18n.T("架构: 未知")
 		}
 		if strings.HasPrefix(string(uid), "info_detailed_") {
 			indexStr := strings.TrimPrefix(string(uid), "info_detailed_")
@@ -4076,7 +4210,7 @@ func (at *AnalysisTab) getNodeText(uid widget.TreeNodeID) string {
 					}
 				}
 			}
-			return "详细信息: 未知"
+			return i18n.T("详细信息: 未知")
 		}
 
 		// 架构节点
@@ -4089,7 +4223,7 @@ func (at *AnalysisTab) getNodeText(uid widget.TreeNodeID) string {
 					}
 				}
 			}
-			return fmt.Sprintf("架构 %s", archIndexStr)
+			return fmt.Sprintf(i18n.T("架构 %s"), archIndexStr)
 		}
 		// 段节点
 		if strings.HasPrefix(string(uid), "section_") {
@@ -4299,7 +4433,7 @@ func (at *AnalysisTab) displayStringsInSectionWithRichText(id widget.TableCellID
 			case 3:
 				text = "0"
 			case 4:
-				text = "未在此段中找到字符串"
+				text = i18n.T("未在此段中找到字符串")
 			}
 			label := widget.NewLabel(text)
 			label.Truncation = fyne.TextTruncateEllipsis
@@ -4323,7 +4457,7 @@ func (at *AnalysisTab) displayStringsInSectionWithRichText(id widget.TableCellID
 			case 3:
 				text = fmt.Sprintf("%d", len(data))
 			case 4:
-				text = fmt.Sprintf("段太大，仅搜索前%.1fKB的字符串", float64(maxStringParseSize)/1024)
+				text = fmt.Sprintf(i18n.T("段太大，仅搜索前%.1fKB的字符串"), float64(maxStringParseSize)/1024)
 			}
 			label := widget.NewLabel(text)
 			label.Truncation = fyne.TextTruncateEllipsis
@@ -4454,7 +4588,7 @@ func (at *AnalysisTab) displayStringsInSection(id widget.TableCellID, label *wid
 			case 3:
 				label.SetText("0")
 			case 4:
-				label.SetText("未在此段中找到字符串")
+				label.SetText(i18n.T("未在此段中找到字符串"))
 			}
 		} else {
 			label.SetText("")
@@ -4477,7 +4611,7 @@ func (at *AnalysisTab) displayStringsInSection(id widget.TableCellID, label *wid
 			case 3:
 				label.SetText(fmt.Sprintf("%d", len(data)))
 			case 4:
-				label.SetText(fmt.Sprintf("段太大，仅搜索前%.1fKB的字符串", float64(maxStringParseSize)/1024))
+				label.SetText(fmt.Sprintf(i18n.T("段太大，仅搜索前%.1fKB的字符串"), float64(maxStringParseSize)/1024))
 			}
 			return
 		}
@@ -4588,7 +4722,7 @@ func (at *AnalysisTab) filterSectionData(searchText string) {
 		at.highlightMatches = nil
 		at.currentTable.Refresh()
 		section := at.fileInfo.Sections[at.selectedSection]
-		at.updateStatus(fmt.Sprintf("显示段 %s 的所有字符串", section.Name))
+		at.updateStatus(fmt.Sprintf(i18n.T("显示段 %s 的所有字符串"), section.Name))
 		return
 	}
 
@@ -4596,7 +4730,7 @@ func (at *AnalysisTab) filterSectionData(searchText string) {
 	section := at.fileInfo.Sections[at.selectedSection]
 	data, err := at.getCachedSectionData(at.selectedSection)
 	if err != nil || len(data) == 0 {
-		at.updateStatus("无法获取段数据")
+		at.updateStatus(i18n.T("无法获取段数据"))
 		return
 	}
 
@@ -4651,10 +4785,10 @@ func (at *AnalysisTab) filterSectionData(searchText string) {
 
 	// 更新状态信息
 	if matchCount > 0 {
-		at.updateStatus(fmt.Sprintf("在段 %s 中找到 %d 个匹配 \"%s\" 的字符串",
+		at.updateStatus(fmt.Sprintf(i18n.T("在段 %s 中找到 %d 个匹配 \"%s\" 的字符串"),
 			section.Name, matchCount, at.currentSearchText))
 	} else {
-		at.updateStatus(fmt.Sprintf("在段 %s 中未找到匹配 \"%s\" 的字符串",
+		at.updateStatus(fmt.Sprintf(i18n.T("在段 %s 中未找到匹配 \"%s\" 的字符串"),
 			section.Name, at.currentSearchText))
 	}
 }
@@ -5025,7 +5159,7 @@ func (at *AnalysisTab) onTreeNodeSelected(uid widget.TreeNodeID) {
 		at.switchToSectionListMode()
 		at.currentTable.Refresh()
 		at.currentTable.ScrollToTop()
-		at.updateStatus("显示段列表信息（IDA风格）")
+		at.updateStatus(i18n.T("显示段列表信息（IDA风格）"))
 
 	case "sections":
 		// 显示所有段信息
@@ -5034,7 +5168,7 @@ func (at *AnalysisTab) onTreeNodeSelected(uid widget.TreeNodeID) {
 		at.currentTable.Refresh()
 		at.currentTable.ScrollToTop()
 		if at.fileInfo != nil {
-			at.updateStatus(fmt.Sprintf("显示所有段信息 (%d个)", len(at.fileInfo.Sections)))
+			at.updateStatus(fmt.Sprintf(i18n.T("显示所有段信息 (%d个)"), len(at.fileInfo.Sections)))
 		}
 
 	default:
@@ -5048,7 +5182,7 @@ func (at *AnalysisTab) onTreeNodeSelected(uid widget.TreeNodeID) {
 			at.switchToSectionListMode()
 			at.currentTable.Refresh()
 			at.currentTable.ScrollToTop()
-			at.updateStatus("显示文件详细信息")
+			at.updateStatus(i18n.T("显示文件详细信息"))
 			// 架构节点
 		} else if strings.HasPrefix(string(uid), "arch_") {
 			archIndexStr := strings.TrimPrefix(string(uid), "arch_")
@@ -5057,7 +5191,7 @@ func (at *AnalysisTab) onTreeNodeSelected(uid widget.TreeNodeID) {
 				at.selectedSection = -1
 				for _, section := range at.fileInfo.Sections {
 					if section.ArchIndex == archIndex && section.Type == "Architecture" {
-						at.updateStatus(fmt.Sprintf("架构信息: %s", section.Name))
+						at.updateStatus(fmt.Sprintf(i18n.T("架构信息: %s"), section.Name))
 						break
 					}
 				}
@@ -5085,7 +5219,7 @@ func (at *AnalysisTab) onTreeNodeSelected(uid widget.TreeNodeID) {
 				at.selectedSection = i
 				section := at.fileInfo.Sections[i]
 				at.updateTableLayout() // 更新表格布局为段数据模式
-				at.updateStatus(fmt.Sprintf("选择段: %s (大小: %d bytes)", section.Name, section.Size))
+				at.updateStatus(fmt.Sprintf(i18n.T("选择段: %s (大小: %d bytes)"), section.Name, section.Size))
 				at.currentTable.Refresh()
 				at.currentTable.ScrollToTop()
 			}

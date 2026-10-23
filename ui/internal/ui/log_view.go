@@ -3,6 +3,8 @@ package ui
 import (
 	"strings"
 
+	"fridare-gui/internal/i18n"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
@@ -79,7 +81,7 @@ func (l *LogView) Append(s string) {
 func (l *LogView) refresh() {
 	body := l.text
 	if strings.TrimSpace(body) == "" {
-		body = "日志输出（等宽高对比）\n"
+		body = i18n.T("日志输出（等宽高对比）\n")
 	}
 	// Use TextSegment with Foreground + monospaced caption size — readable on light theme
 	l.rich.Segments = []widget.RichTextSegment{

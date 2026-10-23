@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+
+	"fridare-gui/internal/i18n"
 )
 
 // hostDockerInternal is the Docker Desktop DNS name for the host machine
@@ -72,12 +74,12 @@ func DockerExtraHostArgs() []string {
 // ContainerNetworkHint documents the rewrite for logs/UI.
 func ContainerNetworkHint(hostProxy, containerProxy string) string {
 	if hostProxy == "" {
-		return "容器未注入代理"
+		return i18n.T("容器未注入代理")
 	}
 	if hostProxy == containerProxy {
-		return "容器代理=" + containerProxy
+		return i18n.T("容器代理=") + containerProxy
 	}
-	return "容器代理 " + hostProxy + " → " + containerProxy + "（localhost 已改为 host.docker.internal）"
+	return i18n.T("容器代理 ") + hostProxy + " → " + containerProxy + i18n.T("（localhost 已改为 host.docker.internal）")
 }
 
 // HostNeedsDockerInternal is true on typical Docker Desktop hosts.

@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"fridare-gui/internal/i18n"
 )
 
 // GetExecutableDir 获取可执行文件所在目录
@@ -51,7 +53,7 @@ func GetConfigDir() (string, error) {
 	}
 
 	if configDir == "" {
-		return "", fmt.Errorf("无法确定配置目录")
+		return "", fmt.Errorf(i18n.T("无法确定配置目录"))
 	}
 
 	return filepath.Join(configDir, "fridare"), nil
@@ -261,7 +263,7 @@ func FindExecutable(name string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("找不到可执行文件: %s", name)
+	return "", fmt.Errorf(i18n.T("找不到可执行文件: %s"), name)
 }
 
 // FetchRemoteText 获取远程文本内容(支持代理)
@@ -287,7 +289,7 @@ func FetchRemoteText(urlStr string, proxyURL string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("请求失败: %s", resp.Status)
+		return "", fmt.Errorf(i18n.T("请求失败: %s"), resp.Status)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -314,7 +316,7 @@ func TestProxy(proxyURL string, testURL string, timeout int) (bool, string, erro
 	if proxyURL != "" {
 		proxyParsed, err := url.Parse(proxyURL)
 		if err != nil {
-			return false, "代理URL格式错误", err
+			return false, i18n.T("代理URL格式错误"), err
 		}
 
 		transport := &http.Transport{
@@ -329,15 +331,15 @@ func TestProxy(proxyURL string, testURL string, timeout int) (bool, string, erro
 	elapsed := time.Since(start)
 
 	if err != nil {
-		return false, fmt.Sprintf("连接失败: %v", err), err
+		return false, fmt.Sprintf(i18n.T("连接失败: %v"), err), err
 	}
 	defer resp.Body.Close()
 
 	// 检查响应状态
 	if resp.StatusCode == http.StatusOK {
-		return true, fmt.Sprintf("连接成功 (%dms)", elapsed.Milliseconds()), nil
+		return true, fmt.Sprintf(i18n.T("连接成功 (%dms)"), elapsed.Milliseconds()), nil
 	} else {
-		return false, fmt.Sprintf("HTTP状态码: %d", resp.StatusCode), nil
+		return false, fmt.Sprintf(i18n.T("HTTP状态码: %d"), resp.StatusCode), nil
 	}
 }
 
