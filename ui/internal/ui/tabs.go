@@ -303,6 +303,17 @@ func (mt *ModifyTab) startPatching() {
 		}
 
 		err := mt.hexReplacer.PatchFile(inputPath, magicName, outputPath, progressCallback)
+		if err == nil {
+			// Static hexreplace does not rewrite Lre/frida/ or repair the dex
+			// checksum. Without this, Android server aborts: backend_class != null.
+			if changed, perr := rebuild.PatchProductFile(outputPath, magicName); perr != nil {
+				err = fmt.Errorf("Android helper: %w", perr)
+			} else if changed {
+				fyne.Do(func() {
+					mt.addLog("INFO: 已套用协议面 + Android helper dex/hash（backend_class != null）")
+				})
+			}
+		}
 		if err == nil && mt.stripAfterChk != nil && mt.stripAfterChk.Checked {
 			if res, serr := rebuild.StripProductBinary(outputPath, magicName); serr != nil {
 				err = fmt.Errorf("去符号: %w", serr)
@@ -1105,8 +1116,9 @@ func (tt *ToolsTab) detectFridaTools() {
 
 	output, err := cmd.Output()
 	if err != nil {
-		tt.updateStatus("未检测到frida-tools")
-		tt.addLog("ERROR: 未检测到frida-tools: " + err.Error())
+		// pip show frida 查的是原生绑定（import frida），不是 PyPI 发行名 frida-tools。
+		tt.updateStatus("未检测到原生包 frida（import frida）。frida-tools 是另一个发行名，wheel 文件名是 frida_tools-*.whl")
+		tt.addLog("ERROR: pip show frida 失败（这不是 frida-tools）: " + err.Error())
 		return
 	}
 
@@ -1143,7 +1155,7 @@ func (tt *ToolsTab) detectFridaTools() {
 
 	// 更新UI
 	fyne.Do(func() {
-		tt.fridaInfoLabel.SetText("已检测到frida-tools")
+		tt.fridaInfoLabel.SetText("已检测到 frida 原生包（import frida，不是发行名 frida-tools）")
 		tt.fridaVersionLabel.SetText("版本: " + version)
 		tt.fridaPathLabel.SetText("路径: " + fridaPath)
 		tt.patchStatusLabel.SetText("状态: " + patchStatus)
@@ -1164,8 +1176,8 @@ func (tt *ToolsTab) detectFridaTools() {
 		}
 	})
 
-	tt.updateStatus("frida-tools检测完成")
-	tt.addLog(fmt.Sprintf("INFO: frida-tools v%s 检测完成，状态: %s", version, patchStatus))
+	tt.updateStatus("frida 原生包检测完成")
+	tt.addLog(fmt.Sprintf("INFO: 原生包 frida v%s（import frida）。PyPI 发行名 frida-tools 的 wheel/import 是 frida_tools。状态: %s", version, patchStatus))
 }
 
 // checkPatchStatus 检查patch状态
@@ -1380,33 +1392,55 @@ func (tt *ToolsTab) patchPythonFiles(magicName, port string) error {
 	}
 
 	filePath := filepath.Join(tt.fridaInfo.InstallPath, "core.py")
+	if err := tt.patchOnePython(filePath, magicName); err != nil {
+		return err
+	}
+	// frida 14+ CLI lives in the import package frida_tools (sibling of the
+	// native frida package). PyPI project name remains frida-tools.
+	parent := filepath.Dir(tt.fridaInfo.InstallPath)
+	toolsDir := filepath.Join(parent, "frida_tools")
+	if st, err := os.Stat(toolsDir); err == nil && st.IsDir() {
+		walkErr := filepath.Walk(toolsDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil || info == nil || info.IsDir() {
+				return nil
+			}
+			if strings.HasSuffix(strings.ToLower(info.Name()), ".py") {
+				return tt.patchOnePython(path, magicName)
+			}
+			return nil
+		})
+		if walkErr != nil {
+			return walkErr
+		}
+	}
+
+	tt.addLog("INFO: 已跳过 __init__.py 全局替换（避免破坏 import _frida）；协议/API 已按前缀同步")
+	return nil
+}
+
+func (tt *ToolsTab) patchOnePython(filePath, magicName string) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		tt.addLog("WARN: core.py 不存在，跳过 Python 文本魔改")
+		tt.addLog("WARN: 跳过不存在的 Python 文件: " + filepath.Base(filePath))
 		return nil
 	}
-
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("读取文件 core.py 失败: %v", err)
+		return fmt.Errorf("读取文件 %s 失败: %v", filePath, err)
 	}
-
-	// full=true: 与魔改 server 同步 — frida:rpc + re.frida.* + Frida.* API
 	contentStr, n, err := core.PatchClientProtocolSurface(string(content), magicName, true)
 	if err != nil {
 		return err
 	}
+	base := filepath.Base(filePath)
 	if n > 0 {
 		if err := os.WriteFile(filePath, []byte(contentStr), 0644); err != nil {
-			return fmt.Errorf("写入文件 core.py 失败: %v", err)
+			return fmt.Errorf("写入文件 %s 失败: %v", base, err)
 		}
-		tt.addLog(fmt.Sprintf("INFO: 客户端协议面已同步 magic=%s（rpc/re.frida./Frida.*）共 %d 处 → core.py", magicName, n))
-		tt.addLog("SUCCESS: 已魔改Python文件: core.py")
+		tt.addLog(fmt.Sprintf("INFO: 客户端协议面已同步 magic=%s（rpc/re.frida./Frida.*）共 %d 处 → %s", magicName, n, base))
+		tt.addLog("SUCCESS: 已魔改Python文件: " + base)
 	} else {
-		tt.addLog("INFO: core.py 中未找到可替换协议标记，可能已魔改或版本结构不同")
+		tt.addLog("INFO: " + base + " 中未找到可替换协议标记，可能已魔改或版本结构不同")
 	}
-
-	// 明确跳过 __init__.py 全局 bare "frida" 替换（避免破坏 import _frida）
-	tt.addLog("INFO: 已跳过 __init__.py 全局替换（避免破坏 import _frida）；协议/API 已按前缀同步")
 	return nil
 }
 
@@ -1536,6 +1570,11 @@ func (tt *ToolsTab) hexReplace(filePath, oldStr, newStr string) error {
 	if err := os.Rename(tempFile, filePath); err != nil {
 		os.Remove(tempFile)
 		return fmt.Errorf("替换原文件失败: %v", err)
+	}
+	// HexReplace only edits named sections. Android helper dex uses Lre/frida/
+	// and needs a checksum repair or the server aborts: backend_class != null.
+	if _, err := rebuild.PatchProductFile(filePath, newStr); err != nil {
+		return fmt.Errorf("Android helper: %v", err)
 	}
 
 	return nil
@@ -1732,20 +1771,20 @@ type SettingsTab struct {
 	concurrentDownloadsEntry *FixedWidthEntry
 
 	// OpenAI 兼容端点（AI agent / 源码重编译）
-	openaiBaseEntry       *FixedWidthEntry
-	openaiKeyEntry        *FixedWidthEntry
-	openaiModelEntry      *FixedWidthEntry
-	openaiHelpLabel       *widget.Label
-	openaiAgentProxyChk   *widget.Check
-	openaiProbeBtn        *widget.Button
-	openaiProbeResult     *widget.Label
+	openaiBaseEntry     *FixedWidthEntry
+	openaiKeyEntry      *FixedWidthEntry
+	openaiModelEntry    *FixedWidthEntry
+	openaiHelpLabel     *widget.Label
+	openaiAgentProxyChk *widget.Check
+	openaiProbeBtn      *widget.Button
+	openaiProbeResult   *widget.Label
 
 	// 源码重编译相关
-	rebuildDiskEntry       *FixedWidthEntry
-	rebuildImageEntry      *FixedWidthEntry
-	rebuildMirrorEntry     *FixedWidthEntry
-	rebuildPullDirectChk   *widget.Check
-	rebuildUseGrokChk      *widget.Check
+	rebuildDiskEntry     *FixedWidthEntry
+	rebuildImageEntry    *FixedWidthEntry
+	rebuildMirrorEntry   *FixedWidthEntry
+	rebuildPullDirectChk *widget.Check
+	rebuildUseGrokChk    *widget.Check
 
 	// 操作按钮
 	saveBtn   *widget.Button

@@ -367,6 +367,68 @@ func PatchArtifactBinaryMarkers(dir, magic string) (int, error) {
 	if err := core.ValidateMagicName(magic); err != nil {
 		return 0, err
 	}
+	n := 0
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
+			return nil
+		}
+		if info.Size() < MinArtifactBytes || info.Size() > 200*1024*1024 {
+			return nil
+		}
+		changed, err := PatchProductFile(path, magic)
+		if err != nil {
+			return err
+		}
+		if changed {
+			n++
+		}
+		return nil
+	})
+	return n, err
+}
+
+// PatchProductFile rewrites one product binary: same-length markers, then
+// Android helper dex checksums and agent ELF hashes.
+// The helper step is what stops Android frida-server from aborting with
+// `backend_class != null` after `Lre/frida/...` is renamed.
+// Returns true when the file was written.
+func PatchProductFile(path, magic string) (bool, error) {
+	if err := core.ValidateMagicName(magic); err != nil {
+		return false, err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	if info.IsDir() || info.Size() < MinArtifactBytes || info.Size() > 200*1024*1024 {
+		return false, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	orig := data
+	pairs := productMarkerPairs(magic)
+	for _, p := range pairs {
+		if len(p[0]) != len(p[1]) {
+			continue
+		}
+		data = bytes.ReplaceAll(data, p[0], p[1])
+	}
+	// Always run after the string replace. A whole-file replace of `re/frida`
+	// leaves the embedded helper dex checksum stale; ART then fails the class
+	// lookup and the server aborts with backend_class != null.
+	helperHits := PatchAndroidHelperInBinary(data, magic)
+	if helperHits == 0 && bytes.Equal(orig, data) {
+		return false, nil
+	}
+	if err := os.WriteFile(path, data, info.Mode()); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func productMarkerPairs(magic string) [][2][]byte {
 	pairs := [][2][]byte{
 		{[]byte("frida-server"), []byte(magic + "-server")},
 		{[]byte("frida-helper"), []byte(magic + "-helper")},
@@ -380,46 +442,16 @@ func PatchArtifactBinaryMarkers(dir, magic string) (int, error) {
 		{[]byte("frida_helper"), []byte(magic + "_helper")},
 		{[]byte("frida_agent"), []byte(magic + "_agent")},
 		{[]byte("frida_gadget"), []byte(magic + "_gadget")},
-		// Stealth markers (same length when magic is 5 letters)
 		{[]byte("frida-zymbiote"), []byte(magic + "-zymbiote")},
 		{[]byte("u:object_r:frida"), []byte("u:object_r:" + magic)},
 		{[]byte("_frida_"), []byte("_" + magic + "_")},
 	}
-	// Server+client protocol surface (same length when magic is 5 letters)
 	if proto, err := core.ClientProtocolBinaryPairs(magic); err == nil {
 		pairs = append(pairs, proto...)
 	} else {
-		// fallback product-only rpc (should not happen after ValidateMagicName)
 		pairs = append(pairs, [2][]byte{[]byte("frida:rpc"), []byte(magic + ":rpc")})
 	}
-	n := 0
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info == nil || info.IsDir() {
-			return nil
-		}
-		if info.Size() < MinArtifactBytes || info.Size() > 200*1024*1024 {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		orig := data
-		for _, p := range pairs {
-			if len(p[0]) != len(p[1]) {
-				continue
-			}
-			data = bytes.ReplaceAll(data, p[0], p[1])
-		}
-		if PatchAndroidHelperInBinary(data, magic) > 0 || !bytes.Equal(orig, data) {
-			if err := os.WriteFile(path, data, info.Mode()); err != nil {
-				return err
-			}
-			n++
-		}
-		return nil
-	})
-	return n, err
+	return pairs
 }
 
 func dirExists(p string) bool {

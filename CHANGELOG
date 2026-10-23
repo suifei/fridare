@@ -4,8 +4,12 @@
 
 ## Unreleased
 
+## v4.0.9 - 2026-10-23
+
 ### Fixed
-- 源码重编译同时勾选 arm64 与 x86_64 时，catalog 两组产物都变成 x86-64（[issue #38](https://github.com/suifei/fridare/issues/38)）。`OrganizeExportToCatalog` 在拷贝 `artifacts/<target>/` 之后又遍历产物根目录，按文件名压平，字典序靠后的 `x86_64` 覆盖其余架构。现在每个目标只取自己的子目录。同一条编译脚本里 `CC=aarch64-linux-gnu-gcc` 也只留在 `linux-arm64` 子 shell，不再套到后面的 x86_64 / Android / MinGW。
+- 源码重编译同时勾选 arm64 与 x86_64 时，catalog 两组产物都变成 x86-64（[issue #38](https://github.com/suifei/fridare/issues/38)，[#39](https://github.com/suifei/fridare/pull/39)）。`OrganizeExportToCatalog` 在拷贝 `artifacts/<target>/` 之后又遍历产物根目录，按文件名压平，字典序靠后的 `x86_64` 覆盖其余架构。现在每个目标只取自己的子目录。同一条编译脚本里 `CC=aarch64-linux-gnu-gcc` 也只留在 `linux-arm64` 子 shell，不再套到后面的 x86_64 / Android / MinGW。
+- Android server 启动 `backend_class != null`：静态「frida 魔改」只改了段内字符串，没有改嵌入 helper dex 的 `Lre/frida/...`，也没有重算 dex SHA-1/Adler32。导出和魔改完成都会走 `PatchProductFile`（含 `PatchAndroidHelperInBinary`）。v4.0.8 发布的 GUI 还没有这条路径，需要用本版重新导出/魔改 Android 产物。本仓库没有重编已发布的 `kxmwp-*` Frida zip。
+- pip 名称：PyPI 发行名是 `frida-tools`，wheel 文件名和 import 包是 `frida_tools`，原生绑定是 `frida`。INSTALL.txt / 产物库提示把产品标签 `17.17.1` 说成要安装的版本；实际 `EffectivePipVersion` 是 `17.17.0`。下载列表不再把 `frida-*.whl` 标成 frida-tools。就地魔改会同时改 `frida` 与旁边的 `frida_tools` 包。
 - 手搓 `frida-tools` wheel 文件名把 PEP 440 本地版本的 `+` 错写成 `.`，pip 报 `Invalid wheel filename (invalid version)`（[issue #36](https://github.com/suifei/fridare/issues/36)）。正确形式：`frida_tools-14.10.4+frida.17.17.0.fridare.kxmwp-py3-none-any.whl`。已发布包把文件名里 `14.10.4.frida.` 改成 `14.10.4+frida.` 即可安装。
 - Android `kxmwp-server` 启动 `backend_class != null` abort：嵌入 helper dex 仍是 `Lre/frida/HelperBackend`，且同长度改 `frida_agent_main` 后 GNU hash 未更新。`PatchAndroidHelperInBinary` 改 dex 描述符、重算 SHA-1/Adler32、按当前 dynstr 重写 `DT_GNU_HASH`。
 - 16.x `frida-ps` 报 `undefined symbol: kxmwp_agent_main`：只对导出 `*_agent_main` 的嵌入 agent ELF 重写 GNU/sysv hash；agent 内残留的 GumJS 全局 `Frida` 改成 PascalCase(magic)（**不**把 `Kxmwp.` 写回 `Frida.`）。已重传 `kxmwp-16.7.19` 的 android-arm64 zip。
