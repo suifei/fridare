@@ -36,6 +36,106 @@ func TestCatalogEntryDirAndList(t *testing.T) {
 	}
 }
 
+func TestOrganizeExportToCatalog_MultiArchKeepsEachBinary(t *testing.T) {
+	tmp := t.TempDir()
+	dockerArts := filepath.Join(tmp, "artifacts")
+	armDir := filepath.Join(dockerArts, "android-arm64")
+	x64Dir := filepath.Join(dockerArts, "android-x86_64")
+	if err := os.MkdirAll(armDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(x64Dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// Distinct payloads. "frida-server" is rewritten to the magic basename;
+	// the ARCH= marker is not a patch pair and must survive per target.
+	armBody := append([]byte("ARCH=arm64\x00frida-server\x00"), make([]byte, 2048)...)
+	x64Body := append([]byte("ARCH=x86_64\x00frida-server\x00"), make([]byte, 2048)...)
+	if err := os.WriteFile(filepath.Join(armDir, "frida-server"), armBody, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(x64Dir, "frida-server"), x64Body, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// Loose root blob sorts as a sibling. Export must not flatten it over both targets.
+	if err := os.WriteFile(filepath.Join(dockerArts, "frida-server"), x64Body, 0755); err != nil {
+		t.Fatal(err)
+	}
+	catalog := filepath.Join(tmp, "catalog")
+	cfg := JobConfig{
+		FridaVersion: "17.17.0",
+		TargetIDs:    []string{"android-arm64", "android-x86_64"},
+		MagicName:    "abcde",
+		ListenPort:   27042,
+		WorkDir:      tmp,
+	}
+	_, entries, err := OrganizeExportToCatalog(catalog, cfg, dockerArts, filepath.Join(tmp, "flat"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("entries=%v", entries)
+	}
+	armOut, err := os.ReadFile(filepath.Join(catalog, "17.17.0", "android-arm64", "abcde", "binaries", "abcde-server"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	x64Out, err := os.ReadFile(filepath.Join(catalog, "17.17.0", "android-x86_64", "abcde", "binaries", "abcde-server"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(armOut, []byte("ARCH=arm64")) {
+		t.Fatalf("android-arm64 catalog binary lost its arch payload: %q", armOut[:32])
+	}
+	if bytes.Contains(armOut, []byte("ARCH=x86_64")) {
+		t.Fatal("android-arm64 catalog binary was overwritten by x86_64")
+	}
+	if !bytes.Contains(x64Out, []byte("ARCH=x86_64")) {
+		t.Fatalf("android-x86_64 catalog binary lost its arch payload: %q", x64Out[:32])
+	}
+}
+
+func TestOrganizeExportToCatalog_FlatRootDoesNotSwallowSiblingArch(t *testing.T) {
+	tmp := t.TempDir()
+	dockerArts := filepath.Join(tmp, "artifacts")
+	x64Dir := filepath.Join(dockerArts, "linux-x86_64")
+	if err := os.MkdirAll(x64Dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	x64Body := append([]byte("ARCH=x86_64\x00frida-server\x00"), make([]byte, 2048)...)
+	loose := append([]byte("ARCH=loose\x00frida-server\x00"), make([]byte, 2048)...)
+	if err := os.WriteFile(filepath.Join(x64Dir, "frida-server"), x64Body, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dockerArts, "frida-server"), loose, 0755); err != nil {
+		t.Fatal(err)
+	}
+	catalog := filepath.Join(tmp, "catalog")
+	cfg := JobConfig{
+		FridaVersion: "17.17.0",
+		TargetIDs:    []string{"linux-arm64", "linux-x86_64"},
+		MagicName:    "abcde",
+		WorkDir:      tmp,
+	}
+	if _, _, err := OrganizeExportToCatalog(catalog, cfg, dockerArts, ""); err != nil {
+		t.Fatal(err)
+	}
+	x64Out, err := os.ReadFile(filepath.Join(catalog, "17.17.0", "linux-x86_64", "abcde", "binaries", "abcde-server"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(x64Out, []byte("ARCH=x86_64")) || bytes.Contains(x64Out, []byte("ARCH=loose")) {
+		t.Fatal("linux-x86_64 should keep its own subdir blob, not the loose root file")
+	}
+	armOut, err := os.ReadFile(filepath.Join(catalog, "17.17.0", "linux-arm64", "abcde", "binaries", "abcde-server"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(armOut, []byte("ARCH=loose")) || bytes.Contains(armOut, []byte("ARCH=x86_64")) {
+		t.Fatal("missing arm64 subdir may use a loose root file, but must not import the x86_64 sibling directory")
+	}
+}
+
 func TestOrganizeExportToCatalog(t *testing.T) {
 	tmp := t.TempDir()
 	dockerArts := filepath.Join(tmp, "docker-arts", "android-arm64")

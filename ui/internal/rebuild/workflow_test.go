@@ -254,6 +254,55 @@ func TestNeedsAndroidNDK(t *testing.T) {
 	}
 }
 
+func TestCompileTargetsShell_MultiArchDoesNotShareCC(t *testing.T) {
+	script, err := compileTargetsShell([]string{"linux-arm64", "linux-x86_64", "android-arm64", "android-x86_64"}, "frida", "artifacts", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := strings.Index(script, "configure/make target ")
+	if first < 0 {
+		t.Fatal(script)
+	}
+	if strings.Contains(script[:first], "export CC=") {
+		t.Fatal("CC must not be exported for every target in the job")
+	}
+	arm := targetScriptSection(script, "linux-arm64")
+	x64 := targetScriptSection(script, "linux-x86_64")
+	aArm := targetScriptSection(script, "android-arm64")
+	aX64 := targetScriptSection(script, "android-x86_64")
+	if !strings.Contains(arm, "--host=aarch64-linux-gnu") || !strings.Contains(arm, "artifacts/linux-arm64") {
+		t.Fatalf("linux-arm64 section:\n%s", arm)
+	}
+	if !strings.Contains(arm, `export CC="${CC:-aarch64-linux-gnu-gcc}"`) {
+		t.Fatal("linux-arm64 subshell should set the aarch64 cross compiler")
+	}
+	if !strings.Contains(x64, "--host=linux-x86_64") || !strings.Contains(x64, "artifacts/linux-x86_64") {
+		t.Fatalf("linux-x86_64 section:\n%s", x64)
+	}
+	if strings.Contains(x64, "export CC=") || strings.Contains(aArm, "export CC=") || strings.Contains(aX64, "export CC=") {
+		t.Fatal("non-linux-arm64 targets must not inherit CC=aarch64-linux-gnu-gcc")
+	}
+	if !strings.Contains(aArm, "--host=android-arm64") || !strings.Contains(aArm, "artifacts/android-arm64") {
+		t.Fatalf("android-arm64 section:\n%s", aArm)
+	}
+	if !strings.Contains(aX64, "--host=android-x86_64") || !strings.Contains(aX64, "artifacts/android-x86_64") {
+		t.Fatalf("android-x86_64 section:\n%s", aX64)
+	}
+}
+
+func targetScriptSection(script, id string) string {
+	marker := "configure/make target " + id
+	i := strings.Index(script, marker)
+	if i < 0 {
+		return ""
+	}
+	rest := script[i:]
+	if j := strings.Index(rest[len(marker):], "configure/make target "); j >= 0 {
+		return rest[:len(marker)+j]
+	}
+	return rest
+}
+
 func TestNeedsLinuxArm64Cross(t *testing.T) {
 	if !NeedsLinuxArm64Cross([]string{"linux-arm64"}) {
 		t.Fatal("linux-arm64 needs aarch64 cross")
