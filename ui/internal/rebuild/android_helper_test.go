@@ -99,6 +99,47 @@ func TestPatchAndroidHelper_SkipsNonAgentELF(t *testing.T) {
 	}
 }
 
+func TestPatchProductFile_RepairsHelperDexChecksum(t *testing.T) {
+	body := []byte("Lre/frida/HelperBackend;\x00frida-server\x00")
+	dex := makeTinyDex(t, body)
+	blob := append(append([]byte("PAD"), dex...), make([]byte, MinArtifactBytes)...)
+	dir := t.TempDir()
+	p := filepath.Join(dir, "frida-server")
+	if err := os.WriteFile(p, blob, 0755); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := PatchProductFile(p, "kxmwp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changed {
+		t.Fatal("expected android helper + marker rewrite")
+	}
+	out, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(out, []byte("Lre/frida/HelperBackend")) {
+		t.Fatal("dex descriptor still re/frida")
+	}
+	if !bytes.Contains(out, []byte("Lre/kxmwp/HelperBackend")) {
+		t.Fatal("missing renamed descriptor")
+	}
+	at := bytes.Index(out, []byte("dex\n"))
+	if at < 0 {
+		t.Fatal("dex header lost")
+	}
+	size := int(binary.LittleEndian.Uint32(out[at+32 : at+36]))
+	got := out[at : at+size]
+	if adler32.Checksum(got[12:]) != binary.LittleEndian.Uint32(got[8:12]) {
+		t.Fatal("dex adler stale after export patch; Android server aborts backend_class != null")
+	}
+	sum := sha1.Sum(got[32:])
+	if !bytes.Equal(sum[:], got[12:32]) {
+		t.Fatal("dex sha1 stale")
+	}
+}
+
 func TestPatchArtifactBinaryMarkers_RewritesDexJavaDescriptor(t *testing.T) {
 	dir := t.TempDir()
 	body := []byte("Lre/frida/HelperBackend;\x00kxmwp-server\x00")

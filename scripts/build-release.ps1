@@ -8,7 +8,7 @@
 #   powershell -File scripts\build-release.ps1 -Version 4.0.7 -Only windows-amd64
 
 param(
-    [string]$Version = "4.0.8",
+    [string]$Version = "4.0.9",
     # Optional: build only one platform dir name, e.g. windows-amd64
     [string]$Only = ""
 )
