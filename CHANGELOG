@@ -4,8 +4,10 @@
 
 ## Unreleased
 
+## v4.1.0 - 2026-10-23
+
 ### Added
-- 英文界面（[issue #37](https://github.com/suifei/fridare/issues/37)）。默认语言仍是中文。设置 → 界面配置 → 语言，可在「中文」和 English 之间切换；选择后立即重建界面，并写入 `config.json` 的 `language`（`zh` / `en`）。`fridare-gui`、`fridare-create`、`fridare-patch` 启动时读取该字段。文案目录在 `ui/internal/i18n`，缺译时回退中文原文。
+- 英文界面（[issue #37](https://github.com/suifei/fridare/issues/37)，[#40](https://github.com/suifei/fridare/pull/40)）。默认语言仍是中文。设置页顶部「界面配置」里的语言可在「中文」和 English 之间切换；选择后立即重建窗口，并写入 `config.json` 的 `language`（`zh` / `en`）。`fridare-gui`、`fridare-create`、`fridare-patch` 启动时读取该字段。文案目录在 `ui/internal/i18n`，缺译时回退中文原文。
 
 ## v4.0.9 - 2026-10-23
 

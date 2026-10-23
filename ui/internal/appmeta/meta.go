@@ -3,7 +3,7 @@ package appmeta
 
 const (
 	// Version is the product version (keep in sync with GUI and release scripts).
-	Version = "4.0.9"
+	Version = "4.1.0"
 
 	// ProductName is the marketing name.
 	ProductName = "Fridare"

@@ -2000,18 +2000,22 @@ func (st *SettingsTab) setupUI() {
 	st.noShowNoticeCheck = widget.NewCheck(i18n.T("启动时不显示公告"), nil)
 	st.noShowNoticeCheck.SetChecked(st.config.NoShowNotice)
 
+	langHint := widget.NewLabel(i18n.T("说明: 语言立即生效并写入配置。中文为默认语言。"))
+	langHint.Wrapping = fyne.TextWrapWord
 	uiConfigSection := widget.NewCard(i18n.T("🎨 界面配置"), "", container.NewVBox(
 		container.NewHBox(
 			widget.NewLabel(i18n.T("语言:")), st.langSelect,
+		),
+		langHint,
+		container.NewHBox(
 			widget.NewLabel(i18n.T("主题:")), st.themeSelect,
 			st.debugModeCheck,
+			st.noShowNoticeCheck,
 		),
 		container.NewHBox(
 			widget.NewLabel(i18n.T("窗口大小:")), st.windowWidthEntry,
 			widget.NewLabel("x"), st.windowHeightEntry,
-			st.noShowNoticeCheck,
 		),
-		widget.NewLabel(i18n.T("说明: 语言立即生效并写入配置。中文为默认语言。")),
 	))
 
 	// 下载配置区域
@@ -2143,13 +2147,16 @@ func (st *SettingsTab) setupUI() {
 	)
 
 	rightColumn := container.NewVBox(
-		uiConfigSection,
 		downloadConfigSection,
 		rebuildConfigSection,
 		actionSection,
 	)
 
-	st.content = container.NewGridWithColumns(2, leftColumn, rightColumn)
+	// Language sits above the two columns so Settings opens on the switch.
+	st.content = container.NewVBox(
+		uiConfigSection,
+		container.NewGridWithColumns(2, leftColumn, rightColumn),
+	)
 }
 
 func (st *SettingsTab) Content() *fyne.Container {

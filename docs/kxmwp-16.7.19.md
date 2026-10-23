@@ -4,7 +4,7 @@
 
 Release：<https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19>
 
-本 tag **不是** GUI `latest`（GUI latest 是 v4.0.9）。
+本 tag **不是** GUI `latest`（GUI latest 是 v4.1.0）。
 
 ## 魔改面（术语）
 
