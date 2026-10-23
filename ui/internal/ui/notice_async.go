@@ -1,8 +1,10 @@
 package ui
 
 import (
-	"fridare-gui/internal/utils"
 	"strings"
+
+	"fridare-gui/internal/i18n"
+	"fridare-gui/internal/utils"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -55,12 +57,12 @@ func (mw *MainWindow) showNoticeAsync() {
 		}
 
 		// 在主UI线程中显示通知
-		mw.addLog("INFO: 成功获取通知内容: https://raw.githubusercontent.com/suifei/fridare/main/NOTICE.md")
+		mw.addLog(i18n.T("INFO: 成功获取通知内容: https://raw.githubusercontent.com/suifei/fridare/main/NOTICE.md"))
 
 		if mw.config.NoShowNotice {
 			// 将通知显示到log中不弹窗，markdown 文本用于日志显示
 			mw.addLog("NOTICE: " + strings.ReplaceAll(data.Content, "\n\n", "\n"))
-			mw.addLog("INFO: 配置设置为不显示通知，跳过显示")
+			mw.addLog(i18n.T("INFO: 配置设置为不显示通知，跳过显示"))
 			return
 		}
 
@@ -70,22 +72,22 @@ func (mw *MainWindow) showNoticeAsync() {
 		contentViewer.Wrapping = fyne.TextWrapWord
 
 		// 支持对话框勾选不再显示并记录到配置文件
-		checkbox := widget.NewCheck("不再显示此通知", func(checked bool) {
+		checkbox := widget.NewCheck(i18n.T("不再显示此通知"), func(checked bool) {
 			mw.config.NoShowNotice = checked
 			// 保存配置
 			if err := mw.config.Save(); err != nil {
-				mw.updateStatus("保存配置失败: " + err.Error())
-				mw.addLog("ERROR: 保存配置失败: " + err.Error())
+				mw.updateStatus(i18n.T("保存配置失败: ") + err.Error())
+				mw.addLog(i18n.T("ERROR: 保存配置失败: ") + err.Error())
 			} else {
-				mw.updateStatus("配置已保存")
-				mw.addLog("INFO: 配置已保存")
+				mw.updateStatus(i18n.T("配置已保存"))
+				mw.addLog(i18n.T("INFO: 配置已保存"))
 			}
 		})
 		checkbox.SetChecked(mw.config.NoShowNotice)
 
 		content := container.NewBorder(nil, checkbox, nil, nil, container.NewVScroll(contentViewer))
 
-		dialog := dialog.NewCustom("Fridare GUI - 通知", "确定", content, mw.window)
+		dialog := dialog.NewCustom(i18n.T("Fridare GUI - 通知"), i18n.T("确定"), content, mw.window)
 		dialog.Resize(fyne.NewSize(400, 400))
 		dialog.Show()
 	}()

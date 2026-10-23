@@ -4,11 +4,12 @@ import (
 	"debug/elf"
 	"debug/macho"
 	"debug/pe"
-
 	"fmt"
 	"os"
 	"strings"
 	"unicode"
+
+	"fridare-gui/internal/i18n"
 )
 
 // BinaryAnalyzer 二进制文件分析器
@@ -82,19 +83,19 @@ func (ba *BinaryAnalyzer) AnalyzeFile() (*FileInfo, error) {
 	// 获取文件信息
 	file, err := os.Open(ba.filePath)
 	if err != nil {
-		return nil, fmt.Errorf("打开文件失败: %v", err)
+		return nil, fmt.Errorf(i18n.T("打开文件失败: %v"), err)
 	}
 	defer file.Close()
 
 	stat, err := file.Stat()
 	if err != nil {
-		return nil, fmt.Errorf("获取文件信息失败: %v", err)
+		return nil, fmt.Errorf(i18n.T("获取文件信息失败: %v"), err)
 	}
 
 	// 使用hexreplace.go中的检测和打开逻辑
 	binFile, format, err := detectAndOpenFile(ba.filePath)
 	if err != nil {
-		return nil, fmt.Errorf("检测文件格式失败: %v", err)
+		return nil, fmt.Errorf(i18n.T("检测文件格式失败: %v"), err)
 	}
 
 	// 创建文件信息
@@ -129,7 +130,7 @@ func (ba *BinaryAnalyzer) AnalyzeFile() (*FileInfo, error) {
 		bitness := ba.getPEBitness(f)
 		fileInfo.Sections = ba.parsePESections(f, fileInfo.FileType, bitness)
 	default:
-		return nil, fmt.Errorf("不支持的文件格式")
+		return nil, fmt.Errorf(i18n.T("不支持的文件格式"))
 	}
 
 	return fileInfo, nil
@@ -345,13 +346,13 @@ func (ba *BinaryAnalyzer) parsePESections(f *pe.File, fileType string, bitness i
 // GetSectionData 获取指定段的数据
 func (ba *BinaryAnalyzer) GetSectionData(filePath string, sectionIndex int, sections []SectionInfo) ([]byte, error) {
 	if sectionIndex < 0 || sectionIndex >= len(sections) {
-		return nil, fmt.Errorf("无效的段索引")
+		return nil, fmt.Errorf(i18n.T("无效的段索引"))
 	}
 
 	// 使用hexreplace.go中的检测和打开逻辑
 	binFile, format, err := detectAndOpenFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("打开文件失败: %v", err)
+		return nil, fmt.Errorf(i18n.T("打开文件失败: %v"), err)
 	}
 
 	// 根据文件类型获取段数据
@@ -382,7 +383,7 @@ func (ba *BinaryAnalyzer) GetSectionData(filePath string, sectionIndex int, sect
 				}
 			}
 		}
-		return nil, fmt.Errorf("未找到 Fat Mach-O 段数据")
+		return nil, fmt.Errorf(i18n.T("未找到 Fat Mach-O 段数据"))
 	case *elf.File:
 		if sectionIndex < len(f.Sections) {
 			return f.Sections[sectionIndex].Data()
@@ -392,10 +393,10 @@ func (ba *BinaryAnalyzer) GetSectionData(filePath string, sectionIndex int, sect
 			return f.Sections[sectionIndex].Data()
 		}
 	default:
-		return nil, fmt.Errorf("不支持的文件格式: %v", format)
+		return nil, fmt.Errorf(i18n.T("不支持的文件格式: %v"), format)
 	}
 
-	return nil, fmt.Errorf("未找到段数据")
+	return nil, fmt.Errorf(i18n.T("未找到段数据"))
 }
 
 // isPrintable 检查字符是否可打印

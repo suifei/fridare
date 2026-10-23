@@ -1,11 +1,13 @@
 package main
 
 import (
+	"log"
+
 	"fridare-gui/internal/appmeta"
 	"fridare-gui/internal/assets"
 	"fridare-gui/internal/config"
+	"fridare-gui/internal/i18n"
 	"fridare-gui/internal/ui"
-	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -28,12 +30,14 @@ func main() {
 	// 窗口/标题栏用 PNG；PE 文件图标由 .syso 提供
 	myApp.SetIcon(assets.AppIconPNG)
 
-	// 加载配置
+	// 先读已保存的语言，再加载配置（加载过程里的提示也走同一语言）
+	i18n.InitFromUserConfig()
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Printf("加载配置失败，使用默认配置: %v", err)
+		log.Printf(i18n.T("加载配置失败，使用默认配置: %v"), err)
 		cfg = config.DefaultConfig()
 	}
+	i18n.SetLanguage(cfg.Language)
 
 	// 创建主窗口
 	mainWindow := ui.NewMainWindow(myApp, cfg)

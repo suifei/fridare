@@ -3,17 +3,19 @@ package core
 import (
 	"fmt"
 	"strings"
+
+	"fridare-gui/internal/i18n"
 )
 
 // ValidateMagicName enforces the shipped hexreplace / frida-tools contract:
 // exactly 5 lowercase English letters a-z (same as hexreplace isStringAlpha).
 func ValidateMagicName(name string) error {
 	if len(name) != 5 {
-		return fmt.Errorf("魔改名称必须是恰好 5 个小写字母 a-z，当前长度 %d: %q", len(name), name)
+		return fmt.Errorf(i18n.T("魔改名称必须是恰好 5 个小写字母 a-z，当前长度 %d: %q"), len(name), name)
 	}
 	for i, c := range name {
 		if c < 'a' || c > 'z' {
-			return fmt.Errorf("魔改名称第 %d 个字符 %q 无效，只能是小写字母 a-z", i+1, c)
+			return fmt.Errorf(i18n.T("魔改名称第 %d 个字符 %q 无效，只能是小写字母 a-z"), i+1, c)
 		}
 	}
 	return nil

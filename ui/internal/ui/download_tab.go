@@ -3,14 +3,16 @@ package ui
 import (
 	"context"
 	"fmt"
-	"fridare-gui/internal/config"
-	"fridare-gui/internal/core"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
+
+	"fridare-gui/internal/config"
+	"fridare-gui/internal/core"
+	"fridare-gui/internal/i18n"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -218,14 +220,14 @@ func (dt *DownloadTab) setupUI() {
 // createTopSection 创建顶部控制区域（包含版本选择和工具栏）
 func (dt *DownloadTab) createTopSection() *fyne.Container {
 	// 第一行：版本和平台选择
-	dt.versionSelect = widget.NewSelect([]string{"加载中..."}, nil)
+	dt.versionSelect = widget.NewSelect([]string{i18n.T("加载中...")}, nil)
 	dt.versionSelect.OnChanged = dt.onVersionChanged
 
 	// 使用固定宽度的自定义版本输入框
 	dt.customVersion = NewFixedWidthEntry(150)
-	dt.customVersion.SetPlaceHolder("或手动输入版本号")
+	dt.customVersion.SetPlaceHolder(i18n.T("或手动输入版本号"))
 
-	refreshBtn := widget.NewButton("刷新", func() {
+	refreshBtn := widget.NewButton(i18n.T("刷新"), func() {
 		dt.loadVersions()
 	})
 
@@ -241,24 +243,24 @@ func (dt *DownloadTab) createTopSection() *fyne.Container {
 
 	// 过滤器 - 使用固定宽度的自定义Entry
 	dt.filterEntry = NewFixedWidthEntry(120)
-	dt.filterEntry.SetPlaceHolder("过滤文件名...")
+	dt.filterEntry.SetPlaceHolder(i18n.T("过滤文件名..."))
 	dt.filterEntry.OnChanged = dt.onFilterChanged
 
 	// 第一行：版本和平台控制 - 使用分组布局确保清晰的结构和间距
 	versionSection := container.NewHBox(
-		newStandardLabel("版本:"),
+		newStandardLabel(i18n.T("版本:")),
 		dt.versionSelect,
 		dt.customVersion,
 		refreshBtn,
 	)
 
 	platformSection := container.NewHBox(
-		newStandardLabel("平台:"),
+		newStandardLabel(i18n.T("平台:")),
 		dt.platformSelect,
 	)
 
 	filterSection := container.NewHBox(
-		newStandardLabel("过滤:"),
+		newStandardLabel(i18n.T("过滤:")),
 		dt.filterEntry,
 	)
 
@@ -272,26 +274,26 @@ func (dt *DownloadTab) createTopSection() *fyne.Container {
 	)
 
 	// 第二行：文件操作工具栏
-	dt.toolbarSelectAll = widget.NewButton("全选", dt.selectAll)
+	dt.toolbarSelectAll = widget.NewButton(i18n.T("全选"), dt.selectAll)
 	dt.toolbarSelectAll.Resize(fyne.NewSize(60, 35))
 
-	dt.toolbarInvertSel = widget.NewButton("反选", dt.invertSelection)
+	dt.toolbarInvertSel = widget.NewButton(i18n.T("反选"), dt.invertSelection)
 	dt.toolbarInvertSel.Resize(fyne.NewSize(60, 35))
 
-	dt.toolbarDownload = widget.NewButton("下载选中", dt.startBatchDownload)
+	dt.toolbarDownload = widget.NewButton(i18n.T("下载选中"), dt.startBatchDownload)
 	dt.toolbarDownload.Importance = widget.HighImportance
 	dt.toolbarDownload.Resize(fyne.NewSize(100, 35))
 	dt.toolbarDownload.Disable()
 
-	dt.toolbarCancelSel = widget.NewButton("取消选中", dt.clearSelection)
+	dt.toolbarCancelSel = widget.NewButton(i18n.T("取消选中"), dt.clearSelection)
 	dt.toolbarCancelSel.Resize(fyne.NewSize(80, 35))
 
 	// 下载控制按钮 - 移除暂停功能，只保留开始和取消
-	dt.toolbarStart = widget.NewButton("开始", dt.startSelectedDownloads)
+	dt.toolbarStart = widget.NewButton(i18n.T("开始"), dt.startSelectedDownloads)
 	dt.toolbarStart.Resize(fyne.NewSize(60, 35))
 	dt.toolbarStart.Disable()
 
-	dt.toolbarStop = widget.NewButton("取消", dt.stopSelectedDownloads)
+	dt.toolbarStop = widget.NewButton(i18n.T("取消"), dt.stopSelectedDownloads)
 	dt.toolbarStop.Resize(fyne.NewSize(60, 35))
 	dt.toolbarStop.Disable()
 
@@ -316,7 +318,7 @@ func (dt *DownloadTab) createTopSection() *fyne.Container {
 // createStatusBar 创建状态栏
 func (dt *DownloadTab) createStatusBar() *fyne.Container {
 	return container.NewHBox(
-		newStandardLabel("就绪"),
+		newStandardLabel(i18n.T("就绪")),
 	)
 }
 
@@ -348,7 +350,7 @@ func (dt *DownloadTab) createFileList() *container.Scroll {
 			stopBtn.Hide()
 
 			// 打开文件位置按钮 - 超链接样式
-			openLocationBtn := widget.NewButton("📁 打开位置", nil)
+			openLocationBtn := widget.NewButton(i18n.T("📁 打开位置"), nil)
 			openLocationBtn.Resize(fyne.NewSize(80, 18))
 			openLocationBtn.Hide()
 
@@ -442,7 +444,7 @@ func (dt *DownloadTab) createFileList() *container.Scroll {
 			nameLabel.SetText(asset.Asset.Name)
 
 			// 设置详细信息
-			info := fmt.Sprintf("平台: %s | 类型: %s | 大小: %s | 时间: %s",
+			info := fmt.Sprintf(i18n.T("平台: %s | 类型: %s | 大小: %s | 时间: %s"),
 				asset.Platform,
 				asset.FileType,
 				asset.Size,
@@ -450,7 +452,7 @@ func (dt *DownloadTab) createFileList() *container.Scroll {
 			infoLabel.SetText(info)
 
 			// 根据下载状态设置UI
-			if asset.IsDownloading || asset.Status == "完成" || asset.Status == "失败" {
+			if asset.IsDownloading || asset.Status == i18n.T("完成") || asset.Status == i18n.T("失败") {
 				// 显示控制区域
 				controlsContainer.Show()
 				progressBar.Show()
@@ -463,17 +465,17 @@ func (dt *DownloadTab) createFileList() *container.Scroll {
 					statusLabel.Show()
 					statusLabel.SetText(fmt.Sprintf("%.1f%% - %s", asset.Progress*100, asset.Speed))
 
-					stopBtn.SetText("取消")
+					stopBtn.SetText(i18n.T("取消"))
 					stopBtn.OnTapped = func() {
 						dt.stopAssetDownload(id)
 						dt.updateToolbarDownloadButtons() // 更新工具栏按钮状态
 					}
-				} else if asset.Status == "完成" {
+				} else if asset.Status == i18n.T("完成") {
 					// 下载完成：隐藏开始/取消按钮，显示打开文件位置按钮
 					stopBtn.Hide()
 					openLocationBtn.Show()
 					statusLabel.Show()
-					statusLabel.SetText("完成")
+					statusLabel.SetText(i18n.T("完成"))
 
 					openLocationBtn.OnTapped = func() {
 						if asset.DownloadPath != "" {
@@ -483,11 +485,11 @@ func (dt *DownloadTab) createFileList() *container.Scroll {
 							dt.openFileLocation(asset.Asset.Name)
 						}
 					}
-				} else if asset.Status == "失败" {
+				} else if asset.Status == i18n.T("失败") {
 					stopBtn.Hide()
 					openLocationBtn.Hide()
 					statusLabel.Show()
-					statusLabel.SetText("失败")
+					statusLabel.SetText(i18n.T("失败"))
 				}
 			} else {
 				// 隐藏控制区域，节约空间
@@ -573,7 +575,7 @@ func (dt *DownloadTab) stopAssetDownload(assetIndex int) {
 			downloadPath := filepath.Join(dt.config.DownloadDir, asset.Asset.Name)
 
 			// 立即更新UI状态
-			dt.filteredAssets[assetIndex].Status = "已取消"
+			dt.filteredAssets[assetIndex].Status = i18n.T("已取消")
 			dt.filteredAssets[assetIndex].IsDownloading = false
 			dt.filteredAssets[assetIndex].Progress = 0
 			dt.filteredAssets[assetIndex].Speed = ""
@@ -602,7 +604,7 @@ func (dt *DownloadTab) stopAssetDownload(assetIndex int) {
 				// 1秒后重置为等待状态
 				time.Sleep(1 * time.Second)
 				if assetIndex < len(dt.filteredAssets) {
-					dt.filteredAssets[assetIndex].Status = "等待"
+					dt.filteredAssets[assetIndex].Status = i18n.T("等待")
 					fyne.Do(func() {
 						dt.assetList.Refresh()
 					})
@@ -610,7 +612,7 @@ func (dt *DownloadTab) stopAssetDownload(assetIndex int) {
 			}()
 		}
 
-		dt.updateStatus("下载已取消")
+		dt.updateStatus(i18n.T("下载已取消"))
 	}
 }
 
@@ -668,7 +670,7 @@ func (dt *DownloadTab) loadAssetsForVersion(versionName string) {
 			Version:       selectedVersion.Version,
 			Platform:      platform,
 			FileType:      fileType,
-			SHA256:        "计算中...", // 这里可以后续从GitHub API获取
+			SHA256:        i18n.T("计算中..."), // 这里可以后续从GitHub API获取
 			Size:          core.FormatSize(asset.Size),
 			UploadTime:    selectedVersion.Published.Format("2006-01-02"),
 			Selected:      false,
@@ -676,7 +678,7 @@ func (dt *DownloadTab) loadAssetsForVersion(versionName string) {
 			Progress:      0.0,
 			Speed:         "",
 			Downloaded:    "",
-			Status:        "等待",
+			Status:        i18n.T("等待"),
 		}
 		dt.currentAssets = append(dt.currentAssets, assetInfo)
 	}
@@ -702,7 +704,7 @@ func (dt *DownloadTab) parseAssetInfo(filename string) (platform, fileType strin
 	case strings.HasPrefix(base, "frida-") && strings.HasSuffix(base, ".whl"):
 		fileType = "frida"
 	default:
-		fileType = "其他"
+		fileType = i18n.T("其他")
 	}
 
 	// 确定平台
@@ -739,7 +741,7 @@ func (dt *DownloadTab) parseAssetInfo(filename string) (platform, fileType strin
 			platform = "macOS x64"
 		}
 	} else {
-		platform = "通用"
+		platform = i18n.T("通用")
 	}
 
 	return platform, fileType
@@ -761,7 +763,7 @@ func (dt *DownloadTab) filterAssets() {
 	filteredIndex := 0
 	for _, asset := range dt.currentAssets {
 		// 平台过滤 - 如果选择 "All" 则不进行平台过滤
-		if platformFilter != "" && platformFilter != "All" && asset.Platform != platformFilter && asset.Platform != "通用" {
+		if platformFilter != "" && platformFilter != "All" && asset.Platform != platformFilter && asset.Platform != i18n.T("通用") {
 			continue
 		}
 
@@ -793,13 +795,13 @@ func (dt *DownloadTab) startBatchDownload() {
 	}
 
 	if len(selectedAssets) == 0 {
-		dt.updateStatus("请选择要下载的文件")
+		dt.updateStatus(i18n.T("请选择要下载的文件"))
 		return
 	}
 
 	// 禁用下载按钮
 	dt.toolbarDownload.Disable()
-	dt.updateStatus(fmt.Sprintf("开始批量下载 %d 个文件...", len(selectedAssets)))
+	dt.updateStatus(fmt.Sprintf(i18n.T("开始批量下载 %d 个文件..."), len(selectedAssets)))
 
 	// 为每个选中的文件开始下载
 	for _, assetIndex := range selectedAssets {
@@ -814,7 +816,7 @@ func (dt *DownloadTab) startSingleDownload(assetIndex int) {
 	}
 
 	// 更新资源状态
-	dt.filteredAssets[assetIndex].Status = "下载中"
+	dt.filteredAssets[assetIndex].Status = i18n.T("下载中")
 	dt.filteredAssets[assetIndex].IsDownloading = true
 	dt.filteredAssets[assetIndex].Progress = 0.0
 
@@ -830,7 +832,7 @@ func (dt *DownloadTab) startSingleDownload(assetIndex int) {
 	task := &DownloadTask{
 		AssetIndex: assetIndex,
 		Progress:   0.0,
-		Status:     "下载中",
+		Status:     i18n.T("下载中"),
 		Context:    ctx,
 		CancelFunc: cancel,
 	}
@@ -843,8 +845,8 @@ func (dt *DownloadTab) startSingleDownload(assetIndex int) {
 
 		// 确保下载目录存在
 		if err := dt.config.EnsureDownloadDir(); err != nil {
-			dt.updateStatus(fmt.Sprintf("创建下载目录失败: %v", err))
-			dt.filteredAssets[assetIndex].Status = "失败"
+			dt.updateStatus(fmt.Sprintf(i18n.T("创建下载目录失败: %v"), err))
+			dt.filteredAssets[assetIndex].Status = i18n.T("失败")
 			dt.assetList.Refresh()
 			return
 		}
@@ -877,11 +879,11 @@ func (dt *DownloadTab) startSingleDownload(assetIndex int) {
 			}
 
 			if ctx.Err() == context.Canceled {
-				dt.updateStatus(fmt.Sprintf("下载已取消: %s", asset.Asset.Name))
-				dt.filteredAssets[assetIndex].Status = "已取消"
+				dt.updateStatus(fmt.Sprintf(i18n.T("下载已取消: %s"), asset.Asset.Name))
+				dt.filteredAssets[assetIndex].Status = i18n.T("已取消")
 			} else {
-				dt.updateStatus(fmt.Sprintf("下载失败 %s: %v", asset.Asset.Name, err))
-				dt.filteredAssets[assetIndex].Status = "失败"
+				dt.updateStatus(fmt.Sprintf(i18n.T("下载失败 %s: %v"), asset.Asset.Name, err))
+				dt.filteredAssets[assetIndex].Status = i18n.T("失败")
 			}
 		} else {
 			// 检查任务是否还存在（可能已被用户取消）
@@ -891,8 +893,8 @@ func (dt *DownloadTab) startSingleDownload(assetIndex int) {
 				return
 			}
 
-			dt.updateStatus(fmt.Sprintf("下载完成: %s", asset.Asset.Name))
-			dt.filteredAssets[assetIndex].Status = "完成"
+			dt.updateStatus(fmt.Sprintf(i18n.T("下载完成: %s"), asset.Asset.Name))
+			dt.filteredAssets[assetIndex].Status = i18n.T("完成")
 			dt.filteredAssets[assetIndex].Progress = 1.0
 			dt.filteredAssets[assetIndex].DownloadPath = downloadPath // 保存下载路径
 
@@ -917,8 +919,8 @@ func (dt *DownloadTab) startSingleDownload(assetIndex int) {
 
 // loadVersions 加载版本列表
 func (dt *DownloadTab) loadVersions() {
-	dt.updateStatus("正在获取版本列表...")
-	dt.versionSelect.SetOptions([]string{"加载中..."})
+	dt.updateStatus(i18n.T("正在获取版本列表..."))
+	dt.versionSelect.SetOptions([]string{i18n.T("加载中...")})
 	dt.versionSelect.Disable()
 
 	go func() {
@@ -927,9 +929,9 @@ func (dt *DownloadTab) loadVersions() {
 		// 在主线程中更新UI，使用fyne.Do避免线程警告
 		fyne.Do(func() {
 			if err != nil {
-				dt.versionSelect.SetOptions([]string{"获取失败"})
+				dt.versionSelect.SetOptions([]string{i18n.T("获取失败")})
 				dt.versionSelect.Enable()
-				dt.updateStatus(fmt.Sprintf("获取版本列表失败: %v", err))
+				dt.updateStatus(fmt.Sprintf(i18n.T("获取版本列表失败: %v"), err))
 				return
 			}
 
@@ -951,7 +953,7 @@ func (dt *DownloadTab) loadVersions() {
 				dt.loadAssetsForVersion(versionStrings[0])
 			}
 
-			dt.updateStatus(fmt.Sprintf("成功加载 %d 个版本", len(versions)))
+			dt.updateStatus(fmt.Sprintf(i18n.T("成功加载 %d 个版本"), len(versions)))
 		})
 	}()
 }
@@ -981,21 +983,21 @@ func (dt *DownloadTab) startSelectedDownloads() {
 func (dt *DownloadTab) startAssetDownload(assetIndex int) {
 	// 检查索引有效性
 	if assetIndex < 0 || assetIndex >= len(dt.filteredAssets) {
-		dt.updateStatus("无效的文件索引")
+		dt.updateStatus(i18n.T("无效的文件索引"))
 		return
 	}
 
 	// 检查是否已经在下载中
 	if dt.filteredAssets[assetIndex].IsDownloading {
-		dt.updateStatus("该文件正在下载中")
+		dt.updateStatus(i18n.T("该文件正在下载中"))
 		return
 	}
 
 	// 如果文件已完成下载，询问是否重新下载
-	if dt.filteredAssets[assetIndex].Status == "完成" {
-		dt.updateStatus("文件已下载完成，正在重新下载...")
+	if dt.filteredAssets[assetIndex].Status == i18n.T("完成") {
+		dt.updateStatus(i18n.T("文件已下载完成，正在重新下载..."))
 		// 重置状态
-		dt.filteredAssets[assetIndex].Status = "等待"
+		dt.filteredAssets[assetIndex].Status = i18n.T("等待")
 		dt.filteredAssets[assetIndex].Progress = 0.0
 	}
 
@@ -1004,7 +1006,7 @@ func (dt *DownloadTab) startAssetDownload(assetIndex int) {
 
 	// 更新状态消息
 	asset := dt.filteredAssets[assetIndex]
-	dt.updateStatus(fmt.Sprintf("开始下载: %s", asset.Asset.Name))
+	dt.updateStatus(fmt.Sprintf(i18n.T("开始下载: %s"), asset.Asset.Name))
 }
 
 // stopSelectedDownloads 停止当前选中的下载任务
@@ -1035,25 +1037,25 @@ func (dt *DownloadTab) updateToolbarDownloadButtons() {
 	// 开始按钮：只有在选中文件且没有下载且未完成时才启用
 	if hasSelected && !hasActive {
 		asset := dt.filteredAssets[dt.currentSelection]
-		if asset.Status != "完成" {
+		if asset.Status != i18n.T("完成") {
 			dt.toolbarStart.Enable()
-			dt.toolbarStart.SetText("开始")
+			dt.toolbarStart.SetText(i18n.T("开始"))
 		} else {
 			dt.toolbarStart.Disable()
-			dt.toolbarStart.SetText("已完成")
+			dt.toolbarStart.SetText(i18n.T("已完成"))
 		}
 	} else {
 		dt.toolbarStart.Disable()
-		dt.toolbarStart.SetText("开始")
+		dt.toolbarStart.SetText(i18n.T("开始"))
 	}
 
 	// 取消按钮：只有在有活跃下载时才启用
 	if hasActive {
 		dt.toolbarStop.Enable()
-		dt.toolbarStop.SetText("取消")
+		dt.toolbarStop.SetText(i18n.T("取消"))
 	} else {
 		dt.toolbarStop.Disable()
-		dt.toolbarStop.SetText("取消")
+		dt.toolbarStop.SetText(i18n.T("取消"))
 	}
 }
 
@@ -1067,7 +1069,7 @@ func (dt *DownloadTab) openFileLocation(filename string) {
 
 	// 检查文件是否存在
 	if _, err := os.Stat(downloadPath); os.IsNotExist(err) {
-		dt.updateStatus(fmt.Sprintf("文件不存在: %s", filename))
+		dt.updateStatus(fmt.Sprintf(i18n.T("文件不存在: %s"), filename))
 		return
 	}
 
@@ -1083,8 +1085,8 @@ func (dt *DownloadTab) openFileLocation(filename string) {
 	}
 
 	if err := cmd.Start(); err != nil {
-		dt.updateStatus(fmt.Sprintf("无法打开文件位置: %v", err))
+		dt.updateStatus(fmt.Sprintf(i18n.T("无法打开文件位置: %v"), err))
 	} else {
-		dt.updateStatus(fmt.Sprintf("已打开文件位置: %s", filename))
+		dt.updateStatus(fmt.Sprintf(i18n.T("已打开文件位置: %s"), filename))
 	}
 }

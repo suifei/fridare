@@ -2,15 +2,17 @@ package ui
 
 import (
 	"fmt"
-	"fridare-gui/internal/appmeta"
-	"fridare-gui/internal/assets"
-	"fridare-gui/internal/config"
-	"fridare-gui/internal/core"
-	"fridare-gui/internal/utils"
 	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"fridare-gui/internal/appmeta"
+	"fridare-gui/internal/assets"
+	"fridare-gui/internal/config"
+	"fridare-gui/internal/core"
+	"fridare-gui/internal/i18n"
+	"fridare-gui/internal/utils"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -58,8 +60,9 @@ type MainWindow struct {
 
 // NewMainWindow 创建主窗口
 func NewMainWindow(app fyne.App, cfg *config.Config) *MainWindow {
+	i18n.SetLanguage(cfg.Language)
 	// 创建窗口
-	window := app.NewWindow("Fridare GUI - Frida 魔改工具")
+	window := app.NewWindow(i18n.T("Fridare GUI - Frida 魔改工具"))
 	window.SetMaster()
 	// Windows 标题栏需要 PNG；ICO 的 StaticResource 往往无法作为窗体图标
 	window.SetIcon(assets.AppIconPNG)
@@ -114,37 +117,37 @@ func (mw *MainWindow) setupUI() {
 	mw.toolsTab = NewToolsTab(mw.config, mw.updateStatus)
 	mw.toolsTab.SetLogFunction(mw.addLog) // 设置日志函数
 	mw.rebuildTab = NewRebuildTab(mw.app, mw.config, mw.updateStatus, mw.addLog, mw.window)
-	mw.settingsTab = NewSettingsTab(mw.config, mw.updateStatus, mw.applyTheme, mw.window)
+	mw.settingsTab = NewSettingsTab(mw.config, mw.updateStatus, mw.applyTheme, mw.applyLanguage, mw.window)
 	mw.helpTab = NewHelpTab()                                                      // 新增帮助标签页
 	mw.analysisTab = NewAnalysisTab(mw.app, mw.config, mw.updateStatus, mw.addLog) // 新增分析标签页
 
 	// 添加标签页（与原型保持一致），为每个tab添加滚动支持
-	mw.tabContainer.Append(container.NewTabItem("📥 下载",
+	mw.tabContainer.Append(container.NewTabItem(i18n.T("📥 下载"),
 		container.NewScroll(mw.downloadTab.Content())))
-	mw.tabContainer.Append(container.NewTabItem("🔧 frida 魔改",
+	mw.tabContainer.Append(container.NewTabItem(i18n.T("🔧 frida 魔改"),
 		container.NewScroll(mw.modifyTab.Content())))
-	mw.tabContainer.Append(container.NewTabItem("📦 iOS DEB 魔改",
+	mw.tabContainer.Append(container.NewTabItem(i18n.T("📦 iOS DEB 魔改"),
 		container.NewScroll(mw.packageTab.Content())))
-	mw.tabContainer.Append(container.NewTabItem("🆕 iOS DEB 打包",
+	mw.tabContainer.Append(container.NewTabItem(i18n.T("🆕 iOS DEB 打包"),
 		container.NewScroll(mw.createTab.Content()))) // 新增创建标签页
-	mw.tabContainer.Append(container.NewTabItem("🛠️ frida-tools 魔改",
+	mw.tabContainer.Append(container.NewTabItem(i18n.T("🛠️ frida-tools 魔改"),
 		container.NewScroll(mw.toolsTab.Content())))
 	// 可选源码重编译：三栏布局自带内部滚动，不再包一层全页 Scroll（否则 Agent 对话被压到视口外）
-	mw.tabContainer.Append(container.NewTabItem("🧬 源码重编译",
+	mw.tabContainer.Append(container.NewTabItem(i18n.T("🧬 源码重编译"),
 		mw.rebuildTab.Content()))
-	mw.tabContainer.Append(container.NewTabItem("🔬 文件分析",
+	mw.tabContainer.Append(container.NewTabItem(i18n.T("🔬 文件分析"),
 		container.NewScroll(mw.analysisTab.Content()))) // 新增分析标签页
-	mw.tabContainer.Append(container.NewTabItem("⚙️ 设置",
+	mw.tabContainer.Append(container.NewTabItem(i18n.T("⚙️ 设置"),
 		container.NewScroll(mw.settingsTab.Content()))) // 设置标签页
-	mw.tabContainer.Append(container.NewTabItem("❓ 帮助",
+	mw.tabContainer.Append(container.NewTabItem(i18n.T("❓ 帮助"),
 		mw.helpTab.Content())) // 帮助标签页 - 不需要滚动包装因为内部已处理
 	mw.tabContainer.OnSelected = func(tab *container.TabItem) {
-		mw.updateStatus("切换到标签: " + tab.Text)
+		mw.updateStatus(i18n.T("切换到标签: ") + tab.Text)
 		// 如果当前标签是设置标签页，则刷新配置显示
-		if tab.Text == "⚙️ 设置" {
+		if tab.Text == i18n.T("⚙️ 设置") {
 			mw.settingsTab.RefreshConfigDisplay()
 		}
-		if tab.Text == "🧬 源码重编译" {
+		if tab.Text == i18n.T("🧬 源码重编译") {
 			mw.rebuildTab.Refresh()
 		}
 	}
@@ -182,7 +185,7 @@ func (mw *MainWindow) createToolbar() *fyne.Container {
 
 	// 代理配置 - 使用固定宽度的Entry，参考download_tab的实现
 	mw.proxyEntry = NewFixedWidthEntry(300)
-	mw.proxyEntry.SetPlaceHolder("http://proxy:port (可选)")
+	mw.proxyEntry.SetPlaceHolder(i18n.T("http://proxy:port (可选)"))
 	if mw.config.Proxy != "" {
 		mw.proxyEntry.SetText(mw.config.Proxy)
 	}
@@ -191,17 +194,17 @@ func (mw *MainWindow) createToolbar() *fyne.Container {
 	proxyTestBtn := widget.NewButtonWithIcon("", theme.SearchIcon(), func() {
 		mw.testProxy()
 	})
-	proxyTestBtn.SetText("测试")
+	proxyTestBtn.SetText(i18n.T("测试"))
 
 	// 保存代理配置按钮
 	proxySaveBtn := widget.NewButtonWithIcon("", theme.DocumentSaveIcon(), func() {
 		mw.saveProxyConfig()
 	})
-	proxySaveBtn.SetText("保存")
+	proxySaveBtn.SetText(i18n.T("保存"))
 
 	// 全局魔改配置区域
 	mw.globalMagicNameEntry = NewFixedWidthEntry(80)
-	mw.globalMagicNameEntry.SetPlaceHolder("5字符")
+	mw.globalMagicNameEntry.SetPlaceHolder(i18n.T("5字符"))
 	if mw.config.MagicName != "" {
 		mw.globalMagicNameEntry.SetText(mw.config.MagicName)
 	} else {
@@ -209,7 +212,7 @@ func (mw *MainWindow) createToolbar() *fyne.Container {
 	}
 
 	mw.globalPortEntry = NewFixedWidthEntry(60)
-	mw.globalPortEntry.SetPlaceHolder("端口")
+	mw.globalPortEntry.SetPlaceHolder(i18n.T("端口"))
 	if mw.config.DefaultPort > 0 {
 		mw.globalPortEntry.SetText(fmt.Sprintf("%d", mw.config.DefaultPort))
 	} else {
@@ -235,18 +238,18 @@ func (mw *MainWindow) createToolbar() *fyne.Container {
 		mw.globalMagicNameEntry.SetText(randomName)
 		mw.updateGlobalMagicName(randomName)
 	})
-	randomMagicBtn.SetText("随机")
+	randomMagicBtn.SetText(i18n.T("随机"))
 
 	// 代理配置区域 - 参考download_tab的布局方式
 	proxyArea := container.NewHBox(
-		widget.NewLabel("代理:"),
+		widget.NewLabel(i18n.T("代理:")),
 		mw.proxyEntry,
 		proxyTestBtn,
 		proxySaveBtn,
-		widget.NewLabel("全局魔改:"),
+		widget.NewLabel(i18n.T("全局魔改:")),
 		mw.globalMagicNameEntry,
 		randomMagicBtn,
-		widget.NewLabel("端口:"),
+		widget.NewLabel(i18n.T("端口:")),
 		mw.globalPortEntry,
 	)
 
@@ -288,21 +291,66 @@ func (mw *MainWindow) saveProxyConfig() {
 
 	// 保存配置
 	if err := mw.config.Save(); err != nil {
-		mw.updateStatus("保存代理配置失败: " + err.Error())
-		mw.addLog("ERROR: 保存代理配置失败: " + err.Error())
+		mw.updateStatus(i18n.T("保存代理配置失败: ") + err.Error())
+		mw.addLog(i18n.T("ERROR: 保存代理配置失败: ") + err.Error())
 	} else {
-		mw.updateStatus("代理配置已保存")
-		mw.addLog("INFO: 代理配置已保存")
+		mw.updateStatus(i18n.T("代理配置已保存"))
+		mw.addLog(i18n.T("INFO: 代理配置已保存"))
 	}
 }
 
 // saveConfig 保存配置
 func (mw *MainWindow) saveConfig() {
 	if err := mw.config.Save(); err != nil {
-		mw.updateStatus("保存配置失败: " + err.Error())
-		log.Printf("保存配置失败: %v", err)
+		mw.updateStatus(i18n.T("保存配置失败: ") + err.Error())
+		log.Printf(i18n.T("保存配置失败: %v"), err)
 	} else {
-		mw.updateStatus("配置已保存")
+		mw.updateStatus(i18n.T("配置已保存"))
+	}
+}
+
+// applyLanguage 保存语言并重建界面，使已创建的控件换成新文案。
+func (mw *MainWindow) applyLanguage() {
+	mw.captureTransientConfig()
+	i18n.SetLanguage(mw.config.Language)
+	if err := mw.config.Save(); err != nil {
+		mw.updateStatus(i18n.T("保存配置失败: ") + err.Error())
+	}
+	idx := 0
+	if mw.tabContainer != nil {
+		idx = mw.tabContainer.SelectedIndex()
+	}
+	var keptLog string
+	if mw.logText != nil {
+		keptLog = mw.logText.String()
+	}
+	mw.window.SetTitle(i18n.T("Fridare GUI - Frida 魔改工具"))
+	mw.setupUI()
+	if mw.tabContainer != nil && idx > 0 && idx < len(mw.tabContainer.Items) {
+		mw.tabContainer.SelectIndex(idx)
+	}
+	if keptLog != "" && mw.logText != nil {
+		mw.logText.SetLogText(keptLog)
+	}
+}
+
+// captureTransientConfig 把工具栏和设置页上未点「保存」的字段留在内存配置里，避免切换语言时丢输入。
+func (mw *MainWindow) captureTransientConfig() {
+	if mw.proxyEntry != nil {
+		mw.config.Proxy = strings.TrimSpace(mw.proxyEntry.Text)
+	}
+	if mw.globalMagicNameEntry != nil {
+		if name := strings.TrimSpace(mw.globalMagicNameEntry.Text); name != "" {
+			mw.config.MagicName = name
+		}
+	}
+	if mw.globalPortEntry != nil {
+		if port, err := strconv.Atoi(strings.TrimSpace(mw.globalPortEntry.Text)); err == nil && port > 0 && port <= 65535 {
+			mw.config.DefaultPort = port
+		}
+	}
+	if mw.settingsTab != nil {
+		mw.settingsTab.snapshotInto(mw.config)
 	}
 }
 
@@ -319,18 +367,18 @@ func (mw *MainWindow) applyTheme() {
 func (mw *MainWindow) showAbout() {
 	content := widget.NewRichTextFromMarkdown(
 		"# Fridare GUI v" + appmeta.Version + "\n\n" +
-			appmeta.GUIDescription + "\n\n" +
-			"**特性**\n" +
-			"- 下载发行版 / 静态二进制魔改 / DEB 打包\n" +
-			"- frida-tools 魔改\n" +
-			"- 可选 Docker 源码重编译（Host: Windows / macOS / Linux）\n\n" +
-			"**作者** suifei@gmail.com\n\n" +
-			"**项目** " + appmeta.ProjectURL + "\n",
+			i18n.T(appmeta.GUIDescription) + "\n\n" +
+			i18n.T("**特性**\n") +
+			i18n.T("- 下载发行版 / 静态二进制魔改 / DEB 打包\n") +
+			i18n.T("- frida-tools 魔改\n") +
+			i18n.T("- 可选 Docker 源码重编译（Host: Windows / macOS / Linux）\n\n") +
+			i18n.T("**作者** suifei@gmail.com\n\n") +
+			i18n.T("**项目** ") + appmeta.ProjectURL + "\n",
 	)
 	content.Wrapping = fyne.TextWrapWord
 	scroll := container.NewScroll(content)
 	scroll.SetMinSize(fyne.NewSize(420, 280))
-	dialog.NewCustom("关于 Fridare GUI", "确定", scroll, mw.window).Show()
+	dialog.NewCustom(i18n.T("关于 Fridare GUI"), i18n.T("确定"), scroll, mw.window).Show()
 }
 
 // showNotice 显示通知对话框
@@ -353,11 +401,11 @@ func (mw *MainWindow) showNotice() {
 		// 获取失败或内容为空则不显示通知
 		return
 	} else {
-		mw.addLog("INFO: 成功获取通知内容: " + noticeURL)
+		mw.addLog(i18n.T("INFO: 成功获取通知内容: ") + noticeURL)
 		if mw.config.NoShowNotice {
 			// 将通知显示到log中不弹窗，markdown 文本用于日志显示
 			mw.addLog("NOTICE: " + strings.ReplaceAll(noticeContent, "\n\n", "\n"))
-			mw.addLog("INFO: 配置设置为不显示通知，跳过显示")
+			mw.addLog(i18n.T("INFO: 配置设置为不显示通知，跳过显示"))
 			return
 		}
 	}
@@ -367,22 +415,22 @@ func (mw *MainWindow) showNotice() {
 	contentViewer.ParseMarkdown(noticeContent)
 	contentViewer.Wrapping = fyne.TextWrapWord
 	// 支持对话框勾选不再显示并记录到配置文件
-	checkbox := widget.NewCheck("不再显示此通知", func(checked bool) {
+	checkbox := widget.NewCheck(i18n.T("不再显示此通知"), func(checked bool) {
 		mw.config.NoShowNotice = checked
 		// 保存配置
 		if err := mw.config.Save(); err != nil {
-			mw.updateStatus("保存配置失败: " + err.Error())
-			mw.addLog("ERROR: 保存配置失败: " + err.Error())
+			mw.updateStatus(i18n.T("保存配置失败: ") + err.Error())
+			mw.addLog(i18n.T("ERROR: 保存配置失败: ") + err.Error())
 		} else {
-			mw.updateStatus("配置已保存")
-			mw.addLog("INFO: 配置已保存")
+			mw.updateStatus(i18n.T("配置已保存"))
+			mw.addLog(i18n.T("INFO: 配置已保存"))
 		}
 	})
 	checkbox.SetChecked(mw.config.NoShowNotice)
 
 	content := container.NewBorder(nil, checkbox, nil, nil, container.NewVScroll(contentViewer))
 
-	dialog := dialog.NewCustom("Fridare GUI - 通知", "确定", content, mw.window)
+	dialog := dialog.NewCustom(i18n.T("Fridare GUI - 通知"), i18n.T("确定"), content, mw.window)
 	dialog.Resize(fyne.NewSize(400, 400))
 	dialog.Show()
 }
@@ -408,7 +456,7 @@ type StatusUpdater func(message string)
 // createBottomArea 创建底部区域
 func (mw *MainWindow) createBottomArea() *fyne.Container {
 	// 创建状态栏（说明性 caption 层级）
-	mw.statusBar = widget.NewLabel("等待操作...")
+	mw.statusBar = widget.NewLabel(i18n.T("等待操作..."))
 	mw.statusBar.TextStyle = fyne.TextStyle{Italic: true}
 	mw.statusBar.Importance = widget.MediumImportance
 
@@ -417,13 +465,13 @@ func (mw *MainWindow) createBottomArea() *fyne.Container {
 	mw.logText.SetMinHeight(88)
 
 	// 创建日志控制按钮
-	clearBtn := widget.NewButton("清空", func() {
+	clearBtn := widget.NewButton(i18n.T("清空"), func() {
 		mw.logText.SetLogText("")
-		mw.updateStatus("日志已清空")
+		mw.updateStatus(i18n.T("日志已清空"))
 	})
 
-	historyBtn := widget.NewButton("历史", func() {
-		mw.updateStatus("历史功能待实现")
+	historyBtn := widget.NewButton(i18n.T("历史"), func() {
+		mw.updateStatus(i18n.T("历史功能待实现"))
 	})
 
 	logControls := container.NewHBox(
@@ -435,11 +483,11 @@ func (mw *MainWindow) createBottomArea() *fyne.Container {
 
 	// 组装底部区域
 	bottomArea := container.NewBorder(
-		logControls,                 // top
-		nil,                         // bottom
-		nil,                         // left
-		nil,                         // right
-		mw.logText.CanvasObject(),   // center — 高对比 LogView
+		logControls,               // top
+		nil,                       // bottom
+		nil,                       // left
+		nil,                       // right
+		mw.logText.CanvasObject(), // center — 高对比 LogView
 	)
 
 	return bottomArea
@@ -462,11 +510,11 @@ func (mw *MainWindow) testProxy() {
 
 	// 如果代理为空，测试直连
 	if proxyURL == "" {
-		mw.updateStatus("正在测试直连...")
-		mw.addLog("INFO: 开始测试直连")
+		mw.updateStatus(i18n.T("正在测试直连..."))
+		mw.addLog(i18n.T("INFO: 开始测试直连"))
 	} else {
-		mw.updateStatus("正在测试代理连接...")
-		mw.addLog("INFO: 开始测试代理连接: " + proxyURL)
+		mw.updateStatus(i18n.T("正在测试代理连接..."))
+		mw.addLog(i18n.T("INFO: 开始测试代理连接: ") + proxyURL)
 	}
 
 	// 异步执行测试
@@ -505,24 +553,24 @@ func (mw *MainWindow) testProxy() {
 		// 更新UI
 		if successCount > 0 {
 			if successCount == len(testURLs) {
-				mw.updateStatus("代理测试完全成功")
-				dialog.ShowInformation("代理测试结果",
-					fmt.Sprintf("%s, 测试成功！(%d/%d)\n\n%s",
+				mw.updateStatus(i18n.T("代理测试完全成功"))
+				dialog.ShowInformation(i18n.T("代理测试结果"),
+					fmt.Sprintf(i18n.T("%s, 测试成功！(%d/%d)\n\n%s"),
 						ProxyInfo,
 						successCount, len(testURLs), strings.Join(results, "\n")),
 					mw.window)
 			} else {
-				mw.updateStatus(fmt.Sprintf("代理测试部分成功 (%d/%d)", successCount, len(testURLs)))
-				dialog.ShowInformation("代理测试结果",
-					fmt.Sprintf("%s, 部分成功 (%d/%d)\n\n%s",
+				mw.updateStatus(fmt.Sprintf(i18n.T("代理测试部分成功 (%d/%d)"), successCount, len(testURLs)))
+				dialog.ShowInformation(i18n.T("代理测试结果"),
+					fmt.Sprintf(i18n.T("%s, 部分成功 (%d/%d)\n\n%s"),
 						ProxyInfo,
 						successCount, len(testURLs), strings.Join(results, "\n")),
 					mw.window)
 			}
 		} else {
-			mw.updateStatus("代理测试失败")
+			mw.updateStatus(i18n.T("代理测试失败"))
 			dialog.ShowError(
-				fmt.Errorf("%s, 代理测试失败\n\n%s", ProxyInfo, strings.Join(results, "\n")),
+				fmt.Errorf(i18n.T("%s, 代理测试失败\n\n%s"), ProxyInfo, strings.Join(results, "\n")),
 				mw.window)
 		}
 	}()
@@ -540,7 +588,7 @@ func (mw *MainWindow) updateGlobalMagicName(magicName string) {
 
 	// 通知所有标签页更新
 	mw.updateTabsGlobalConfig()
-	mw.updateStatus("全局魔改名称已更新: " + magicName)
+	mw.updateStatus(i18n.T("全局魔改名称已更新: ") + magicName)
 }
 
 // updateGlobalPort 更新全局端口
@@ -550,7 +598,7 @@ func (mw *MainWindow) updateGlobalPort(port int) {
 
 	// 通知所有标签页更新
 	mw.updateTabsGlobalConfig()
-	mw.updateStatus(fmt.Sprintf("全局端口已更新: %d", port))
+	mw.updateStatus(fmt.Sprintf(i18n.T("全局端口已更新: %d"), port))
 }
 
 // updateTabsGlobalConfig 更新所有标签页的全局配置

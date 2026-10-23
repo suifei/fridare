@@ -3,10 +3,6 @@ package ui
 import (
 	"context"
 	"fmt"
-	"fridare-gui/internal/config"
-	"fridare-gui/internal/core"
-	"fridare-gui/internal/rebuild"
-	"fridare-gui/internal/utils"
 	"net/url"
 	"os"
 	"os/exec"
@@ -16,6 +12,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"fridare-gui/internal/config"
+	"fridare-gui/internal/core"
+	"fridare-gui/internal/i18n"
+	"fridare-gui/internal/rebuild"
+	"fridare-gui/internal/utils"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -122,15 +124,15 @@ func NewRebuildTab(app fyne.App, cfg *config.Config, statusUpdater StatusUpdater
 
 func (rt *RebuildTab) setupUI() {
 	// ── Top step rail ──────────────────────────────────────────────
-	rt.step1Btn = widget.NewButton("① 基础镜像", func() { rt.selectStep(0) })
-	rt.step2Btn = widget.NewButton("② 魔改开发", func() { rt.selectStep(1) })
-	rt.stepBadge = widget.NewLabel("当前：步骤① 初始化工具链镜像")
+	rt.step1Btn = widget.NewButton(i18n.T("① 基础镜像"), func() { rt.selectStep(0) })
+	rt.step2Btn = widget.NewButton(i18n.T("② 魔改开发"), func() { rt.selectStep(1) })
+	rt.stepBadge = widget.NewLabel(i18n.T("当前：步骤① 初始化工具链镜像"))
 	rt.stepBadge.TextStyle = fyne.TextStyle{Bold: true}
-	rt.imageStatus = widget.NewLabel("镜像状态: 点击刷新…")
+	rt.imageStatus = widget.NewLabel(i18n.T("镜像状态: 点击刷新…"))
 	rt.imageStatus.Wrapping = fyne.TextWrapWord
 
 	// ── Shared enable + mirror (also in settings; surfaced here for convenience)
-	rt.enableSource = widget.NewCheck("启用源码级魔改", func(on bool) {
+	rt.enableSource = widget.NewCheck(i18n.T("启用源码级魔改"), func(on bool) {
 		rt.config.RebuildAcknowledged = on
 		_ = rt.config.Save()
 		rt.refreshEnabled()
@@ -144,41 +146,41 @@ func (rt *RebuildTab) setupUI() {
 	} else {
 		rt.mirrorEntry.SetText(rebuild.DefaultDockerHubMirror)
 	}
-	fillMirror := widget.NewButton("默认源", func() {
+	fillMirror := widget.NewButton(i18n.T("默认源"), func() {
 		rt.mirrorEntry.SetText(rebuild.DefaultDockerHubMirror)
 		rt.pullDirectChk.SetChecked(true)
 	})
-	rt.pullDirectChk = widget.NewCheck("镜像源直连（不走代理）", nil)
+	rt.pullDirectChk = widget.NewCheck(i18n.T("镜像源直连（不走代理）"), nil)
 	rt.pullDirectChk.SetChecked(rt.config.RebuildDockerPullDirect)
-	rt.archiveChk = widget.NewCheck("完成后 docker save 留档到本地", nil)
+	rt.archiveChk = widget.NewCheck(i18n.T("完成后 docker save 留档到本地"), nil)
 	rt.archiveChk.SetChecked(true)
 
 	// ── Step 1 panel: base image ────────────────────────────────────
-	rt.bootstrapBtn = widget.NewButton("构建 / 校验基础镜像", rt.startBootstrap)
+	rt.bootstrapBtn = widget.NewButton(i18n.T("构建 / 校验基础镜像"), rt.startBootstrap)
 	rt.bootstrapBtn.Importance = widget.HighImportance
-	rt.refreshImgBtn = widget.NewButton("刷新镜像状态", rt.refreshImageStatus)
-	rt.checkDepsBtn = widget.NewButton("检查依赖", rt.checkDeps)
-	rt.depsLabel = widget.NewLabel("步骤① 只需 Docker + 磁盘；AI/OpenAI 在步骤② 需要。")
+	rt.refreshImgBtn = widget.NewButton(i18n.T("刷新镜像状态"), rt.refreshImageStatus)
+	rt.checkDepsBtn = widget.NewButton(i18n.T("检查依赖"), rt.checkDeps)
+	rt.depsLabel = widget.NewLabel(i18n.T("步骤① 只需 Docker + 磁盘；AI/OpenAI 在步骤② 需要。"))
 	rt.depsLabel.Wrapping = fyne.TextWrapWord
 
 	step1Help := widget.NewRichTextFromMarkdown(
-		"**步骤① 基础镜像**\n\n" +
-			"- 只装开发工具链（apt / Node 20 / Go 1.24 / NDK r29）\n" +
-			"- 本地标签留档，下次直接复用，不重复下载\n" +
-			"- 国内默认 Hub 源：`" + rebuild.DefaultDockerHubMirror + "`（可改）\n" +
-			"- AI 魔改 / 编译 **不要** 在此步装重依赖",
+		i18n.T("**步骤① 基础镜像**\n\n") +
+			i18n.T("- 只装开发工具链（apt / Node 20 / Go 1.24 / NDK r29）\n") +
+			i18n.T("- 本地标签留档，下次直接复用，不重复下载\n") +
+			i18n.T("- 国内默认 Hub 源：`") + rebuild.DefaultDockerHubMirror + i18n.T("`（可改）\n") +
+			i18n.T("- AI 魔改 / 编译 **不要** 在此步装重依赖"),
 	)
 	step1Help.Wrapping = fyne.TextWrapWord
 
 	rt.step1Panel = container.NewVBox(
 		step1Help,
 		widget.NewSeparator(),
-		widget.NewLabel("Docker Hub 镜像源:"),
+		widget.NewLabel(i18n.T("Docker Hub 镜像源:")),
 		container.NewBorder(nil, nil, nil, fillMirror, rt.mirrorEntry),
 		rt.pullDirectChk,
 		rt.archiveChk,
-		widget.NewLabel("本地镜像名: "+rt.config.RebuildDockerImage),
-		widget.NewLabel("留档标签: "+rebuild.BuilderStableImageTag(rt.config.RebuildDockerImage)),
+		widget.NewLabel(i18n.T("本地镜像名: ")+rt.config.RebuildDockerImage),
+		widget.NewLabel(i18n.T("留档标签: ")+rebuild.BuilderStableImageTag(rt.config.RebuildDockerImage)),
 		container.NewHBox(rt.bootstrapBtn, rt.refreshImgBtn, rt.checkDepsBtn),
 		rt.imageStatus,
 		rt.depsLabel,
@@ -186,7 +188,7 @@ func (rt *RebuildTab) setupUI() {
 
 	// ── Step 2 panel: develop ───────────────────────────────────────
 	rt.versionEntry = widget.NewEntry()
-	rt.versionEntry.SetPlaceHolder("官方 tag，如 17.17.0")
+	rt.versionEntry.SetPlaceHolder(i18n.T("官方 tag，如 17.17.0"))
 	rt.versionEntry.SetText("17.17.0")
 
 	rt.magicEntry = widget.NewEntry()
@@ -195,12 +197,12 @@ func (rt *RebuildTab) setupUI() {
 	} else {
 		rt.magicEntry.SetText("frida")
 	}
-	randomBtn := widget.NewButton("随机", func() {
+	randomBtn := widget.NewButton(i18n.T("随机"), func() {
 		rt.magicEntry.SetText(utils.GenerateRandomName())
 	})
 
 	rt.portEntry = widget.NewEntry()
-	rt.portEntry.SetPlaceHolder("官方 27042；改了才动 DEFAULT_CONTROL_PORT")
+	rt.portEntry.SetPlaceHolder(i18n.T("官方 27042；改了才动 DEFAULT_CONTROL_PORT"))
 	if rt.config.DefaultPort > 0 {
 		rt.portEntry.SetText(strconv.Itoa(rt.config.DefaultPort))
 	} else {
@@ -224,14 +226,14 @@ func (rt *RebuildTab) setupUI() {
 	targetsScroll := container.NewVScroll(targetsBox)
 	targetsScroll.SetMinSize(fyne.NewSize(0, 140))
 
-	rt.useGrokCheck = widget.NewCheck("使用本机 grok（端点跟 GUI）", nil)
+	rt.useGrokCheck = widget.NewCheck(i18n.T("使用本机 grok（端点跟 GUI）"), nil)
 	rt.useGrokCheck.SetChecked(rt.config.RebuildUseLocalGrok)
 	if _, ok := rebuild.ResolveGrokBinary(nil); ok {
-		rt.useGrokCheck.SetText("本机已有 grok — 勾选使用")
+		rt.useGrokCheck.SetText(i18n.T("本机已有 grok — 勾选使用"))
 	} else {
-		rt.useGrokCheck.SetText("未检测到 grok（将用朴素替换）")
+		rt.useGrokCheck.SetText(i18n.T("未检测到 grok（将用朴素替换）"))
 	}
-	rt.useGUIProxyCheck = widget.NewCheck("OpenAI 端点走 GUI 代理出口（默认不走）", func(on bool) {
+	rt.useGUIProxyCheck = widget.NewCheck(i18n.T("OpenAI 端点走 GUI 代理出口（默认不走）"), func(on bool) {
 		rt.config.RebuildAgentUseGUIProxy = on
 		_ = rt.config.Save()
 	})
@@ -239,52 +241,52 @@ func (rt *RebuildTab) setupUI() {
 
 	rt.profileSelect = widget.NewSelect([]string{"safe", "deep", "abi", "explore"}, nil)
 	rt.profileSelect.SetSelected("deep") // default: server+client protocol/API/idents sync
-	rt.stripSymbolsChk = widget.NewCheck("导出时去符号（ELF/PE frida_ / _frida_ → magic）", func(on bool) {
+	rt.stripSymbolsChk = widget.NewCheck(i18n.T("导出时去符号（ELF/PE frida_ / _frida_ → magic）"), func(on bool) {
 		rt.config.RebuildStripSymbols = on
 		_ = rt.config.Save()
 	})
 	rt.stripSymbolsChk.SetChecked(rt.config.RebuildStripSymbols)
-	rt.seededJunkChk = widget.NewCheck("注入 TU 花指令（constructor+noinline；官方 strip 后仍留常量）", func(on bool) {
+	rt.seededJunkChk = widget.NewCheck(i18n.T("注入 TU 花指令（constructor+noinline；官方 strip 后仍留常量）"), func(on bool) {
 		rt.config.RebuildSeededJunk = on
 		_ = rt.config.Save()
 	})
 	rt.seededJunkChk.SetChecked(rt.config.RebuildSeededJunk)
-	rt.stealthMarkersChk = widget.NewCheck("行为标记（SELinux / zymbiote / memfd / 带引号 linjector）", func(on bool) {
+	rt.stealthMarkersChk = widget.NewCheck(i18n.T("行为标记（SELinux / zymbiote / memfd / 带引号 linjector）"), func(on bool) {
 		rt.config.RebuildStealthMarkers = on
 		_ = rt.config.Save()
 	})
 	rt.stealthMarkersChk.SetChecked(rt.config.RebuildStealthMarkers)
-	rt.randomAgentChk = widget.NewCheck("随机 agent 落盘前缀（只改 dump so，不动 meson .version）", func(on bool) {
+	rt.randomAgentChk = widget.NewCheck(i18n.T("随机 agent 落盘前缀（只改 dump so，不动 meson .version）"), func(on bool) {
 		rt.config.RebuildRandomAgent = on
 		_ = rt.config.Save()
 	})
 	rt.randomAgentChk.SetChecked(rt.config.RebuildRandomAgent)
-	profileHelp := widget.NewLabel("deep（推荐）：协议面 re.frida.* → re.{magic}.、/re/frida/ → /re/{magic}/、frida:rpc → {magic}:rpc 成对。下面 stealth 开关针对行为识别可见面（线程名/管道/SELinux/maps）。不能全树改名。这不是免杀。启动端口用 -l。须用 catalog 内 wheel + PROTOCOL-SYNC。")
+	profileHelp := widget.NewLabel(i18n.T("deep（推荐）：协议面 re.frida.* → re.{magic}.、/re/frida/ → /re/{magic}/、frida:rpc → {magic}:rpc 成对。下面 stealth 开关针对行为识别可见面（线程名/管道/SELinux/maps）。不能全树改名。这不是免杀。启动端口用 -l。须用 catalog 内 wheel + PROTOCOL-SYNC。"))
 	profileHelp.Wrapping = fyne.TextWrapWord
 	profileHelp.Importance = widget.LowImportance
-	stealthHelp := widget.NewLabel("行为隐身覆盖运行时可见向量，不是对内核/游戏加固/杀软的保证，不能保证非常好的效果，这不是免杀。静态「frida 魔改」只能去符号，花指令/行为标记只有本页源码重编译能做。")
+	stealthHelp := widget.NewLabel(i18n.T("行为隐身覆盖运行时可见向量，不是对内核/游戏加固/杀软的保证，不能保证非常好的效果，这不是免杀。静态「frida 魔改」只能去符号，花指令/行为标记只有本页源码重编译能做。"))
 	stealthHelp.Wrapping = fyne.TextWrapWord
 	stealthHelp.Importance = widget.LowImportance
 
-	rt.developBtn = widget.NewButton("启动步骤② 魔改+编译", rt.startDevelop)
+	rt.developBtn = widget.NewButton(i18n.T("启动步骤② 魔改+编译"), rt.startDevelop)
 	rt.developBtn.Importance = widget.HighImportance
-	rt.fullOneShotBtn = widget.NewButton("一键深度定制（①+② deep）", rt.startFull)
+	rt.fullOneShotBtn = widget.NewButton(i18n.T("一键深度定制（①+② deep）"), rt.startFull)
 
-	step2Help := widget.NewLabel("步骤②：在已就绪的基础镜像上魔改源码并编译。默认 deep：服务端+客户端协议面同步；产物含 binaries + python/host wheels + PROTOCOL-SYNC。")
+	step2Help := widget.NewLabel(i18n.T("步骤②：在已就绪的基础镜像上魔改源码并编译。默认 deep：服务端+客户端协议面同步；产物含 binaries + python/host wheels + PROTOCOL-SYNC。"))
 	step2Help.Wrapping = fyne.TextWrapWord
 
 	rt.step2Panel = container.NewVBox(
 		step2Help,
 		widget.NewSeparator(),
-		widget.NewLabel("Frida 版本 (depth=1):"),
+		widget.NewLabel(i18n.T("Frida 版本 (depth=1):")),
 		rt.versionEntry,
-		container.NewBorder(nil, nil, widget.NewLabel("魔改名"), randomBtn, rt.magicEntry),
-		container.NewBorder(nil, nil, widget.NewLabel("端口"), nil, rt.portEntry),
-		widget.NewLabel("编译目标:"),
+		container.NewBorder(nil, nil, widget.NewLabel(i18n.T("魔改名")), randomBtn, rt.magicEntry),
+		container.NewBorder(nil, nil, widget.NewLabel(i18n.T("端口")), nil, rt.portEntry),
+		widget.NewLabel(i18n.T("编译目标:")),
 		targetsScroll,
-		container.NewBorder(nil, nil, widget.NewLabel("魔改强度"), nil, rt.profileSelect),
+		container.NewBorder(nil, nil, widget.NewLabel(i18n.T("魔改强度")), nil, rt.profileSelect),
 		profileHelp,
-		widget.NewLabel("Stealth（与流水线对等，可关）:"),
+		widget.NewLabel(i18n.T("Stealth（与流水线对等，可关）:")),
 		rt.stripSymbolsChk,
 		rt.seededJunkChk,
 		rt.stealthMarkersChk,
@@ -301,34 +303,34 @@ func (rt *RebuildTab) setupUI() {
 
 	// ── Agent + log column (fixed visible) ──────────────────────────
 	rt.goalsEntry = widget.NewMultiLineEntry()
-	rt.goalsEntry.SetPlaceHolder("对 Agent 说：魔改目标 / 约束 / 失败后如何修…（始终显示在此栏，不会滚到屏幕外）")
+	rt.goalsEntry.SetPlaceHolder(i18n.T("对 Agent 说：魔改目标 / 约束 / 失败后如何修…（始终显示在此栏，不会滚到屏幕外）"))
 	rt.goalsEntry.SetMinRowsVisible(4)
 
 	rt.agentLog = NewLogView()
 	rt.agentLog.SetMinHeight(160)
-	rt.agentLog.SetText("【Agent 对话】计划与文件操作会出现在这里。\n")
+	rt.agentLog.SetText(i18n.T("【Agent 对话】计划与文件操作会出现在这里。\n"))
 
 	rt.jobLog = NewLogView()
 	rt.jobLog.SetMinHeight(120)
 
 	rt.progressBar = widget.NewProgressBar()
-	rt.progressLabel = widget.NewLabel("空闲")
-	rt.artifactLabel = widget.NewLabel("产物: （完成后显示）")
+	rt.progressLabel = widget.NewLabel(i18n.T("空闲"))
+	rt.artifactLabel = widget.NewLabel(i18n.T("产物: （完成后显示）"))
 	rt.artifactLabel.Wrapping = fyne.TextWrapWord
 
-	rt.cancelBtn = widget.NewButton("终止", rt.cancelJob)
-	rt.resetBtn = widget.NewButton("重来", rt.resetJob)
-	rt.openArtsBtn = widget.NewButton("产物目录", rt.openArtifacts)
+	rt.cancelBtn = widget.NewButton(i18n.T("终止"), rt.cancelJob)
+	rt.resetBtn = widget.NewButton(i18n.T("重来"), rt.resetJob)
+	rt.openArtsBtn = widget.NewButton(i18n.T("产物目录"), rt.openArtifacts)
 
-	agentHeader := widget.NewLabel("Agent 对话")
+	agentHeader := widget.NewLabel(i18n.T("Agent 对话"))
 	agentHeader.TextStyle = fyne.TextStyle{Bold: true}
-	logHeader := widget.NewLabel("任务日志")
+	logHeader := widget.NewLabel(i18n.T("任务日志"))
 	logHeader.TextStyle = fyne.TextStyle{Bold: true}
 
 	agentPanel := container.NewBorder(
 		container.NewVBox(
 			agentHeader,
-			widget.NewLabel("魔改目标输入:"),
+			widget.NewLabel(i18n.T("魔改目标输入:")),
 			rt.goalsEntry,
 			container.NewHBox(rt.cancelBtn, rt.resetBtn, rt.openArtsBtn),
 			rt.progressBar,
@@ -345,14 +347,14 @@ func (rt *RebuildTab) setupUI() {
 	)
 
 	// ── Left nav column ────────────────────────────────────────────
-	hostHint := widget.NewLabel("Host " + rebuild.HostPlatformLabel() + "\n编译仅 Docker/Linux")
+	hostHint := widget.NewLabel("Host " + rebuild.HostPlatformLabel() + i18n.T("\n编译仅 Docker/Linux"))
 	hostHint.Wrapping = fyne.TextWrapWord
 	hostHint.Importance = widget.MediumImportance
 
 	// Catalog browser
-	rt.catalogStatus = widget.NewLabel("产物库: 加载中…")
+	rt.catalogStatus = widget.NewLabel(i18n.T("产物库: 加载中…"))
 	rt.catalogStatus.Wrapping = fyne.TextWrapWord
-	rt.installHint = widget.NewLabel("选中条目后可打开目录 / 查看 python/*.whl")
+	rt.installHint = widget.NewLabel(i18n.T("选中条目后可打开目录 / 查看 python/*.whl"))
 	rt.installHint.Wrapping = fyne.TextWrapWord
 	rt.catalogSel = -1
 	rt.catalogList = widget.NewList(
@@ -380,17 +382,17 @@ func (rt *RebuildTab) setupUI() {
 		if id >= 0 && id < len(rt.catalogEntries) {
 			e := rt.catalogEntries[id]
 			pipVer := rebuild.EffectivePipVersion(rebuild.JobConfig{FridaVersion: e.Version})
-			rt.installHint.SetText(fmt.Sprintf("路径:\n%s\n\n不要 pip install frida-tools（那是 PyPI 发行名，会装官方包）。\nwheel 文件名和 import 包名是 frida_tools；原生绑定是 frida。\n产品标签 %s → pip frida==%s（EffectivePipVersion）。\n\npip install --force-reinstall --no-deps python/host/<平台>/frida-*.whl\npip install --force-reinstall --no-deps python/frida_tools-*.whl\npython -c \"import frida; print(frida.__version__)\"  # 须 == %s",
+			rt.installHint.SetText(fmt.Sprintf(i18n.T("路径:\n%s\n\n不要 pip install frida-tools（那是 PyPI 发行名，会装官方包）。\nwheel 文件名和 import 包名是 frida_tools；原生绑定是 frida。\n产品标签 %s → pip frida==%s（EffectivePipVersion）。\n\npip install --force-reinstall --no-deps python/host/<平台>/frida-*.whl\npip install --force-reinstall --no-deps python/frida_tools-*.whl\npython -c \"import frida; print(frida.__version__)\"  # 须 == %s"),
 				e.Path, e.Version, pipVer, pipVer))
 		}
 	}
-	rt.refreshCatBtn = widget.NewButton("刷新产物库", rt.refreshCatalog)
-	rt.openCatRootBtn = widget.NewButton("打开总目录", rt.openCatalogRoot)
-	rt.openCatSelBtn = widget.NewButton("打开选中项", rt.openCatalogSelected)
+	rt.refreshCatBtn = widget.NewButton(i18n.T("刷新产物库"), rt.refreshCatalog)
+	rt.openCatRootBtn = widget.NewButton(i18n.T("打开总目录"), rt.openCatalogRoot)
+	rt.openCatSelBtn = widget.NewButton(i18n.T("打开选中项"), rt.openCatalogSelected)
 	catScroll := container.NewVScroll(rt.catalogList)
 	catScroll.SetMinSize(fyne.NewSize(0, 140))
 	catalogBox := container.NewVBox(
-		widget.NewLabelWithStyle("历史产物库", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle(i18n.T("历史产物库"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		widget.NewLabel("version / platform / magic"),
 		rt.catalogStatus,
 		catScroll,
@@ -400,13 +402,13 @@ func (rt *RebuildTab) setupUI() {
 	)
 
 	// Nav uses separate buttons (Fyne objects cannot be parented twice)
-	navStep1 := widget.NewButton("① 基础镜像", func() { rt.selectStep(0) })
-	navStep2 := widget.NewButton("② 魔改开发", func() { rt.selectStep(1) })
+	navStep1 := widget.NewButton(i18n.T("① 基础镜像"), func() { rt.selectStep(0) })
+	navStep2 := widget.NewButton(i18n.T("② 魔改开发"), func() { rt.selectStep(1) })
 	nav := container.NewVBox(
-		widget.NewLabelWithStyle("源码魔改", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabelWithStyle(i18n.T("源码魔改"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		rt.enableSource,
 		widget.NewSeparator(),
-		widget.NewLabel("流程步骤"),
+		widget.NewLabel(i18n.T("流程步骤")),
 		navStep1,
 		navStep2,
 		widget.NewSeparator(),
@@ -451,13 +453,13 @@ func (rt *RebuildTab) selectStep(i int) {
 	if i == 0 {
 		rt.step1Panel.Show()
 		rt.step2Panel.Hide()
-		rt.stepBadge.SetText("当前：步骤① 基础镜像（工具链）")
+		rt.stepBadge.SetText(i18n.T("当前：步骤① 基础镜像（工具链）"))
 		rt.step1Btn.Importance = widget.HighImportance
 		rt.step2Btn.Importance = widget.MediumImportance
 	} else {
 		rt.step1Panel.Hide()
 		rt.step2Panel.Show()
-		rt.stepBadge.SetText("当前：步骤② 魔改开发（AI + 编译）")
+		rt.stepBadge.SetText(i18n.T("当前：步骤② 魔改开发（AI + 编译）"))
 		rt.step1Btn.Importance = widget.MediumImportance
 		rt.step2Btn.Importance = widget.HighImportance
 	}
@@ -589,15 +591,15 @@ func (rt *RebuildTab) doRefreshImageStatus() {
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
 		ready, detail := rebuild.ProbeLocalBuilderImage(ctx, rebuild.ExecRunner{}, img)
-		text := "镜像状态: " + detail
+		text := i18n.T("镜像状态: ") + detail
 		if ready {
 			text = "✓ " + text
 		} else {
 			text = "○ " + text
 		}
 		arch := rebuild.ImageArchiveDir(filepath.Join(rt.config.WorkDir, "rebuild"))
-		text += "\n档案目录: " + arch
-		text += "\n镜像源: " + mirror
+		text += i18n.T("\n档案目录: ") + arch
+		text += i18n.T("\n镜像源: ") + mirror
 		fyne.Do(func() {
 			if rt.imageStatus != nil {
 				rt.imageStatus.SetText(text)
@@ -607,7 +609,7 @@ func (rt *RebuildTab) doRefreshImageStatus() {
 }
 
 func (rt *RebuildTab) checkDeps() {
-	rt.appendLog("INFO: 开始依赖探测…")
+	rt.appendLog(i18n.T("INFO: 开始依赖探测…"))
 	go func() {
 		report := rebuild.ProbeDeps(rebuild.ProbeOptions{
 			WorkDir:       rt.config.WorkDir,
@@ -621,7 +623,7 @@ func (rt *RebuildTab) checkDeps() {
 		rt.mu.Unlock()
 
 		var b strings.Builder
-		b.WriteString(fmt.Sprintf("检查时间: %s\n", report.CheckedAt.Format(time.RFC3339)))
+		b.WriteString(fmt.Sprintf(i18n.T("检查时间: %s\n"), report.CheckedAt.Format(time.RFC3339)))
 		writeProbe := func(p rebuild.ProbeResult) {
 			mark := "✗"
 			if p.Available {
@@ -629,7 +631,7 @@ func (rt *RebuildTab) checkDeps() {
 			}
 			req := ""
 			if p.Required {
-				req = " [必需]"
+				req = i18n.T(" [必需]")
 			}
 			b.WriteString(fmt.Sprintf("%s %s%s: %s\n", mark, p.Name, req, p.Detail))
 		}
@@ -640,17 +642,17 @@ func (rt *RebuildTab) checkDeps() {
 		writeProbe(report.Disk)
 		writeProbe(report.OpenAI)
 		if report.Ready {
-			b.WriteString("\n步骤② 就绪。")
+			b.WriteString(i18n.T("\n步骤② 就绪。"))
 		} else {
-			b.WriteString("\n步骤② 未完全就绪（步骤① 仍可只检查 Docker/磁盘）。\n")
-			b.WriteString("OpenAI 推荐: " + rebuild.RecommendedAPIBase + " QQ " + rebuild.RecommendedQQGroup + "\n")
+			b.WriteString(i18n.T("\n步骤② 未完全就绪（步骤① 仍可只检查 Docker/磁盘）。\n"))
+			b.WriteString(i18n.T("OpenAI 推荐: ") + rebuild.RecommendedAPIBase + " QQ " + rebuild.RecommendedQQGroup + "\n")
 		}
 		text := b.String()
 		fyne.Do(func() {
 			rt.depsLabel.SetText(text)
-			rt.updateStatus("依赖检查完成")
+			rt.updateStatus(i18n.T("依赖检查完成"))
 		})
-		rt.appendLog("INFO: 依赖检查完成 ready=" + strconv.FormatBool(report.Ready))
+		rt.appendLog(i18n.T("INFO: 依赖检查完成 ready=") + strconv.FormatBool(report.Ready))
 		rt.appendAgent("[deps]\n" + text)
 	}()
 }
@@ -662,14 +664,14 @@ func (rt *RebuildTab) startBootstrap() {
 	rt.saveMirrorConfig()
 	cfg := rt.baseJobConfig(rebuild.JobModeBootstrap)
 	// bootstrap doesn't need magic validation hard-fail if empty
-	msg := fmt.Sprintf("步骤① 构建基础镜像\n镜像: %s\n源: %s 直连=%v\n留档 tar=%v\n\n仅安装工具链，不做 Frida 编译。",
+	msg := fmt.Sprintf(i18n.T("步骤① 构建基础镜像\n镜像: %s\n源: %s 直连=%v\n留档 tar=%v\n\n仅安装工具链，不做 Frida 编译。"),
 		cfg.DockerImage, cfg.DockerMirror, cfg.DockerPullDirect, cfg.ArchiveImage)
-	dialog.ShowConfirm("步骤① 基础镜像", msg, func(ok bool) {
+	dialog.ShowConfirm(i18n.T("步骤① 基础镜像"), msg, func(ok bool) {
 		if !ok {
 			return
 		}
 		rt.selectStep(0)
-		rt.appendAgent("→ 开始步骤①：构建/校验基础镜像…")
+		rt.appendAgent(i18n.T("→ 开始步骤①：构建/校验基础镜像…"))
 		rt.doStart(cfg)
 	}, rt.window)
 }
@@ -683,14 +685,14 @@ func (rt *RebuildTab) startDevelop() {
 		return
 	}
 	cfg := rt.baseJobConfig(rebuild.JobModeDevelop)
-	msg := fmt.Sprintf("步骤② 魔改开发\n版本 %s\n目标 %s\n\n使用已就绪基础镜像；AI 在容器工作区魔改并编译。",
+	msg := fmt.Sprintf(i18n.T("步骤② 魔改开发\n版本 %s\n目标 %s\n\n使用已就绪基础镜像；AI 在容器工作区魔改并编译。"),
 		cfg.FridaVersion, strings.Join(cfg.TargetIDs, ", "))
-	dialog.ShowConfirm("步骤② 魔改开发", msg, func(ok bool) {
+	dialog.ShowConfirm(i18n.T("步骤② 魔改开发"), msg, func(ok bool) {
 		if !ok {
 			return
 		}
 		rt.selectStep(1)
-		rt.appendAgent("→ 开始步骤②：clone → AI 魔改 → Docker 编译…\n" + rebuild.FormatStealthJobSummary(cfg) + "\n目标: " + cfg.Goals)
+		rt.appendAgent(i18n.T("→ 开始步骤②：clone → AI 魔改 → Docker 编译…\n") + rebuild.FormatStealthJobSummary(cfg) + i18n.T("\n目标: ") + cfg.Goals)
 		rt.doStart(cfg)
 	}, rt.window)
 }
@@ -708,20 +710,20 @@ func (rt *RebuildTab) startFull() {
 	if rt.profileSelect != nil {
 		rt.profileSelect.SetSelected("deep")
 	}
-	msg := fmt.Sprintf("一键全流程（① 镜像 + ② 魔改编译）\n版本 %s\n目标 %s\n%s\n产物 %s",
+	msg := fmt.Sprintf(i18n.T("一键全流程（① 镜像 + ② 魔改编译）\n版本 %s\n目标 %s\n%s\n产物 %s"),
 		cfg.FridaVersion, strings.Join(cfg.TargetIDs, ", "), rebuild.FormatStealthJobSummary(cfg), cfg.ArtifactDir)
-	dialog.ShowConfirm("确认全流程", msg, func(ok bool) {
+	dialog.ShowConfirm(i18n.T("确认全流程"), msg, func(ok bool) {
 		if !ok {
 			return
 		}
-		rt.appendAgent("→ 一键全流程启动…\n" + rebuild.FormatStealthJobSummary(cfg))
+		rt.appendAgent(i18n.T("→ 一键全流程启动…\n") + rebuild.FormatStealthJobSummary(cfg))
 		rt.doStart(cfg)
 	}, rt.window)
 }
 
 func (rt *RebuildTab) gateEnabled() bool {
 	if rt.enableSource == nil || !rt.enableSource.Checked {
-		dialog.ShowInformation("未启用", "请先勾选「启用源码级魔改」。", rt.window)
+		dialog.ShowInformation(i18n.T("未启用"), i18n.T("请先勾选「启用源码级魔改」。"), rt.window)
 		return false
 	}
 	return true
@@ -743,10 +745,10 @@ func (rt *RebuildTab) validateDevelopForm() error {
 		return err
 	}
 	if strings.TrimSpace(rt.versionEntry.Text) == "" {
-		return fmt.Errorf("请填写 Frida 官方版本")
+		return fmt.Errorf(i18n.T("请填写 Frida 官方版本"))
 	}
 	if len(rt.selectedTargets()) == 0 {
-		return fmt.Errorf("请至少选择一个编译目标")
+		return fmt.Errorf(i18n.T("请至少选择一个编译目标"))
 	}
 	report := rebuild.ProbeDeps(rebuild.ProbeOptions{
 		WorkDir:       rt.config.WorkDir,
@@ -757,7 +759,7 @@ func (rt *RebuildTab) validateDevelopForm() error {
 	})
 	rt.lastDeps = report
 	if err := rebuild.CanStartSourceJob(report, rt.config.Proxy); err != nil {
-		return fmt.Errorf("%w\n\n%s", err, rebuild.RecommendedEndpointHelp)
+		return fmt.Errorf("%w\n\n%s", err, i18n.T(rebuild.RecommendedEndpointHelp))
 	}
 	return nil
 }
@@ -777,9 +779,9 @@ func (rt *RebuildTab) doStart(cfg rebuild.JobConfig) {
 			rt.fullOneShotBtn.Disable()
 		}
 		rt.progressBar.SetValue(0)
-		rt.progressLabel.SetText("启动中…")
+		rt.progressLabel.SetText(i18n.T("启动中…"))
 	})
-	rt.appendLog(fmt.Sprintf("INFO: 任务启动 mode=%s version=%s", cfg.Mode, cfg.FridaVersion))
+	rt.appendLog(fmt.Sprintf(i18n.T("INFO: 任务启动 mode=%s version=%s"), cfg.Mode, cfg.FridaVersion))
 	rt.appendAgent(fmt.Sprintf("[%s] mode=%s version=%s targets=%v",
 		time.Now().Format("15:04:05"), cfg.Mode, cfg.FridaVersion, cfg.TargetIDs))
 
@@ -824,32 +826,32 @@ func (rt *RebuildTab) onJobTerminal(ev rebuild.ProgressEvent) {
 		rt.refreshEnabled()
 		var extra string
 		if st.LogPath != "" {
-			extra = "\n日志: " + st.LogPath
+			extra = i18n.T("\n日志: ") + st.LogPath
 			if st.LatestLog != "" {
 				extra += "\n" + st.LatestLog
 			}
 		}
 		if st.Artifact != "" {
-			rt.artifactLabel.SetText("产物: " + st.Artifact + extra)
+			rt.artifactLabel.SetText(i18n.T("产物: ") + st.Artifact + extra)
 		} else if st.LogPath != "" {
-			rt.artifactLabel.SetText("产物: （未导出）" + extra)
+			rt.artifactLabel.SetText(i18n.T("产物: （未导出）") + extra)
 		}
 		if ev.Stage == rebuild.StageDone {
-			title := "完成"
+			title := i18n.T("完成")
 			body := ev.Message
 			if st.Artifact != "" {
-				body += "\n\n产物: " + st.Artifact
+				body += i18n.T("\n\n产物: ") + st.Artifact
 			}
-			body += "\n\n可在左侧「历史产物库」按版本/平台/magic 浏览；python/*.whl 供本机 pip 安装以连接 server。"
+			body += i18n.T("\n\n可在左侧「历史产物库」按版本/平台/magic 浏览；python/*.whl 供本机 pip 安装以连接 server。")
 			dialog.ShowInformation(title, body, rt.window)
 			rt.refreshCatalog()
 			// if bootstrap done, offer step 2
-			if strings.Contains(ev.Message, "步骤①") || strings.Contains(ev.Message, "基础镜像") {
+			if strings.Contains(ev.Message, i18n.T("步骤①")) || strings.Contains(ev.Message, i18n.T("基础镜像")) {
 				rt.selectStep(1)
 			}
 		}
 		if ev.Stage == rebuild.StageFailed && st.LogPath != "" {
-			dialog.ShowError(fmt.Errorf("%s\n\n日志:\n%s", ev.Message, st.LogPath), rt.window)
+			dialog.ShowError(fmt.Errorf(i18n.T("%s\n\n日志:\n%s"), ev.Message, st.LogPath), rt.window)
 		}
 		rt.doRefreshImageStatus()
 	})
@@ -858,9 +860,9 @@ func (rt *RebuildTab) onJobTerminal(ev rebuild.ProgressEvent) {
 
 func (rt *RebuildTab) cancelJob() {
 	rt.orch.Cancel()
-	rt.appendLog("WARN: 用户请求终止")
-	rt.appendAgent("WARN: 用户终止任务")
-	rt.updateStatus("正在终止…")
+	rt.appendLog(i18n.T("WARN: 用户请求终止"))
+	rt.appendAgent(i18n.T("WARN: 用户终止任务"))
+	rt.updateStatus(i18n.T("正在终止…"))
 }
 
 func (rt *RebuildTab) resetJob() {
@@ -870,12 +872,12 @@ func (rt *RebuildTab) resetJob() {
 	rt.mu.Unlock()
 	fyne.Do(func() {
 		rt.progressBar.SetValue(0)
-		rt.progressLabel.SetText("已重置")
+		rt.progressLabel.SetText(i18n.T("已重置"))
 		rt.refreshEnabled()
-		rt.artifactLabel.SetText("产物: （完成后显示）")
+		rt.artifactLabel.SetText(i18n.T("产物: （完成后显示）"))
 	})
-	rt.appendLog("INFO: 任务已重置")
-	rt.appendAgent("INFO: 已重置，可重新开始步骤① 或 ②")
+	rt.appendLog(i18n.T("INFO: 任务已重置"))
+	rt.appendAgent(i18n.T("INFO: 已重置，可重新开始步骤① 或 ②"))
 }
 
 func (rt *RebuildTab) openArtifacts() {
@@ -886,9 +888,9 @@ func (rt *RebuildTab) openArtifacts() {
 	}
 	_ = os.MkdirAll(dir, 0755)
 	openHostFolder(dir)
-	rt.appendLog("INFO: 产物目录 " + dir)
+	rt.appendLog(i18n.T("INFO: 产物目录 ") + dir)
 	rt.refreshCatalog()
-	dialog.ShowInformation("产物目录", dir+"\n\n"+rebuild.ToolsPatchGuidance(rt.magicEntry.Text, rt.config.DefaultPort), rt.window)
+	dialog.ShowInformation(i18n.T("产物目录"), dir+"\n\n"+rebuild.ToolsPatchGuidance(rt.magicEntry.Text, rt.config.DefaultPort), rt.window)
 }
 
 func (rt *RebuildTab) catalogRootPath() string {
@@ -902,7 +904,7 @@ func (rt *RebuildTab) refreshCatalog() {
 		ents, err := rebuild.ListCatalog(root)
 		fyne.Do(func() {
 			if err != nil {
-				rt.catalogStatus.SetText("产物库读取失败: " + err.Error())
+				rt.catalogStatus.SetText(i18n.T("产物库读取失败: ") + err.Error())
 				return
 			}
 			rt.catalogEntries = ents
@@ -911,7 +913,7 @@ func (rt *RebuildTab) refreshCatalog() {
 				rt.catalogList.UnselectAll()
 				rt.catalogList.Refresh()
 			}
-			rt.catalogStatus.SetText(fmt.Sprintf("产物库 %d 项\n%s", len(ents), root))
+			rt.catalogStatus.SetText(fmt.Sprintf(i18n.T("产物库 %d 项\n%s"), len(ents), root))
 		})
 	}()
 }
@@ -925,7 +927,7 @@ func (rt *RebuildTab) openCatalogRoot() {
 
 func (rt *RebuildTab) openCatalogSelected() {
 	if rt.catalogSel < 0 || rt.catalogSel >= len(rt.catalogEntries) {
-		dialog.ShowInformation("未选择", "请先在左侧产物库列表中点选 version/platform/magic 条目。", rt.window)
+		dialog.ShowInformation(i18n.T("未选择"), i18n.T("请先在左侧产物库列表中点选 version/platform/magic 条目。"), rt.window)
 		return
 	}
 	e := rt.catalogEntries[rt.catalogSel]

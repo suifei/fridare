@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"fridare-gui/internal/i18n"
 )
 
 // OfficialListenPort is Frida's stock DEFAULT_CONTROL_PORT (frida-core lib/base/socket.vala).
@@ -86,23 +88,23 @@ func isListenPortFind(find string) bool {
 func ListenPortAgentGuidance(port int) string {
 	port = NormalizeListenPort(port)
 	var b strings.Builder
-	b.WriteString("\n## 监听端口（必做，L2）\n")
-	b.WriteString("官方默认监听端口是 **27042**，定义在 `subprojects/frida-core/lib/base/socket.vala`：\n")
+	b.WriteString(i18n.T("\n## 监听端口（必做，L2）\n"))
+	b.WriteString(i18n.T("官方默认监听端口是 **27042**，定义在 `subprojects/frida-core/lib/base/socket.vala`：\n"))
 	b.WriteString("  `public const uint16 DEFAULT_CONTROL_PORT = 27042;`\n")
-	b.WriteString(fmt.Sprintf("本次用户配置端口: **%d**\n", port))
-	b.WriteString("规则:\n")
-	b.WriteString("- find 必须是官方默认 `27042` / `DEFAULT_CONTROL_PORT = 27042`。\n")
-	b.WriteString("- **禁止**把用户端口当成 find（例如把 27142 当成原文再换成 27142，那是空操作）。\n")
-	b.WriteString("- **禁止**全树替换裸数字 27042（brotli / capstone / xz / openssl 等是假阳性数字表）。\n")
-	b.WriteString("- **不要改** `DEFAULT_CLUSTER_PORT`（27052），除非用户明确要求。\n")
+	b.WriteString(fmt.Sprintf(i18n.T("本次用户配置端口: **%d**\n"), port))
+	b.WriteString(i18n.T("规则:\n"))
+	b.WriteString(i18n.T("- find 必须是官方默认 `27042` / `DEFAULT_CONTROL_PORT = 27042`。\n"))
+	b.WriteString(i18n.T("- **禁止**把用户端口当成 find（例如把 27142 当成原文再换成 27142，那是空操作）。\n"))
+	b.WriteString(i18n.T("- **禁止**全树替换裸数字 27042（brotli / capstone / xz / openssl 等是假阳性数字表）。\n"))
+	b.WriteString(i18n.T("- **不要改** `DEFAULT_CLUSTER_PORT`（27052），除非用户明确要求。\n"))
 	if port == OfficialListenPort {
-		b.WriteString("- 本次端口仍是 27042：不要改 DEFAULT_CONTROL_PORT，也不要写 27042→27042。\n")
+		b.WriteString(i18n.T("- 本次端口仍是 27042：不要改 DEFAULT_CONTROL_PORT，也不要写 27042→27042。\n"))
 	} else {
-		b.WriteString(fmt.Sprintf("- 必须改：`DEFAULT_CONTROL_PORT = 27042` → `DEFAULT_CONTROL_PORT = %d`。\n", port))
+		b.WriteString(fmt.Sprintf(i18n.T("- 必须改：`DEFAULT_CONTROL_PORT = 27042` → `DEFAULT_CONTROL_PORT = %d`。\n"), port))
 		if len(strconv.Itoa(port)) == len(OfficialListenPortASCII) {
-			b.WriteString(fmt.Sprintf("- 可在 **frida-core** 内把同长度 ASCII `27042` 换成 `%d`（不要出 frida-core）。\n", port))
+			b.WriteString(fmt.Sprintf(i18n.T("- 可在 **frida-core** 内把同长度 ASCII `27042` 换成 `%d`（不要出 frida-core）。\n"), port))
 		} else {
-			b.WriteString("- 新端口与 27042 位数不同：只改 DEFAULT_CONTROL_PORT 赋值，不要做裸数字替换。\n")
+			b.WriteString(i18n.T("- 新端口与 27042 位数不同：只改 DEFAULT_CONTROL_PORT 赋值，不要做裸数字替换。\n"))
 		}
 	}
 	return b.String()

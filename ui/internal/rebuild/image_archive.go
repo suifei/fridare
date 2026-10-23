@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"fridare-gui/internal/i18n"
 )
 
 // DefaultDockerHubMirror is the recommended China Hub mirror (user-provided).
@@ -75,7 +77,7 @@ func LoadArchivedBuilderImage(ctx context.Context, runner Runner, env []string, 
 	name := strings.ReplaceAll(BuilderImageFeatureTag, ":", "-")
 	tarPath := filepath.Join(dir, "frida-builder-"+name+".tar")
 	if _, err := os.Stat(tarPath); err != nil {
-		return "", fmt.Errorf("无本地镜像档案: %s", tarPath)
+		return "", fmt.Errorf(i18n.T("无本地镜像档案: %s"), tarPath)
 	}
 	out, err := runner.Run(ctx, env, "docker", "load", "-i", tarPath)
 	if err != nil {
@@ -105,14 +107,14 @@ func ProbeLocalBuilderImage(ctx context.Context, runner Runner, image string) (r
 		stable := BuilderStableImageTag(image)
 		out2, err2 := runner.Run(ctx, nil, "docker", "images", "-q", stable)
 		if err2 != nil || strings.TrimSpace(out2) == "" {
-			return false, "本地无 builder 镜像，请先执行步骤①"
+			return false, i18n.T("本地无 builder 镜像，请先执行步骤①")
 		}
 		image = stable
 		out = out2
 	}
 	probe := RunContainerArgs(DockerWorkspace{Image: image}, []string{"bash", "-lc", ImageHasBuilderFeaturesShell()})
 	if _, perr := runner.Run(ctx, nil, probe[0], probe[1:]...); perr != nil {
-		return false, fmt.Sprintf("镜像 %s 存在但工具链过期/不完整（需重建步骤①） id=%s", image, strings.TrimSpace(out))
+		return false, fmt.Sprintf(i18n.T("镜像 %s 存在但工具链过期/不完整（需重建步骤①） id=%s"), image, strings.TrimSpace(out))
 	}
-	return true, fmt.Sprintf("就绪 %s feature=%s id=%s", image, BuilderImageFeatureTag, strings.TrimSpace(out))
+	return true, fmt.Sprintf(i18n.T("就绪 %s feature=%s id=%s"), image, BuilderImageFeatureTag, strings.TrimSpace(out))
 }

@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"fridare-gui/internal/i18n"
 )
 
 // PatchInfo 修补信息
@@ -37,26 +39,26 @@ func (bp *BinaryPatcher) GetPredefinedPatches() map[string][]PatchInfo {
 			{
 				OriginalHex:    "667269646124736572766572",
 				ReplacementHex: "", // 将在运行时设置
-				Description:    "修改服务器名称",
+				Description:    i18n.T("修改服务器名称"),
 			},
 			{
 				OriginalHex:    "000000000000FFFF0000FFFF",
 				ReplacementHex: "", // 将在运行时设置
-				Description:    "修改默认端口",
+				Description:    i18n.T("修改默认端口"),
 			},
 		},
 		"frida-gadget": {
 			{
 				OriginalHex:    "667269646124676164676574",
 				ReplacementHex: "", // 将在运行时设置
-				Description:    "修改gadget标识",
+				Description:    i18n.T("修改gadget标识"),
 			},
 		},
 		"frida.dll": {
 			{
 				OriginalHex:    "6672696461",
 				ReplacementHex: "", // 将在运行时设置
-				Description:    "修改DLL标识",
+				Description:    i18n.T("修改DLL标识"),
 			},
 		},
 	}
@@ -66,7 +68,7 @@ func (bp *BinaryPatcher) GetPredefinedPatches() map[string][]PatchInfo {
 func (bp *BinaryPatcher) DetectFileType(filePath string) (string, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return "", fmt.Errorf("读取文件失败: %w", err)
+		return "", fmt.Errorf(i18n.T("读取文件失败: %w"), err)
 	}
 
 	// 检查文件头和内容特征
@@ -104,13 +106,13 @@ func (bp *BinaryPatcher) PatchFile(inputPath, outputPath string, patches []Patch
 	// 读取原文件
 	data, err := os.ReadFile(inputPath)
 	if err != nil {
-		return fmt.Errorf("读取输入文件失败: %w", err)
+		return fmt.Errorf(i18n.T("读取输入文件失败: %w"), err)
 	}
 
 	// 创建备份
 	backupPath := inputPath + ".bak"
 	if err := os.WriteFile(backupPath, data, 0644); err != nil {
-		return fmt.Errorf("创建备份文件失败: %w", err)
+		return fmt.Errorf(i18n.T("创建备份文件失败: %w"), err)
 	}
 
 	// 应用修补
@@ -124,12 +126,12 @@ func (bp *BinaryPatcher) PatchFile(inputPath, outputPath string, patches []Patch
 
 		originalBytes, err := hex.DecodeString(patch.OriginalHex)
 		if err != nil {
-			return fmt.Errorf("解码原始十六进制失败: %w", err)
+			return fmt.Errorf(i18n.T("解码原始十六进制失败: %w"), err)
 		}
 
 		replacementBytes, err := hex.DecodeString(patch.ReplacementHex)
 		if err != nil {
-			return fmt.Errorf("解码替换十六进制失败: %w", err)
+			return fmt.Errorf(i18n.T("解码替换十六进制失败: %w"), err)
 		}
 
 		// 查找并替换
@@ -138,7 +140,7 @@ func (bp *BinaryPatcher) PatchFile(inputPath, outputPath string, patches []Patch
 
 	// 保存修补后的文件
 	if err := os.WriteFile(outputPath, patchedData, 0755); err != nil {
-		return fmt.Errorf("写入输出文件失败: %w", err)
+		return fmt.Errorf(i18n.T("写入输出文件失败: %w"), err)
 	}
 
 	return nil
@@ -147,7 +149,7 @@ func (bp *BinaryPatcher) PatchFile(inputPath, outputPath string, patches []Patch
 // GenerateNamePatch 生成名称修补信息
 func (bp *BinaryPatcher) GenerateNamePatch(newName string) (string, error) {
 	if len(newName) != 5 {
-		return "", fmt.Errorf("名称必须是5个字符")
+		return "", fmt.Errorf(i18n.T("名称必须是5个字符"))
 	}
 
 	// 将新名称转换为十六进制，并添加$server后缀
@@ -158,7 +160,7 @@ func (bp *BinaryPatcher) GenerateNamePatch(newName string) (string, error) {
 // GeneratePortPatch 生成端口修补信息
 func (bp *BinaryPatcher) GeneratePortPatch(port int) (string, string, error) {
 	if port < 1024 || port > 65535 {
-		return "", "", fmt.Errorf("端口号必须在1024-65535范围内")
+		return "", "", fmt.Errorf(i18n.T("端口号必须在1024-65535范围内"))
 	}
 
 	// 这里需要根据具体的二进制格式来生成端口修补
@@ -177,15 +179,15 @@ func (bp *BinaryPatcher) GeneratePortPatch(port int) (string, string, error) {
 func (bp *BinaryPatcher) ValidateFile(filePath string) error {
 	info, err := os.Stat(filePath)
 	if err != nil {
-		return fmt.Errorf("文件不存在: %w", err)
+		return fmt.Errorf(i18n.T("文件不存在: %w"), err)
 	}
 
 	if info.IsDir() {
-		return fmt.Errorf("路径是目录，不是文件")
+		return fmt.Errorf(i18n.T("路径是目录，不是文件"))
 	}
 
 	if info.Size() == 0 {
-		return fmt.Errorf("文件为空")
+		return fmt.Errorf(i18n.T("文件为空"))
 	}
 
 	return nil
@@ -242,7 +244,7 @@ func (bp *BinaryPatcher) SearchPattern(filePath, hexPattern string) ([]int64, er
 
 	pattern, err := hex.DecodeString(hexPattern)
 	if err != nil {
-		return nil, fmt.Errorf("无效的十六进制模式: %w", err)
+		return nil, fmt.Errorf(i18n.T("无效的十六进制模式: %w"), err)
 	}
 
 	var positions []int64

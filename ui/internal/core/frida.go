@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"fridare-gui/internal/i18n"
+
 	"github.com/go-resty/resty/v2"
 )
 
@@ -101,11 +103,11 @@ func (fc *FridaClient) GetVersions() ([]FridaVersion, error) {
 		Get("https://api.github.com/repos/frida/frida/releases")
 
 	if err != nil {
-		return nil, fmt.Errorf("获取版本列表失败: %w", err)
+		return nil, fmt.Errorf(i18n.T("获取版本列表失败: %w"), err)
 	}
 
 	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("GitHub API返回错误状态码: %d", resp.StatusCode())
+		return nil, fmt.Errorf(i18n.T("GitHub API返回错误状态码: %d"), resp.StatusCode())
 	}
 
 	// 过滤并排序
@@ -132,7 +134,7 @@ func (fc *FridaClient) GetLatestVersion() (*FridaVersion, error) {
 	}
 
 	if len(versions) == 0 {
-		return nil, fmt.Errorf("没有找到可用版本")
+		return nil, fmt.Errorf(i18n.T("没有找到可用版本"))
 	}
 
 	// 返回第一个非预发布版本
@@ -166,12 +168,12 @@ func (fc *FridaClient) FindAsset(version *FridaVersion, platform Platform, fileT
 		// The tools line has its own version, so do not require the frida server version in the name.
 		pattern = `(?i)(^|/)frida[-_]tools-`
 	default:
-		return nil, fmt.Errorf("不支持的文件类型: %s", fileType)
+		return nil, fmt.Errorf(i18n.T("不支持的文件类型: %s"), fileType)
 	}
 
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil, fmt.Errorf("编译正则表达式失败: %w", err)
+		return nil, fmt.Errorf(i18n.T("编译正则表达式失败: %w"), err)
 	}
 
 	for _, asset := range version.Assets {
@@ -180,7 +182,7 @@ func (fc *FridaClient) FindAsset(version *FridaVersion, platform Platform, fileT
 		}
 	}
 
-	return nil, fmt.Errorf("未找到匹配的文件: %s", pattern)
+	return nil, fmt.Errorf(i18n.T("未找到匹配的文件: %s"), pattern)
 }
 
 // DownloadProgress 下载进度回调
@@ -193,12 +195,12 @@ func (fc *FridaClient) DownloadFile(url, filename string, progress DownloadProgr
 		Get(url)
 
 	if err != nil {
-		return fmt.Errorf("下载失败: %w", err)
+		return fmt.Errorf(i18n.T("下载失败: %w"), err)
 	}
 	defer resp.RawBody().Close()
 
 	if resp.StatusCode() != 200 {
-		return fmt.Errorf("下载失败，状态码: %d", resp.StatusCode())
+		return fmt.Errorf(i18n.T("下载失败，状态码: %d"), resp.StatusCode())
 	}
 
 	// 获取文件大小
@@ -211,7 +213,7 @@ func (fc *FridaClient) DownloadFile(url, filename string, progress DownloadProgr
 	// 创建文件
 	out, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("创建文件失败: %w", err)
+		return fmt.Errorf(i18n.T("创建文件失败: %w"), err)
 	}
 	defer out.Close()
 
@@ -225,7 +227,7 @@ func (fc *FridaClient) DownloadFile(url, filename string, progress DownloadProgr
 		if n > 0 {
 			_, writeErr := out.Write(buffer[:n])
 			if writeErr != nil {
-				return fmt.Errorf("写入文件失败: %w", writeErr)
+				return fmt.Errorf(i18n.T("写入文件失败: %w"), writeErr)
 			}
 
 			downloaded += int64(n)
@@ -244,7 +246,7 @@ func (fc *FridaClient) DownloadFile(url, filename string, progress DownloadProgr
 			if err == io.EOF {
 				break
 			}
-			return fmt.Errorf("读取响应失败: %w", err)
+			return fmt.Errorf(i18n.T("读取响应失败: %w"), err)
 		}
 	}
 
@@ -259,12 +261,12 @@ func (fc *FridaClient) DownloadFileWithContext(ctx context.Context, url, filenam
 		Get(url)
 
 	if err != nil {
-		return fmt.Errorf("下载失败: %w", err)
+		return fmt.Errorf(i18n.T("下载失败: %w"), err)
 	}
 	defer resp.RawBody().Close()
 
 	if resp.StatusCode() != 200 {
-		return fmt.Errorf("下载失败，状态码: %d", resp.StatusCode())
+		return fmt.Errorf(i18n.T("下载失败，状态码: %d"), resp.StatusCode())
 	}
 
 	// 获取文件大小
@@ -277,7 +279,7 @@ func (fc *FridaClient) DownloadFileWithContext(ctx context.Context, url, filenam
 	// 创建文件
 	out, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("创建文件失败: %w", err)
+		return fmt.Errorf(i18n.T("创建文件失败: %w"), err)
 	}
 	defer out.Close()
 
@@ -311,7 +313,7 @@ func (fc *FridaClient) DownloadFileWithContext(ctx context.Context, url, filenam
 
 			_, writeErr := out.Write(buffer[:n])
 			if writeErr != nil {
-				return fmt.Errorf("写入文件失败: %w", writeErr)
+				return fmt.Errorf(i18n.T("写入文件失败: %w"), writeErr)
 			}
 
 			downloaded += int64(n)
@@ -337,7 +339,7 @@ func (fc *FridaClient) DownloadFileWithContext(ctx context.Context, url, filenam
 			if err == io.EOF {
 				break
 			}
-			return fmt.Errorf("读取响应失败: %w", err)
+			return fmt.Errorf(i18n.T("读取响应失败: %w"), err)
 		}
 	}
 

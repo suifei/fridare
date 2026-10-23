@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"fridare-gui/internal/i18n"
 )
 
 // JobStage is a named pipeline stage.
@@ -387,7 +389,7 @@ func (o *Orchestrator) Reset() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.cancel = nil
-	o.state = JobState{Stage: StageIdle, Message: "已重置，可重新开始"}
+	o.state = JobState{Stage: StageIdle, Message: i18n.T("已重置，可重新开始")}
 }
 
 func (o *Orchestrator) emit(stage JobStage, pct float64, msg string, err error) {
@@ -423,7 +425,7 @@ func (o *Orchestrator) Start(cfg JobConfig, progressCb func(ProgressEvent)) erro
 	o.mu.Lock()
 	if o.state.Stage != StageIdle && o.state.Stage != StageDone && o.state.Stage != StageFailed && o.state.Stage != StageCancelled {
 		o.mu.Unlock()
-		return fmt.Errorf("任务进行中（%s），请先终止或等待完成", o.state.Stage)
+		return fmt.Errorf(i18n.T("任务进行中（%s），请先终止或等待完成"), o.state.Stage)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	o.cancel = cancel
@@ -432,7 +434,7 @@ func (o *Orchestrator) Start(cfg JobConfig, progressCb func(ProgressEvent)) erro
 		ID:        id,
 		Stage:     StageProbe,
 		StartedAt: time.Now(),
-		Message:   "启动中…",
+		Message:   i18n.T("启动中…"),
 	}
 	o.mu.Unlock()
 
@@ -485,7 +487,7 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 					Time:    time.Now(),
 					Stage:   StageProbe,
 					Percent: 0.02,
-					Message: "文本日志: " + flog.Path(),
+					Message: i18n.T("文本日志: ") + flog.Path(),
 				})
 			}
 		}
@@ -510,13 +512,13 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	defer func() {
 		if err != nil {
 			if ctx.Err() != nil {
-				notify(StageCancelled, o.State().Percent, "用户已终止任务", ctx.Err())
+				notify(StageCancelled, o.State().Percent, i18n.T("用户已终止任务"), ctx.Err())
 			} else {
 				logHint := ""
 				if o.fileLog != nil {
-					logHint = "；完整日志: " + o.fileLog.Path()
+					logHint = i18n.T("；完整日志: ") + o.fileLog.Path()
 				}
-				notify(StageFailed, o.State().Percent, "任务失败: "+err.Error()+logHint, err)
+				notify(StageFailed, o.State().Percent, i18n.T("任务失败: ")+err.Error()+logHint, err)
 			}
 		}
 		o.mu.Lock()
@@ -535,7 +537,7 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	}()
 
 	// --- probe ---
-	notify(StageProbe, 0.05, "检查依赖（Docker / 磁盘 / 代理 / grok-build / OpenAI）…", nil)
+	notify(StageProbe, 0.05, i18n.T("检查依赖（Docker / 磁盘 / 代理 / grok-build / OpenAI）…"), nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -572,15 +574,15 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	// Develop / full need version + targets; bootstrap only needs Docker/disk.
 	if mode != JobModeBootstrap {
 		if strings.TrimSpace(cfg.FridaVersion) == "" {
-			return fmt.Errorf("必须指定 Frida 版本")
+			return fmt.Errorf(i18n.T("必须指定 Frida 版本"))
 		}
 		if len(cfg.TargetIDs) == 0 {
-			return fmt.Errorf("至少选择一个编译目标")
+			return fmt.Errorf(i18n.T("至少选择一个编译目标"))
 		}
 	}
 
 	// --- bootstrap (Step 1: base image with toolchain) ---
-	notify(StageBootstrap, 0.12, "步骤① 准备 Docker 基础镜像（工具链）…", nil)
+	notify(StageBootstrap, 0.12, i18n.T("步骤① 准备 Docker 基础镜像（工具链）…"), nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -597,10 +599,10 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 		artHost = DefaultArtifactDir(workRoot)
 	}
 	if err = os.MkdirAll(srcHost, 0755); err != nil {
-		return fmt.Errorf("创建源码工作目录: %w", err)
+		return fmt.Errorf(i18n.T("创建源码工作目录: %w"), err)
 	}
 	if err = os.MkdirAll(artHost, 0755); err != nil {
-		return fmt.Errorf("创建产物目录: %w", err)
+		return fmt.Errorf(i18n.T("创建产物目录: %w"), err)
 	}
 	// Write Dockerfile with optional China Hub mirror on FROM
 	dockerCtx := filepath.Join(workRoot, "docker")
@@ -610,11 +612,11 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	_ = os.WriteFile(filepath.Join(dockerCtx, "Dockerfile"), []byte(WriteScriptUnixLF(df)), 0644)
 
 	if !SupportsDockerSourceRebuild() {
-		return fmt.Errorf("当前操作系统 %s 未作为源码重编译客户端验证；请使用 Windows / macOS / Linux + Docker Desktop 或 Docker Engine", HostPlatformLabel())
+		return fmt.Errorf(i18n.T("当前操作系统 %s 未作为源码重编译客户端验证；请使用 Windows / macOS / Linux + Docker Desktop 或 Docker Engine"), HostPlatformLabel())
 	}
-	notify(StageBootstrap, 0.13, fmt.Sprintf("Host 客户端 %s — 编译仅在 Docker/Linux 内执行", HostPlatformLabel()), nil)
+	notify(StageBootstrap, 0.13, fmt.Sprintf(i18n.T("Host 客户端 %s — 编译仅在 Docker/Linux 内执行"), HostPlatformLabel()), nil)
 	if mirror != "" {
-		notify(StageBootstrap, 0.135, fmt.Sprintf("Docker 镜像源: %s（pull/build 直连=%v，不走 GUI 代理）", mirror, cfg.DockerPullDirect || mirror != ""), nil)
+		notify(StageBootstrap, 0.135, fmt.Sprintf(i18n.T("Docker 镜像源: %s（pull/build 直连=%v，不走 GUI 代理）"), mirror, cfg.DockerPullDirect || mirror != ""), nil)
 	}
 
 	image := cfg.DockerImage
@@ -646,7 +648,7 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 				}
 				needBuild = false
 			} else {
-				notify(StageBootstrap, 0.15, "pull 失败: "+runErr.Error()+"，改为本地 docker build（含 NDK 等预置依赖）…", nil)
+				notify(StageBootstrap, 0.15, i18n.T("pull 失败: ")+runErr.Error()+i18n.T("，改为本地 docker build（含 NDK 等预置依赖）…"), nil)
 			}
 		} else {
 			// Existing image must include baked toolchain (feature marker)
@@ -654,7 +656,7 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 				probe := RunContainerArgs(DockerWorkspace{Image: localTag}, []string{"bash", "-lc", ImageHasBuilderFeaturesShell()})
 				if _, perr := o.runner.Run(ctx, pullEnv, probe[0], probe[1:]...); perr == nil {
 					needBuild = false
-					notify(StageBootstrap, 0.14, "本地镜像 "+localTag+" 已含预置依赖（"+BuilderImageFeatureTag+"），跳过 docker build", nil)
+					notify(StageBootstrap, 0.14, i18n.T("本地镜像 ")+localTag+i18n.T(" 已含预置依赖（")+BuilderImageFeatureTag+i18n.T("），跳过 docker build"), nil)
 				} else {
 					// try stable feature tag alias
 					stable := BuilderStableImageTag(localTag)
@@ -663,11 +665,11 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 						if _, pS := o.runner.Run(ctx, pullEnv, probeS[0], probeS[1:]...); pS == nil {
 							_, _ = o.runner.Run(ctx, pullEnv, "docker", "tag", stable, localTag)
 							needBuild = false
-							notify(StageBootstrap, 0.14, "从留档标签复用 "+stable+" → "+localTag, nil)
+							notify(StageBootstrap, 0.14, i18n.T("从留档标签复用 ")+stable+" → "+localTag, nil)
 						}
 					}
 					if needBuild {
-						notify(StageBootstrap, 0.145, "本地镜像缺少预置依赖（NDK/Node/Go），将重建 builder 镜像…", nil)
+						notify(StageBootstrap, 0.145, i18n.T("本地镜像缺少预置依赖（NDK/Node/Go），将重建 builder 镜像…"), nil)
 					}
 				}
 			}
@@ -677,56 +679,56 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 					probe := RunContainerArgs(DockerWorkspace{Image: localTag}, []string{"bash", "-lc", ImageHasBuilderFeaturesShell()})
 					if _, perr := o.runner.Run(ctx, pullEnv, probe[0], probe[1:]...); perr == nil {
 						needBuild = false
-						notify(StageBootstrap, 0.14, "从本地 tar 档案恢复镜像: "+path, nil)
+						notify(StageBootstrap, 0.14, i18n.T("从本地 tar 档案恢复镜像: ")+path, nil)
 					}
 				}
 			}
 		}
 		if needBuild {
-			notify(StageBootstrap, 0.16, fmt.Sprintf("docker build -t %s（预装 apt + Node20 + Go1.24 + NDK r29，基座 %s）…", localTag, ResolveDockerImage(DefaultDockerfileBaseImage, mirror)), nil)
-			notify(StageBootstrap, 0.165, "首次构建镜像较慢（NDK+工具链），完成后 AI 魔改/编译只需确认环境与版本 subprojects", nil)
+			notify(StageBootstrap, 0.16, fmt.Sprintf(i18n.T("docker build -t %s（预装 apt + Node20 + Go1.24 + NDK r29，基座 %s）…"), localTag, ResolveDockerImage(DefaultDockerfileBaseImage, mirror)), nil)
+			notify(StageBootstrap, 0.165, i18n.T("首次构建镜像较慢（NDK+工具链），完成后 AI 魔改/编译只需确认环境与版本 subprojects"), nil)
 			// Node/Go/NDK tarballs need proxy inside RUN steps (build-arg).
 			// Client uses pullEnv (no proxy) so Hub/mirror base image pull stays direct.
 			buildArgs := DockerBuildImageArgsWithProxy(localTag, dockerCtx, cfg.Proxy)
 			if _, berr := o.runner.Run(ctx, pullEnv, buildArgs[0], buildArgs[1:]...); berr != nil {
-				return fmt.Errorf("Docker 编译环境构建失败（Dockerfile 预装 NDK/工具链）: %w\n%s", berr, DockerMirrorHelp)
+				return fmt.Errorf(i18n.T("Docker 编译环境构建失败（Dockerfile 预装 NDK/工具链）: %w\n%s"), berr, i18n.T(DockerMirrorHelp))
 			}
 			// verify features after build
 			probe := RunContainerArgs(DockerWorkspace{Image: localTag}, []string{"bash", "-lc", ImageHasBuilderFeaturesShell()})
 			if out, perr := o.runner.Run(ctx, nil, probe[0], probe[1:]...); perr != nil {
-				return fmt.Errorf("builder 镜像自检失败（缺少工具链标记）: %v\n%s", perr, out)
+				return fmt.Errorf(i18n.T("builder 镜像自检失败（缺少工具链标记）: %v\n%s"), perr, out)
 			}
-			notify(StageBootstrap, 0.18, "builder 镜像就绪（依赖已预装）", nil)
+			notify(StageBootstrap, 0.18, i18n.T("builder 镜像就绪（依赖已预装）"), nil)
 		}
 		// Always tag a stable feature-tag alias for local reuse (留档)
 		stable := BuilderStableImageTag(localTag)
 		if stable != "" && stable != localTag {
-			notify(StageBootstrap, 0.185, "本地留档标签: "+stable, nil)
+			notify(StageBootstrap, 0.185, i18n.T("本地留档标签: ")+stable, nil)
 			_, _ = o.runner.Run(ctx, pullEnv, "docker", "tag", localTag, stable)
 		}
 		// Optional docker save tar under workdir/images
 		if cfg.ArchiveImage || mode == JobModeBootstrap {
 			if path, aerr := ArchiveBuilderImage(ctx, o.runner, pullEnv, localTag, workRoot); aerr != nil {
-				notify(StageBootstrap, 0.19, "镜像 tar 留档跳过: "+aerr.Error(), nil)
+				notify(StageBootstrap, 0.19, i18n.T("镜像 tar 留档跳过: ")+aerr.Error(), nil)
 			} else if path != "" {
-				notify(StageBootstrap, 0.19, "镜像已本地留档: "+path, nil)
+				notify(StageBootstrap, 0.19, i18n.T("镜像已本地留档: ")+path, nil)
 			}
 		}
 		image = localTag
-		notify(StageBootstrap, 0.20, fmt.Sprintf("步骤① 完成：基础镜像 %s 可复用（feature=%s）", localTag, BuilderImageFeatureTag), nil)
+		notify(StageBootstrap, 0.20, fmt.Sprintf(i18n.T("步骤① 完成：基础镜像 %s 可复用（feature=%s）"), localTag, BuilderImageFeatureTag), nil)
 	} else {
-		notify(StageBootstrap, 0.15, "dry-run: 跳过 docker pull/build", nil)
+		notify(StageBootstrap, 0.15, i18n.T("dry-run: 跳过 docker pull/build"), nil)
 	}
 
 	// Step 1 only: stop after base image is ready / archived.
 	if mode == JobModeBootstrap {
-		notify(StageDone, 1.0, fmt.Sprintf("步骤① 基础镜像就绪: %s（下次步骤② 直接复用，无需重装工具链）", image), nil)
+		notify(StageDone, 1.0, fmt.Sprintf(i18n.T("步骤① 基础镜像就绪: %s（下次步骤② 直接复用，无需重装工具链）"), image), nil)
 		return nil
 	}
 
 	// --- clone (Step 2: develop — Docker-first; bind-mount so agent can edit on host) ---
 	cloneRef := EffectiveCloneRef(cfg)
-	notify(StageClone, 0.25, fmt.Sprintf("步骤② Docker 内浅克隆 Frida %s (--depth=1, clone=%s)…", cfg.FridaVersion, cloneRef), nil)
+	notify(StageClone, 0.25, fmt.Sprintf(i18n.T("步骤② Docker 内浅克隆 Frida %s (--depth=1, clone=%s)…"), cfg.FridaVersion, cloneRef), nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -753,24 +755,24 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 			out, derr := o.runner.Run(ctx, nil, runArgs[0], runArgs[1:]...)
 			if derr != nil {
 				// Fallback: host git with original proxy (localhost works on host)
-				notify(StageClone, 0.27, "容器克隆失败，尝试 Host git clone（使用本机代理）…", nil)
+				notify(StageClone, 0.27, i18n.T("容器克隆失败，尝试 Host git clone（使用本机代理）…"), nil)
 				if herr := hostGitShallowClone(ctx, o.runner, cfg, cloneDest); herr != nil {
-					return FormatDockerRunError("Docker 内克隆 Frida 源码失败", out, derr)
+					return FormatDockerRunError(i18n.T("Docker 内克隆 Frida 源码失败"), out, derr)
 				}
-				notify(StageClone, 0.29, "Host git 浅克隆成功", nil)
+				notify(StageClone, 0.29, i18n.T("Host git 浅克隆成功"), nil)
 			}
 		} else {
-			notify(StageClone, 0.28, "源码树已存在，跳过 clone", nil)
+			notify(StageClone, 0.28, i18n.T("源码树已存在，跳过 clone"), nil)
 		}
 		// Init submodules before mod — otherwise frida-core/gum are empty gitlinks and
 		// content replace + asset rename miss agent/server/gadget meson files.
-		notify(StageClone, 0.31, "初始化 Frida submodules（魔改前需要完整 frida-core/gum 树）…", nil)
+		notify(StageClone, 0.31, i18n.T("初始化 Frida submodules（魔改前需要完整 frida-core/gum 树）…"), nil)
 		subSh := DockerInitSubmodulesShell("frida")
 		runArgs := RunContainerArgs(wsBase, []string{"bash", "-lc", subSh})
 		if out, serr := o.runner.Run(ctx, nil, runArgs[0], runArgs[1:]...); serr != nil {
-			notify(StageClone, 0.32, "submodule 初始化警告: "+serr.Error()+" — "+truncate(out, 200), nil)
+			notify(StageClone, 0.32, i18n.T("submodule 初始化警告: ")+serr.Error()+" — "+truncate(out, 200), nil)
 		} else {
-			notify(StageClone, 0.32, "submodules 就绪，开始管理分支与魔改", nil)
+			notify(StageClone, 0.32, i18n.T("submodules 就绪，开始管理分支与魔改"), nil)
 		}
 	} else {
 		// Dry-run: create fake source tree
@@ -778,12 +780,12 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 		_ = os.WriteFile(filepath.Join(cloneDest, "README.md"), []byte("dry-run frida source\n"), 0644)
 		_ = os.WriteFile(filepath.Join(cloneDest, "subprojects", "frida-core", "lib", "agent", "frida-agent-android.version"), []byte("V\n"), 0644)
 		_ = os.WriteFile(filepath.Join(cloneDest, "subprojects", "frida-core", "lib", "agent", "meson.build"), []byte("symscript = 'frida-agent-android.version'\n"), 0644)
-		notify(StageClone, 0.30, "dry-run: 已创建伪源码树 "+cloneDest, nil)
+		notify(StageClone, 0.30, i18n.T("dry-run: 已创建伪源码树 ")+cloneDest, nil)
 	}
 
 	// --- branch (prefer Docker git on the bind-mounted tree) ---
 	branch := ManagementBranchName(time.Now())
-	notify(StageBranch, 0.35, "Docker 内创建管理分支 "+branch+"…", nil)
+	notify(StageBranch, 0.35, i18n.T("Docker 内创建管理分支 ")+branch+"…", nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -795,15 +797,15 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 		runArgs := RunContainerArgs(wsBase, []string{"bash", "-lc", branchSh})
 		if _, runErr := o.runner.Run(ctx, nil, runArgs[0], runArgs[1:]...); runErr != nil {
 			// Fallback: host git -C on bind mount only (metadata, not compile)
-			notify(StageBranch, 0.36, "容器内 git 分支失败，尝试 host git 元数据操作（非编译）…", nil)
+			notify(StageBranch, 0.36, i18n.T("容器内 git 分支失败，尝试 host git 元数据操作（非编译）…"), nil)
 			bArgs := CreateBranchArgs(branch)
 			gitArgs := append([]string{"-C", cloneDest}, bArgs[1:]...)
 			if _, herr := o.runner.Run(ctx, nil, "git", gitArgs...); herr != nil {
-				notify(StageBranch, 0.36, "git checkout -b 警告: "+herr.Error(), nil)
+				notify(StageBranch, 0.36, i18n.T("git checkout -b 警告: ")+herr.Error(), nil)
 			}
 		}
 	} else {
-		notify(StageBranch, 0.36, "dry-run: 假定分支 "+branch+" 已创建", nil)
+		notify(StageBranch, 0.36, i18n.T("dry-run: 假定分支 ")+branch+i18n.T(" 已创建"), nil)
 	}
 
 	// Host AI agent must use GUI proxy when option is on
@@ -812,7 +814,7 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	}
 
 	// --- mod plan ---
-	notify(StageModPlan, 0.45, "制定源码魔改计划（扫描树 + AI agent）…", nil)
+	notify(StageModPlan, 0.45, i18n.T("制定源码魔改计划（扫描树 + AI agent）…"), nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -822,10 +824,10 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	}
 	plan, perr := o.agent.PlanMods(ctx, cfg, branch)
 	if perr != nil {
-		return fmt.Errorf("魔改计划失败: %w", perr)
+		return fmt.Errorf(i18n.T("魔改计划失败: %w"), perr)
 	}
 	if plan == nil {
-		return fmt.Errorf("魔改计划为空")
+		return fmt.Errorf(i18n.T("魔改计划为空"))
 	}
 	// If plan still only has globs, refine against cloned tree now
 	if treePlan, terr := PlanModsFromTree(cloneDest, cfg, branch); terr == nil && treePlan != nil && len(treePlan.Operations) > 0 {
@@ -838,19 +840,19 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	o.mu.Lock()
 	o.state.Plan = plan
 	o.mu.Unlock()
-	notify(StageModPlan, 0.50, fmt.Sprintf("魔改计划就绪：%d 项文件操作", len(plan.Operations)), nil)
+	notify(StageModPlan, 0.50, fmt.Sprintf(i18n.T("魔改计划就绪：%d 项文件操作"), len(plan.Operations)), nil)
 
 	// --- mod apply ---
-	notify(StageModApply, 0.55, "执行源码魔改（AI agent + 全树文件操作）…", nil)
+	notify(StageModApply, 0.55, i18n.T("执行源码魔改（AI agent + 全树文件操作）…"), nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
 	if aerr := o.agent.ApplyMods(ctx, cfg, plan, cloneDest); aerr != nil {
-		return fmt.Errorf("应用魔改失败: %w", aerr)
+		return fmt.Errorf(i18n.T("应用魔改失败: %w"), aerr)
 	}
 
 	// --- build: Docker-only configure/make (never host toolchain) ---
-	notify(StageBuild, 0.65, fmt.Sprintf("Docker/Linux 内编译目标: %s …（不在 Host 执行 configure/make）", strings.Join(cfg.TargetIDs, ", ")), nil)
+	notify(StageBuild, 0.65, fmt.Sprintf(i18n.T("Docker/Linux 内编译目标: %s …（不在 Host 执行 configure/make）"), strings.Join(cfg.TargetIDs, ", ")), nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -893,11 +895,11 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 		// Hard rule: compile stage must be docker run of Linux container script.
 		runArgs := RunContainerArgs(wsBase, []string{"bash", "-lc", "bash -x /work/build-only.sh 2>&1"})
 		if !IsDockerCompileCommand(runArgs) {
-			return fmt.Errorf("内部错误: 编译命令未路由到 Docker")
+			return fmt.Errorf(i18n.T("内部错误: 编译命令未路由到 Docker"))
 		}
 		out, runErr := o.runner.Run(ctx, nil, runArgs[0], runArgs[1:]...)
 		if runErr != nil {
-			return FormatDockerRunError("Docker 内编译失败（Host 未执行 make）", out, runErr)
+			return FormatDockerRunError(i18n.T("Docker 内编译失败（Host 未执行 make）"), out, runErr)
 		}
 	} else {
 		// Simulate artifacts
@@ -906,19 +908,19 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 			_ = os.MkdirAll(dir, 0755)
 			_ = os.WriteFile(filepath.Join(dir, cfg.MagicName+"-server-"+cfg.FridaVersion+"-"+id), []byte("dry-run artifact\n"), 0644)
 		}
-		notify(StageBuild, 0.75, "dry-run: 已写入模拟产物（真实路径为 Docker 内 make）", nil)
+		notify(StageBuild, 0.75, i18n.T("dry-run: 已写入模拟产物（真实路径为 Docker 内 make）"), nil)
 	}
 
 	// --- export (catalog: version / platform / magic) ---
 	catalogRoot := CatalogRoot(workRoot)
-	notify(StageExport, 0.85, "导出产物到分类目录 "+catalogRoot+" …", nil)
+	notify(StageExport, 0.85, i18n.T("导出产物到分类目录 ")+catalogRoot+" …", nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
 	dockerArts := filepath.Join(srcHost, "artifacts")
 	// Post-build basename rename: keep source compile-compatible, magic names only on outputs
 	if n, rerr := RenameArtifactBasenames(dockerArts, cfg.MagicName); rerr == nil && n > 0 {
-		notify(StageExport, 0.84, fmt.Sprintf("产物 basename 魔改重命名 %d 个 → magic=%s", n, cfg.MagicName), nil)
+		notify(StageExport, 0.84, fmt.Sprintf(i18n.T("产物 basename 魔改重命名 %d 个 → magic=%s"), n, cfg.MagicName), nil)
 	}
 	// Keep a flat copy under artHost for backward compatibility
 	if entries, rdErr := os.ReadDir(dockerArts); rdErr == nil {
@@ -931,7 +933,7 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	_, _ = RenameArtifactBasenames(artHost, cfg.MagicName)
 	primary, catalogEntries, orgErr := OrganizeExportToCatalog(catalogRoot, cfg, dockerArts, artHost)
 	if orgErr != nil {
-		notify(StageExport, 0.86, "分类导出警告: "+orgErr.Error(), nil)
+		notify(StageExport, 0.86, i18n.T("分类导出警告: ")+orgErr.Error(), nil)
 	}
 	if primary == "" {
 		primary = artHost
@@ -941,13 +943,13 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 	o.mu.Unlock()
 	tips := ArtifactDeployTips(primary, cfg)
 	_ = os.WriteFile(filepath.Join(primary, "README-DEPLOY.txt"), []byte(tips), 0644)
-	_ = os.WriteFile(filepath.Join(artHost, "README-DEPLOY.txt"), []byte(tips+"\n分类目录: "+catalogRoot+"\n"), 0644)
-	notify(StageExport, 0.88, fmt.Sprintf("产物已分类: %s （共 %d 个 platform 条目）", primary, len(catalogEntries)), nil)
+	_ = os.WriteFile(filepath.Join(artHost, "README-DEPLOY.txt"), []byte(tips+i18n.T("\n分类目录: ")+catalogRoot+"\n"), 0644)
+	notify(StageExport, 0.88, fmt.Sprintf(i18n.T("产物已分类: %s （共 %d 个 platform 条目）"), primary, len(catalogEntries)), nil)
 
 	// --- tools package: patch frida-tools + build wheel into catalog ---
 	// Always full protocol surface (rpc + re.frida.* + Frida.*) so host client matches
 	// PatchArtifactBinaryMarkers on server binaries and deep source rewrites.
-	notify(StageToolsPatch, 0.92, "魔改并打包 host frida/frida-tools（服务端+客户端协议同步）…", nil)
+	notify(StageToolsPatch, 0.92, i18n.T("魔改并打包 host frida/frida-tools（服务端+客户端协议同步）…"), nil)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -959,18 +961,18 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 			// Non-fatal for binary-only success, but surface clearly
 			marker := filepath.Join(primary, "NEED_FRIDA_TOOLS_PATCH.txt")
 			_ = os.WriteFile(marker, []byte(ToolsPatchGuidance(cfg.MagicName, cfg.ListenPort)+
-				"\n\n自动 wheel 打包失败: "+werr.Error()+"\n"), 0644)
-			notify(StageToolsPatch, 0.95, "frida-tools wheel 打包失败（二进制仍可用）: "+werr.Error(), nil)
+				i18n.T("\n\n自动 wheel 打包失败: ")+werr.Error()+"\n"), 0644)
+			notify(StageToolsPatch, 0.95, i18n.T("frida-tools wheel 打包失败（二进制仍可用）: ")+werr.Error(), nil)
 		} else {
-			notify(StageToolsPatch, 0.96, fmt.Sprintf("已生成 frida-tools wheel: %v", wheels), nil)
+			notify(StageToolsPatch, 0.96, fmt.Sprintf(i18n.T("已生成 frida-tools wheel: %v"), wheels), nil)
 			toolsWhl, hostWhl := splitClientWheels(wheels)
 			_ = os.WriteFile(filepath.Join(primary, "PYTHON-TOOLS.txt"),
 				[]byte(fridaToolsInstallNotes(cfg, toolsWhl, hostWhl)), 0644)
 		}
 		if packed, perr := PackReleaseZips(catalogRoot, cfg); perr != nil {
-			notify(StageToolsPatch, 0.965, "发布 zip 打包警告: "+perr.Error(), nil)
+			notify(StageToolsPatch, 0.965, i18n.T("发布 zip 打包警告: ")+perr.Error(), nil)
 		} else if len(packed) > 0 {
-			notify(StageToolsPatch, 0.965, fmt.Sprintf("已打包发布 zip %d 个 → %s", len(packed), CatalogReleaseDir(catalogRoot, cfg.FridaVersion)), nil)
+			notify(StageToolsPatch, 0.965, fmt.Sprintf(i18n.T("已打包发布 zip %d 个 → %s"), len(packed), CatalogReleaseDir(catalogRoot, cfg.FridaVersion)), nil)
 		}
 	} else {
 		// dry-run: fake wheel note in catalog
@@ -979,14 +981,14 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 			_ = os.MkdirAll(py, 0755)
 			_ = os.WriteFile(filepath.Join(py, "INSTALL.txt"), []byte("dry-run wheel placeholder\n"), 0644)
 		}
-		notify(StageToolsPatch, 0.95, "dry-run: 跳过 pip download/wheel", nil)
+		notify(StageToolsPatch, 0.95, i18n.T("dry-run: 跳过 pip download/wheel"), nil)
 	}
 
 	// --- protocol cross-check: server binary vs host wheel ---
 	if !cfg.DryRun {
-		notify(StageToolsPatch, 0.97, "核对服务端与客户端协议面（re.{magic}. / {magic}:rpc）…", nil)
+		notify(StageToolsPatch, 0.97, i18n.T("核对服务端与客户端协议面（re.{magic}. / {magic}:rpc）…"), nil)
 		if report, cerr := RunCatalogProtocolCrossCheck(catalogRoot, cfg, catalogEntries, wheels); cerr != nil {
-			notify(StageToolsPatch, 0.98, "协议交叉核对跳过: "+cerr.Error(), nil)
+			notify(StageToolsPatch, 0.98, i18n.T("协议交叉核对跳过: ")+cerr.Error(), nil)
 		} else {
 			outPath := filepath.Join(primary, "PROTOCOL-SYNC.json")
 			_ = WriteProtocolCrossCheckReport(outPath, report)
@@ -994,59 +996,59 @@ func (o *Orchestrator) run(ctx context.Context, cfg JobConfig, progressCb func(P
 				_ = WriteProtocolCrossCheckReport(filepath.Join(e, "PROTOCOL-SYNC.json"), report)
 			}
 			if report.Matched {
-				notify(StageToolsPatch, 0.99, fmt.Sprintf("协议交叉核对通过 magic=%s serverOK=%v clientOK=%v",
+				notify(StageToolsPatch, 0.99, fmt.Sprintf(i18n.T("协议交叉核对通过 magic=%s serverOK=%v clientOK=%v"),
 					cfg.MagicName, report.ServerOK, report.ClientOK), nil)
 			} else {
-				notify(StageToolsPatch, 0.99, fmt.Sprintf("协议交叉核对有告警: %v（见 PROTOCOL-SYNC.json）", report.Issues), nil)
+				notify(StageToolsPatch, 0.99, fmt.Sprintf(i18n.T("协议交叉核对有告警: %v（见 PROTOCOL-SYNC.json）"), report.Issues), nil)
 			}
 		}
 	}
 
-	notify(StageDone, 1.0, "完成。分类产物: "+primary+" ；总目录: "+catalogRoot+" （服务端+客户端同 magic）", nil)
+	notify(StageDone, 1.0, i18n.T("完成。分类产物: ")+primary+i18n.T(" ；总目录: ")+catalogRoot+i18n.T(" （服务端+客户端同 magic）"), nil)
 	return nil
 }
 
 // ArtifactDeployTips returns user-facing deploy/use notes.
 func ArtifactDeployTips(artifactDir string, cfg JobConfig) string {
 	var b strings.Builder
-	b.WriteString("Fridare 源码重编译产物\n")
+	b.WriteString(i18n.T("Fridare 源码重编译产物\n"))
 	b.WriteString("====================\n\n")
-	b.WriteString(fmt.Sprintf("Frida 产品标签: %s\n", cfg.FridaVersion))
-	b.WriteString(fmt.Sprintf("pip frida 版本: %s（EffectivePipVersion；安装 catalog 里的 wheel 文件，不要 pip install frida-tools）\n", EffectivePipVersion(cfg)))
-	b.WriteString("CLI wheel 文件名 / import 包名是 frida_tools；PyPI 发行名才是 frida-tools。\n")
-	b.WriteString(fmt.Sprintf("魔改名称: %s\n", cfg.MagicName))
+	b.WriteString(fmt.Sprintf(i18n.T("Frida 产品标签: %s\n"), cfg.FridaVersion))
+	b.WriteString(fmt.Sprintf(i18n.T("pip frida 版本: %s（EffectivePipVersion；安装 catalog 里的 wheel 文件，不要 pip install frida-tools）\n"), EffectivePipVersion(cfg)))
+	b.WriteString(i18n.T("CLI wheel 文件名 / import 包名是 frida_tools；PyPI 发行名才是 frida-tools。\n"))
+	b.WriteString(fmt.Sprintf(i18n.T("魔改名称: %s\n"), cfg.MagicName))
 	listen := NormalizeListenPort(cfg.ListenPort)
-	b.WriteString(fmt.Sprintf("端口: %d", listen))
+	b.WriteString(fmt.Sprintf(i18n.T("端口: %d"), listen))
 	if listen == OfficialListenPort {
-		b.WriteString("（官方默认 27042；改不改默认值都行，启动用 -l 指定即可）")
+		b.WriteString(i18n.T("（官方默认 27042；改不改默认值都行，启动用 -l 指定即可）"))
 	} else {
-		b.WriteString("（已按配置改 DEFAULT_CONTROL_PORT；仍建议启动带 -l，客户端写同一端口）")
+		b.WriteString(i18n.T("（已按配置改 DEFAULT_CONTROL_PORT；仍建议启动带 -l，客户端写同一端口）"))
 	}
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("魔改强度: %s\n", strings.TrimSpace(cfg.DirectionProfile)))
+	b.WriteString(fmt.Sprintf(i18n.T("魔改强度: %s\n"), strings.TrimSpace(cfg.DirectionProfile)))
 	b.WriteString(FormatStealthJobSummary(cfg))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("目标: %s\n", strings.Join(cfg.TargetIDs, ", ")))
-	b.WriteString(fmt.Sprintf("产物目录: %s\n\n", artifactDir))
-	b.WriteString("目录结构: catalog/{version}/{platform}/{magic}/binaries|python\n\n")
-	b.WriteString("【服务端 + 客户端必须同 magic】\n")
+	b.WriteString(fmt.Sprintf(i18n.T("目标: %s\n"), strings.Join(cfg.TargetIDs, ", ")))
+	b.WriteString(fmt.Sprintf(i18n.T("产物目录: %s\n\n"), artifactDir))
+	b.WriteString(i18n.T("目录结构: catalog/{version}/{platform}/{magic}/binaries|python\n\n"))
+	b.WriteString(i18n.T("【服务端 + 客户端必须同 magic】\n"))
 	b.WriteString(fmt.Sprintf("  frida:rpc → %s:rpc\n", cfg.MagicName))
 	b.WriteString(fmt.Sprintf("  re.frida.* → re.%s.*\n", cfg.MagicName))
 	pas := cfg.MagicName
 	if len(pas) >= 1 {
 		pas = strings.ToUpper(pas[:1]) + pas[1:]
 	}
-	b.WriteString(fmt.Sprintf("  Frida.* API 字面量 → %s.*\n", pas))
-	b.WriteString("  勿 pip install 官方未魔改 frida/frida-tools。\n\n")
-	b.WriteString("部署提示:\n")
-	b.WriteString("1. 部署 binaries 下 *server* 到设备并 chmod +x 运行\n")
-	b.WriteString("2. 本机客户端: 先装 python/host/<你的OS-arch>/frida-*.whl（host-wheels zip 根目录则是 host/<平台>/），再装 python/frida_tools-*.whl\n")
-	b.WriteString("   （详见 python/INSTALL.txt；PROTOCOL-SYNC.json 为协议交叉核对结果）\n")
-	b.WriteString("3. 启动带 -l 指定 IP:端口（可不用 27042）；客户机必须写同一个端口（frida -H host:port）\n")
-	b.WriteString(fmt.Sprintf("   例: %s-server -l 0.0.0.0:%d  →  frida -H 127.0.0.1:%d\n", cfg.MagicName, listen, listen))
-	b.WriteString("4. 默认端口改不改都无所谓；要换端口优先用 -l，不必先改二进制\n")
-	b.WriteString("5. GUI 源码重编译页可浏览历史 catalog，无需重新编译\n\n")
-	b.WriteString("双技术路线:\n- 静态补丁: 无需 Docker，见「frida 魔改」\n- 源码重编译: 本目录产物\n")
+	b.WriteString(fmt.Sprintf(i18n.T("  Frida.* API 字面量 → %s.*\n"), pas))
+	b.WriteString(i18n.T("  勿 pip install 官方未魔改 frida/frida-tools。\n\n"))
+	b.WriteString(i18n.T("部署提示:\n"))
+	b.WriteString(i18n.T("1. 部署 binaries 下 *server* 到设备并 chmod +x 运行\n"))
+	b.WriteString(i18n.T("2. 本机客户端: 先装 python/host/<你的OS-arch>/frida-*.whl（host-wheels zip 根目录则是 host/<平台>/），再装 python/frida_tools-*.whl\n"))
+	b.WriteString(i18n.T("   （详见 python/INSTALL.txt；PROTOCOL-SYNC.json 为协议交叉核对结果）\n"))
+	b.WriteString(i18n.T("3. 启动带 -l 指定 IP:端口（可不用 27042）；客户机必须写同一个端口（frida -H host:port）\n"))
+	b.WriteString(fmt.Sprintf(i18n.T("   例: %s-server -l 0.0.0.0:%d  →  frida -H 127.0.0.1:%d\n"), cfg.MagicName, listen, listen))
+	b.WriteString(i18n.T("4. 默认端口改不改都无所谓；要换端口优先用 -l，不必先改二进制\n"))
+	b.WriteString(i18n.T("5. GUI 源码重编译页可浏览历史 catalog，无需重新编译\n\n"))
+	b.WriteString(i18n.T("双技术路线:\n- 静态补丁: 无需 Docker，见「frida 魔改」\n- 源码重编译: 本目录产物\n"))
 	return b.String()
 }
 
@@ -1056,7 +1058,7 @@ func ToolsPatchGuidance(magicName string, port int) string {
 	if len(pas) >= 1 {
 		pas = strings.ToUpper(pas[:1]) + pas[1:]
 	}
-	return fmt.Sprintf(`主机 frida / frida-tools 必须与魔改 server 使用相同 magic，否则连不上。
+	return fmt.Sprintf(i18n.T(`主机 frida / frida-tools 必须与魔改 server 使用相同 magic，否则连不上。
 
 服务端+客户端同步面:
   frida:rpc → %s:rpc
@@ -1071,7 +1073,7 @@ func ToolsPatchGuidance(magicName string, port int) string {
 
 备选: 「🛠️ frida-tools 魔改」标签就地改 site-packages（用 full 协议面；勿全局替换 frida 字符串）。
 - magic: %s  配置端口: %d（启动仍可用 -l 另指定；客户机连启动时的端口）
-`, magicName, magicName, pas, magicName, port)
+`), magicName, magicName, pas, magicName, port)
 }
 
 func copyPath(src, dst string) error {

@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"fridare-gui/internal/i18n"
 )
 
 // ProbeResult is one dependency check outcome.
@@ -104,14 +106,14 @@ func ProbeDeps(opts ProbeOptions) DepsReport {
 			Name:      "proxy",
 			Available: false,
 			Required:  true,
-			Detail:    "源码魔改需要配置上游代理（设置页 / 工具栏）。克隆 Frida 与拉取依赖通常需要代理。",
+			Detail:    i18n.T("源码魔改需要配置上游代理（设置页 / 工具栏）。克隆 Frida 与拉取依赖通常需要代理。"),
 		}
 	} else {
 		report.Proxy = ProbeResult{
 			Name:      "proxy",
 			Available: true,
 			Required:  true,
-			Detail:    "已配置: " + maskProxy(proxy),
+			Detail:    i18n.T("已配置: ") + maskProxy(proxy),
 		}
 	}
 
@@ -123,21 +125,21 @@ func ProbeDeps(opts ProbeOptions) DepsReport {
 			Name:      "disk",
 			Available: false,
 			Required:  true,
-			Detail:    fmt.Sprintf("无法探测磁盘空间 (%s): %v", o.WorkDir, err),
+			Detail:    fmt.Sprintf(i18n.T("无法探测磁盘空间 (%s): %v"), o.WorkDir, err),
 		}
 	} else if freeGB < o.MinDiskGB {
 		report.Disk = ProbeResult{
 			Name:      "disk",
 			Available: false,
 			Required:  true,
-			Detail:    fmt.Sprintf("空闲 %.1f GB < 建议最低 %.0f GB（路径: %s）", freeGB, o.MinDiskGB, o.WorkDir),
+			Detail:    fmt.Sprintf(i18n.T("空闲 %.1f GB < 建议最低 %.0f GB（路径: %s）"), freeGB, o.MinDiskGB, o.WorkDir),
 		}
 	} else {
 		report.Disk = ProbeResult{
 			Name:      "disk",
 			Available: true,
 			Required:  true,
-			Detail:    fmt.Sprintf("空闲 %.1f GB（建议 ≥ %.0f GB）", freeGB, o.MinDiskGB),
+			Detail:    fmt.Sprintf(i18n.T("空闲 %.1f GB（建议 ≥ %.0f GB）"), freeGB, o.MinDiskGB),
 		}
 	}
 
@@ -149,21 +151,21 @@ func ProbeDeps(opts ProbeOptions) DepsReport {
 			Name:      "openai",
 			Available: false,
 			Required:  true,
-			Detail:    "未配置 OpenAI 兼容 API 端点。推荐: " + RecommendedAPIBase,
+			Detail:    i18n.T("未配置 OpenAI 兼容 API 端点。推荐: ") + RecommendedAPIBase,
 		}
 	} else if key == "" {
 		report.OpenAI = ProbeResult{
 			Name:      "openai",
 			Available: false,
 			Required:  true,
-			Detail:    "已配置端点但缺少 API Key: " + base,
+			Detail:    i18n.T("已配置端点但缺少 API Key: ") + base,
 		}
 	} else {
 		report.OpenAI = ProbeResult{
 			Name:      "openai",
 			Available: true,
 			Required:  true,
-			Detail:    fmt.Sprintf("端点 %s（Key 已设置）", base),
+			Detail:    fmt.Sprintf(i18n.T("端点 %s（Key 已设置）"), base),
 		}
 	}
 
@@ -176,7 +178,7 @@ func ProbeDeps(opts ProbeOptions) DepsReport {
 		}
 	}
 	if report.Ready {
-		report.Messages = append(report.Messages, "依赖检查通过，可启动源码重编译任务。")
+		report.Messages = append(report.Messages, i18n.T("依赖检查通过，可启动源码重编译任务。"))
 	}
 	return report
 }
@@ -184,7 +186,7 @@ func ProbeDeps(opts ProbeOptions) DepsReport {
 // ProxyRequiredForSourceMod returns an error if proxy is empty when user enables source mod.
 func ProxyRequiredForSourceMod(proxy string) error {
 	if strings.TrimSpace(proxy) == "" {
-		return fmt.Errorf("启用源码魔改前必须配置上游代理（设置页或工具栏）")
+		return fmt.Errorf(i18n.T("启用源码魔改前必须配置上游代理（设置页或工具栏）"))
 	}
 	return nil
 }
@@ -196,9 +198,9 @@ func CanStartSourceJob(report DepsReport, proxy string) error {
 	}
 	if !report.Ready {
 		if len(report.Messages) > 0 {
-			return fmt.Errorf("依赖未就绪: %s", strings.Join(report.Messages, "; "))
+			return fmt.Errorf(i18n.T("依赖未就绪: %s"), strings.Join(report.Messages, "; "))
 		}
-		return fmt.Errorf("依赖未就绪，请先「检查依赖」")
+		return fmt.Errorf(i18n.T("依赖未就绪，请先「检查依赖」"))
 	}
 	return nil
 }
@@ -207,10 +209,10 @@ func CanStartSourceJob(report DepsReport, proxy string) error {
 // Needs Docker + disk; does not require OpenAI / grok (AI is step 2).
 func CanStartBootstrapJob(report DepsReport) error {
 	if !report.Docker.Available {
-		return fmt.Errorf("步骤① 需要 Docker: %s", report.Docker.Detail)
+		return fmt.Errorf(i18n.T("步骤① 需要 Docker: %s"), report.Docker.Detail)
 	}
 	if !report.Disk.Available {
-		return fmt.Errorf("步骤① 磁盘不足: %s", report.Disk.Detail)
+		return fmt.Errorf(i18n.T("步骤① 磁盘不足: %s"), report.Disk.Detail)
 	}
 	return nil
 }
@@ -222,7 +224,7 @@ func probeDocker(o ProbeOptions) ProbeResult {
 			Name:      "docker",
 			Available: false,
 			Required:  true,
-			Detail:    "未找到 docker 可执行文件。请安装 Docker Desktop / Engine 后重试（可选功能，不强制改系统）。",
+			Detail:    i18n.T("未找到 docker 可执行文件。请安装 Docker Desktop / Engine 后重试（可选功能，不强制改系统）。"),
 		}
 	}
 	out, err := o.RunCommand("docker", "info", "--format", "{{.ServerVersion}}")
@@ -232,7 +234,7 @@ func probeDocker(o ProbeOptions) ProbeResult {
 			Name:      "docker",
 			Available: false,
 			Required:  true,
-			Detail:    fmt.Sprintf("找到 docker (%s) 但守护进程不可用: %v — %s", path, err, truncate(out, 200)),
+			Detail:    fmt.Sprintf(i18n.T("找到 docker (%s) 但守护进程不可用: %v — %s"), path, err, truncate(out, 200)),
 		}
 	}
 	ver := strings.TrimSpace(out)
@@ -243,7 +245,7 @@ func probeDocker(o ProbeOptions) ProbeResult {
 		Name:      "docker",
 		Available: true,
 		Required:  true,
-		Detail:    fmt.Sprintf("Docker 可用 (%s)，Server: %s", path, ver),
+		Detail:    fmt.Sprintf(i18n.T("Docker 可用 (%s)，Server: %s"), path, ver),
 	}
 }
 
@@ -256,7 +258,7 @@ func probeGrokBuild(o ProbeOptions) ProbeResult {
 		}
 		// Try a lightweight version/help call; failure still counts as present.
 		out, runErr := o.RunCommand(path, "--version")
-		detail := fmt.Sprintf("已找到 %s (%s)", name, path)
+		detail := fmt.Sprintf(i18n.T("已找到 %s (%s)"), name, path)
 		if runErr == nil && strings.TrimSpace(out) != "" {
 			detail += ": " + truncate(strings.TrimSpace(out), 120)
 		}
@@ -271,7 +273,7 @@ func probeGrokBuild(o ProbeOptions) ProbeResult {
 		Name:      "grok_build",
 		Available: false,
 		Required:  true,
-		Detail:    "未找到 grok-build / grok。请安装 Grok Build CLI，或在本机 PATH 中提供可执行文件。AI 端点仍使用 GUI 配置。",
+		Detail:    i18n.T("未找到 grok-build / grok。请安装 Grok Build CLI，或在本机 PATH 中提供可执行文件。AI 端点仍使用 GUI 配置。"),
 	}
 }
 
@@ -282,7 +284,7 @@ func probeBinary(o ProbeOptions, name string, required bool, versionArgs []strin
 			Name:      name,
 			Available: false,
 			Required:  required,
-			Detail:    fmt.Sprintf("未找到 %s", name),
+			Detail:    fmt.Sprintf(i18n.T("未找到 %s"), name),
 		}
 	}
 	detail := path

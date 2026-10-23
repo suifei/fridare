@@ -5,6 +5,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"fridare-gui/internal/i18n"
 )
 
 // CloneSpec describes a shallow Frida source clone.
@@ -21,11 +23,11 @@ type CloneSpec struct {
 func (c CloneSpec) Validate() error {
 	v := strings.TrimSpace(c.Version)
 	if v == "" {
-		return fmt.Errorf("必须指定 Frida 官方版本（tag/commit）")
+		return fmt.Errorf(i18n.T("必须指定 Frida 官方版本（tag/commit）"))
 	}
 	// Reject path traversal / spaces that break shell scripts
 	if strings.ContainsAny(v, " \t\n\r;&|<>`$\\\"'") {
-		return fmt.Errorf("版本字符串包含非法字符: %q", v)
+		return fmt.Errorf(i18n.T("版本字符串包含非法字符: %q"), v)
 	}
 	return nil
 }
@@ -178,7 +180,7 @@ func BuildPipelineScript(opts PipelineScriptOptions) (string, error) {
 		return "", err
 	}
 	if len(opts.TargetIDs) == 0 {
-		return "", fmt.Errorf("至少选择一个编译目标")
+		return "", fmt.Errorf(i18n.T("至少选择一个编译目标"))
 	}
 	branch := opts.Branch
 	if branch == "" {
@@ -241,7 +243,7 @@ func BuildPipelineScript(opts PipelineScriptOptions) (string, error) {
 // the bind-mounted tree). Runs ONLY configure/make/collect inside Docker — never on host.
 func BuildOnlyPipelineScript(opts PipelineScriptOptions) (string, error) {
 	if len(opts.TargetIDs) == 0 {
-		return "", fmt.Errorf("至少选择一个编译目标")
+		return "", fmt.Errorf(i18n.T("至少选择一个编译目标"))
 	}
 	srcDir := opts.SourceDir
 	if srcDir == "" {
@@ -578,32 +580,32 @@ func FormatDockerRunError(stage string, out string, err error) error {
 	hint := ""
 	low := strings.ToLower(out + err.Error())
 	if strings.Contains(low, "connection refused") && (strings.Contains(low, "localhost") || strings.Contains(low, "127.0.0.1")) {
-		hint = "；原因：容器内 localhost 代理不可达，应使用 host.docker.internal（软件已自动改写，请更新到最新构建）"
+		hint = i18n.T("；原因：容器内 localhost 代理不可达，应使用 host.docker.internal（软件已自动改写，请更新到最新构建）")
 	}
 	if strings.Contains(low, "exit status 128") || strings.Contains(low, "exit=128") {
-		hint += "；git exit 128 多为网络/代理/认证失败"
+		hint += i18n.T("；git exit 128 多为网络/代理/认证失败")
 	}
 	if strings.Contains(low, "ndk_root must") || strings.Contains(low, "ndk not found") ||
 		strings.Contains(low, "ndk missing") || strings.Contains(low, "ndk r29 is required") ||
 		strings.Contains(low, "android_ndk_root must") {
-		hint += "；需要 Android NDK r29（应在 Dockerfile/docker build 预装；请重建 fridare/frida-builder 镜像）"
+		hint += i18n.T("；需要 Android NDK r29（应在 Dockerfile/docker build 预装；请重建 fridare/frida-builder 镜像）")
 	}
 	if strings.Contains(low, "need node.js") || strings.Contains(low, "need node.js >=") || strings.Contains(low, "nodejs >=18") {
-		hint += "；需要 Node.js >=18（应在 Dockerfile 预装 Node 20；请重建 builder 镜像，勿在编译任务中现装）"
+		hint += i18n.T("；需要 Node.js >=18（应在 Dockerfile 预装 Node 20；请重建 builder 镜像，勿在编译任务中现装）")
 	}
 	if strings.Contains(low, "need go >=") || strings.Contains(low, "need go >=1") {
-		hint += "；需要 Go >=1.24（应在 Dockerfile 预装；请重建 builder 镜像）"
+		hint += i18n.T("；需要 Go >=1.24（应在 Dockerfile 预装；请重建 builder 镜像）")
 	}
 	if strings.Contains(low, ".version does not exist") || strings.Contains(low, ".symbols does not exist") {
-		hint += "；魔改后缺 version/symbols 文件：内容替换后需同步重命名 frida-agent* 等资源文件名"
+		hint += i18n.T("；魔改后缺 version/symbols 文件：内容替换后需同步重命名 frida-agent* 等资源文件名")
 	}
 	if strings.Contains(low, "signals.sigtrap") || strings.Contains(low, "trace/breakpoint trap") {
-		hint += "；v8-mksnapshot 在此环境无法运行：Frida 16.x 应关闭 compiler_snapshot（与魔改无关）"
+		hint += i18n.T("；v8-mksnapshot 在此环境无法运行：Frida 16.x 应关闭 compiler_snapshot（与魔改无关）")
 	}
 	if msg == "" {
 		return fmt.Errorf("%s: %v%s", stage, err, hint)
 	}
-	return fmt.Errorf("%s: %v%s\n--- docker/git 输出 ---\n%s", stage, err, hint, msg)
+	return fmt.Errorf(i18n.T("%s: %v%s\n--- docker/git 输出 ---\n%s"), stage, err, hint, msg)
 }
 
 // DockerBranchShell creates management branch inside container source tree.
