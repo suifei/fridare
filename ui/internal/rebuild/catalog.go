@@ -218,16 +218,17 @@ func OrganizeExportToCatalog(catalogRoot string, cfg JobConfig, dockerArts, flat
 		_ = os.MkdirAll(binDir, 0755)
 		_ = os.MkdirAll(pyDir, 0755)
 
-		// Prefer docker artifacts under target subdir
-		srcCandidates := []string{
-			filepath.Join(dockerArts, tid),
-			filepath.Join(flatArtHost, tid),
-			dockerArts,
-			flatArtHost,
-		}
-		for _, src := range srcCandidates {
-			if st, e := os.Stat(src); e == nil && st.IsDir() {
-				_ = copyNonEmptyArtifacts(src, binDir)
+		// Per-target subdirectory only. Also walking dockerArts / flatArtHost
+		// descends into every sibling (android-arm64, android-x86_64, …) and
+		// copyNonEmptyArtifacts keeps the basename, so the later directory
+		// (x86_64 sorts after arm64) overwrites every catalog entry.
+		// Issue #38: selecting both arches left two folders of x86-64 binaries.
+		if !copyTargetArtifactDir(dockerArts, flatArtHost, tid, binDir) {
+			// Legacy flat layout: files sit directly in the artifact root.
+			// Do not descend into other target directories.
+			copyFlatArtifactRoot(dockerArts, binDir)
+			if flatArtHost != dockerArts {
+				copyFlatArtifactRoot(flatArtHost, binDir)
 			}
 		}
 		// Flatten nested target dir if present
@@ -268,32 +269,74 @@ func OrganizeExportToCatalog(catalogRoot string, cfg JobConfig, dockerArts, flat
 // MinArtifactBytes skips empty meson stubs (0-byte agent blobs).
 const MinArtifactBytes = 1024
 
+// copyTargetArtifactDir copies product blobs from <root>/<targetID>/ only.
+// Returns true when at least one such directory exists (even if it is empty).
+func copyTargetArtifactDir(dockerArts, flatArtHost, tid, binDir string) bool {
+	found := false
+	for _, root := range []string{dockerArts, flatArtHost} {
+		if root == "" || tid == "" {
+			continue
+		}
+		src := filepath.Join(root, tid)
+		if !dirExists(src) {
+			continue
+		}
+		found = true
+		_ = copyNonEmptyArtifacts(src, binDir)
+	}
+	return found
+}
+
+// copyFlatArtifactRoot copies product files that live directly in dir.
+// Child directories are other build targets and must not be flattened in.
+func copyFlatArtifactRoot(dir, binDir string) {
+	if dir == "" || !dirExists(dir) {
+		return
+	}
+	_ = copyProductArtifacts(dir, binDir, false)
+}
+
 func copyNonEmptyArtifacts(src, dst string) error {
+	return copyProductArtifacts(src, dst, true)
+}
+
+func copyProductArtifacts(src, dst string, recurse bool) error {
+	src = filepath.Clean(src)
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info == nil {
 			return nil
 		}
 		if info.IsDir() {
-			// don't recurse into nested build dirs beyond one level of named blobs
+			if !recurse && path != src {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		if info.Size() < MinArtifactBytes {
+		if !isProductArtifact(info) {
 			return nil
 		}
-		base := info.Name()
-		low := strings.ToLower(base)
-		if !(strings.Contains(low, "server") || strings.Contains(low, "agent") ||
-			strings.Contains(low, "gadget") || strings.Contains(low, "helper") || strings.Contains(low, "inject")) {
-			return nil
-		}
-		// Product binaries only — skip meson intermediates / headers / sources
-		if strings.HasSuffix(low, ".h") || strings.HasSuffix(low, ".c") || strings.HasSuffix(low, ".cc") ||
-			strings.HasSuffix(low, ".cpp") || strings.HasSuffix(low, ".vala") || strings.HasSuffix(low, ".vapi") ||
-			strings.HasSuffix(low, ".txt") || strings.HasSuffix(low, ".json") || strings.HasSuffix(low, ".gir") {
-			return nil
-		}
-		return copyFile(path, filepath.Join(dst, base))
+		return copyFile(path, filepath.Join(dst, info.Name()))
 	})
+}
+
+func isProductArtifact(info os.FileInfo) bool {
+	if info == nil || info.IsDir() || info.Size() < MinArtifactBytes {
+		return false
+	}
+	low := strings.ToLower(info.Name())
+	if !(strings.Contains(low, "server") || strings.Contains(low, "agent") ||
+		strings.Contains(low, "gadget") || strings.Contains(low, "helper") || strings.Contains(low, "inject")) {
+		return false
+	}
+	// Product binaries only — skip meson intermediates / headers / sources
+	switch {
+	case strings.HasSuffix(low, ".h"), strings.HasSuffix(low, ".c"), strings.HasSuffix(low, ".cc"),
+		strings.HasSuffix(low, ".cpp"), strings.HasSuffix(low, ".vala"), strings.HasSuffix(low, ".vapi"),
+		strings.HasSuffix(low, ".txt"), strings.HasSuffix(low, ".json"), strings.HasSuffix(low, ".gir"):
+		return false
+	default:
+		return true
+	}
 }
 
 func listNonEmptyFiles(dir string) ([]string, error) {

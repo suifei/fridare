@@ -269,10 +269,10 @@ func BuildOnlyPipelineScript(opts PipelineScriptOptions) (string, error) {
 // Android NDK r29 (Frida 17.x configure requires ANDROID_NDK_ROOT = r29).
 // Install path: ONLY via Dockerfile (docker build). Runtime only verifies.
 const (
-	AndroidNDKVersion   = "r29"
-	AndroidNDKURL       = "https://dl.google.com/android/repository/android-ndk-r29-linux.zip"
-	AndroidNDKR25URL    = "https://dl.google.com/android/repository/android-ndk-r25c-linux.zip"
-	AndroidNDKDirName   = "android-ndk-r29" // legacy workdir name; not used for install
+	AndroidNDKVersion    = "r29"
+	AndroidNDKURL        = "https://dl.google.com/android/repository/android-ndk-r29-linux.zip"
+	AndroidNDKR25URL     = "https://dl.google.com/android/repository/android-ndk-r25c-linux.zip"
+	AndroidNDKDirName    = "android-ndk-r29" // legacy workdir name; not used for install
 	AndroidNDKR25DirName = "android-ndk-r25"
 )
 
@@ -298,12 +298,17 @@ func NeedsLinuxArm64Cross(targetIDs []string) bool {
 		if err != nil {
 			continue
 		}
-		if t.ID == "linux-arm64" || t.Host == "linux-arm64" || t.Host == "aarch64-linux-gnu" ||
-			strings.HasPrefix(t.Host, "aarch64-linux-") {
+		if linuxArm64CrossTarget(t) {
 			return true
 		}
 	}
 	return false
+}
+
+// linuxArm64CrossTarget is the Linux aarch64 product (not Android/Windows arm64).
+func linuxArm64CrossTarget(t BuildTarget) bool {
+	return t.ID == "linux-arm64" || t.Host == "linux-arm64" || t.Host == "aarch64-linux-gnu" ||
+		strings.HasPrefix(t.Host, "aarch64-linux-")
 }
 
 // VerifyBuildEnvShell checks image-provided toolchain only.
@@ -431,14 +436,6 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir, stealthSeed st
 		b.WriteString(SelectAndroidNDKForFridaSourceShell(srcDir))
 	}
 	b.WriteString("\n")
-	// linux-arm64: ensure cross CC is visible to Frida configure/meson
-	// (host triplet aarch64-linux-gnu OR explicit CC= both work; set both for robustness)
-	if NeedsLinuxArm64Cross(targetIDs) {
-		b.WriteString("export CC=\"${CC:-aarch64-linux-gnu-gcc}\"\n")
-		b.WriteString("export CXX=\"${CXX:-aarch64-linux-gnu-g++}\"\n")
-		b.WriteString("export CC_FOR_linux_arm64=\"${CC_FOR_linux_arm64:-aarch64-linux-gnu-gcc}\"\n")
-		b.WriteString("export CXX_FOR_linux_arm64=\"${CXX_FOR_linux_arm64:-aarch64-linux-gnu-g++}\"\n")
-	}
 	for _, id := range targetIDs {
 		t, err := TargetByID(id)
 		if err != nil {
@@ -482,6 +479,15 @@ func compileTargetsShell(targetIDs []string, srcDir, artifactDir, stealthSeed st
 		perTU := PerTUStealthFlagsShell(stealthSeed)
 		b.WriteString("(\n")
 		b.WriteString("export ANDROID_NDK_ROOT=\"${ANDROID_NDK_ROOT:-}\"\n")
+		// linux-arm64 only. Exporting CC=aarch64-linux-gnu-gcc for the whole
+		// script makes later --host=linux-x86_64 / android-* / mingw use the
+		// same cross compiler. ${CC:-} still honors an explicit override.
+		if linuxArm64CrossTarget(t) {
+			b.WriteString("export CC=\"${CC:-aarch64-linux-gnu-gcc}\"\n")
+			b.WriteString("export CXX=\"${CXX:-aarch64-linux-gnu-g++}\"\n")
+			b.WriteString("export CC_FOR_linux_arm64=\"${CC_FOR_linux_arm64:-aarch64-linux-gnu-gcc}\"\n")
+			b.WriteString("export CXX_FOR_linux_arm64=\"${CXX_FOR_linux_arm64:-aarch64-linux-gnu-g++}\"\n")
+		}
 		if isMinGW {
 			b.WriteString("export CFLAGS=\"$(echo \"${CFLAGS:-}\" | sed -E 's/-include[[:space:]]+[^[:space:]]+//g')\"\n")
 			b.WriteString("export CPPFLAGS=\"$(echo \"${CPPFLAGS:-}\" | sed -E 's/-include[[:space:]]+[^[:space:]]+//g')\"\n")
