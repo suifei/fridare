@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+### Fixed
+- GUI/e2e 在 Windows 上编译时 `docker`/`git`/`python` 子进程弹出黑色控制台：`ExecRunner` / probes / tools 打包路径统一 `CREATE_NO_WINDOW` + `HideWindow`（Linux/macOS 不变）。
+- Android 魔改 `*-server` 启动 `backend_class != null`（[issue #41](https://github.com/suifei/fridare/issues/41)）：deep 源码阶段重写预置 `helper.dex` 的 `re/frida`→`re/{magic}`；导出时对嵌入 dex 做 string_ids 重排与校验；catalog 导出增加 helper 对齐校验旁路文件。
+- builder 镜像探测的 Node 大版本检查改成单引号 `node -e`，避免 Dockerfile/shell 引号嵌套踩坑。
+
 ## v4.1.0 - 2026-10-23
 
 ### Added

@@ -243,6 +243,10 @@ func OrganizeExportToCatalog(catalogRoot string, cfg JobConfig, dockerArts, flat
 		if ShouldStripProductSymbols(cfg) {
 			_, _ = StripProductBinariesDir(binDir, cfg.MagicName)
 		}
+		// Android servers: confirm embedded helper.dex matches magic (issue #38/#41).
+		if strings.Contains(strings.ToLower(tid), "android") {
+			_ = writeAndroidHelperDexVerify(binDir, cfg.MagicName, entry)
+		}
 		// MANIFEST after rename — list real basenames only
 		binFiles, _ := listNonEmptyFiles(binDir)
 		man := ArtifactManifest{
@@ -426,6 +430,44 @@ func PatchProductFile(path, magic string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// writeAndroidHelperDexVerify checks *-server binaries under binDir for aligned
+// helper.dex (issue #38/#41). Writes fridare-android-helper-verify.txt into entry.
+func writeAndroidHelperDexVerify(binDir, magic, entry string) error {
+	if binDir == "" || entry == "" || len(magic) != 5 {
+		return nil
+	}
+	var lines []string
+	err := filepath.Walk(binDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
+			return nil
+		}
+		name := strings.ToLower(info.Name())
+		if !strings.Contains(name, "server") || info.Size() < MinArtifactBytes {
+			return nil
+		}
+		data, rerr := os.ReadFile(path)
+		if rerr != nil {
+			return nil
+		}
+		ok, detail := AndroidHelperDexAligned(data, magic)
+		rel, _ := filepath.Rel(binDir, path)
+		status := "OK"
+		if !ok {
+			status = "FAIL"
+		}
+		lines = append(lines, fmt.Sprintf("%s\t%s\t%s", status, filepath.ToSlash(rel), detail))
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if len(lines) == 0 {
+		lines = []string{"SKIP\t(no *-server binaries)"}
+	}
+	body := "magic=" + magic + "\n" + strings.Join(lines, "\n") + "\n"
+	return os.WriteFile(filepath.Join(entry, "fridare-android-helper-verify.txt"), []byte(body), 0644)
 }
 
 func productMarkerPairs(magic string) [][2][]byte {

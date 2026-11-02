@@ -255,6 +255,16 @@ func ApplyDeepSourceExtras(sourceDir string, cfg JobConfig) error {
 	}
 	// Re-normalize: rewrite may re-read/write; keep shebangs LF for Docker.
 	_, _ = NormalizeSourceTreeLF(sourceDir)
+	// deep ProtocolAPI rewrites Vala find_class to re/{magic}; prebuilt helper.dex
+	// is binary and was skipped above — patch it before meson embeds (issue #41).
+	if needSourceHelperDexPatch(cfg) {
+		if df, dh, derr := PatchAndroidHelperDexInTree(sourceDir, cfg.MagicName); derr != nil {
+			return fmt.Errorf("android helper.dex: %w", derr)
+		} else if df > 0 {
+			_ = os.WriteFile(filepath.Join(sourceDir, "fridare-android-helper-dex.txt"),
+				[]byte(fmt.Sprintf("helper_dex_files=%d replacements=%d magic=%s\n", df, dh, cfg.MagicName)), 0644)
+		}
+	}
 	if n > 0 || ft > 0 {
 		_ = os.WriteFile(filepath.Join(sourceDir, "fridare-deep-strip.txt"),
 			[]byte(fmt.Sprintf("files=%d replacements=%d magic=%s profile=%s idents=%v protocol_api=1\n",

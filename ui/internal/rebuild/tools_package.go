@@ -405,6 +405,7 @@ func runPython(runner Runner, py string, opts *runOpts, args ...string) error {
 	ctx := context.Background()
 	// Always use exec with Dir/Env for reliability on Windows (Runner may not set cwd)
 	cmd := exec.CommandContext(ctx, py, full...)
+	hideConsoleCmd(cmd)
 	if opts != nil {
 		if opts.dir != "" {
 			cmd.Dir = opts.dir
@@ -427,6 +428,7 @@ func extractArchive(arch, dest string) error {
 	switch {
 	case strings.HasSuffix(low, ".tar.gz"), strings.HasSuffix(low, ".tgz"):
 		cmd := exec.Command("tar", "-xzf", arch, "-C", dest)
+		hideConsoleCmd(cmd)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("tar: %w %s", err, truncate(string(out), 200))
 		}
@@ -435,6 +437,7 @@ func extractArchive(arch, dest string) error {
 		// whl is zip
 		cmd := exec.Command("python", "-c",
 			fmt.Sprintf("import zipfile; zipfile.ZipFile(r'''%s''').extractall(r'''%s''')", arch, dest))
+	hideConsoleCmd(cmd)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("unzip: %w %s", err, truncate(string(out), 200))
 		}

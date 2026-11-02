@@ -179,6 +179,7 @@ type ExecRunner struct{}
 
 func (ExecRunner) Run(ctx context.Context, env []string, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	hideConsoleCmd(cmd)
 	if env != nil {
 		cmd.Env = env
 	}

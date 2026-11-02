@@ -151,6 +151,7 @@ sys.stdout.write(out)
 sys.stderr.write("COUNT=%d\n" % count[0])
 `
 	cmd := exec.Command(py, "-c", script, pairLines.String())
+	hideConsoleCmd(cmd)
 	cmd.Stdin = strings.NewReader(content)
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
@@ -180,6 +181,7 @@ func pythonAstParseOK(src string) bool {
 		}
 	}
 	cmd := exec.Command(py, "-c", "import ast,sys; ast.parse(sys.stdin.read())")
+	hideConsoleCmd(cmd)
 	cmd.Stdin = strings.NewReader(src)
 	return cmd.Run() == nil
 }

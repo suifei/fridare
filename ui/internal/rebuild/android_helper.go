@@ -4,21 +4,31 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
+	"fmt"
 	"hash/adler32"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
-// PatchAndroidHelperInBinary fixes two post-rename traps that abort stock
+// PatchAndroidHelperInBinary fixes post-rename traps that abort stock
 // Android frida-server after magic rewrite:
 //
 //  1. Embedded helper dex still has Java descriptors Lre/frida/HelperBackend
-//     while native looks up re.{magic}.HelperBackend. ART then fails to load
+//     while native looks up re.{magic}/HelperBackend. ART then fails to load
 //     the class → linux-host-session.vala:744 backend_class != null.
 //     Pair `/re/frida/` does not match `Lre/frida/` (no leading slash).
 //  2. Same-length rename of dynsym frida_agent_main → {magic}_agent_main
 //     leaves DT_GNU_HASH / bloom on the old name → undefined symbol.
+//  3. Whole-file marker replace of frida-helper → {magic}-helper can break
+//     MUTF-8 string_ids order inside the embedded dex (e.g. magic=xcand makes
+//     "/xcand-helper-" sort after "/proc"). ART rejects the dex → same
+//     backend_class != null. We re-sort string_ids and remap all indices.
 //
 // Size is unchanged. Safe to run after PatchArtifactBinaryMarkers string replace.
+// For source rebuilds (profile=deep), also call PatchAndroidHelperDexInTree before
+// meson embeds src/android-helper/helper.dex — export-only patching is not enough
+// if the user copies raw build-tree binaries (issue #41).
 func PatchAndroidHelperInBinary(data []byte, magic string) int {
 	if len(magic) != 5 || len(data) < 64 {
 		return 0
@@ -56,16 +66,25 @@ func patchEmbeddedDexJavaPackage(data []byte, magic string) int {
 			continue
 		}
 		dex := data[at : at+size]
+		mutated := false
 		c := bytes.Count(dex, old)
 		if c > 0 {
 			copy(dex, bytes.ReplaceAll(dex, old, neu))
-			fixDexChecksum(dex)
 			n += c
-		} else if bytes.Contains(dex, neu) {
-			// already renamed (whole-file replace) but checksums stale
+			mutated = true
+		}
+		// Whole-file marker replace may already have renamed frida-helper →
+		// {magic}-helper inside this dex and broken MUTF-8 string_ids order
+		// (e.g. magic=xcand → "/xcand-helper-" sorts after "/proc"). ART then
+		// rejects the dex → backend_class != null. Re-sort + remap indices.
+		if sorted, err := resortDexStringIds(dex); err == nil && sorted {
+			n++
+			mutated = true
+		}
+		if mutated || bytes.Contains(dex, neu) {
 			before := append([]byte(nil), dex[:32]...)
 			fixDexChecksum(dex)
-			if !bytes.Equal(before, dex[:32]) {
+			if !mutated && !bytes.Equal(before, dex[:32]) {
 				n++
 			}
 		}
@@ -588,4 +607,151 @@ func parseELFNamedSections(img []byte) (map[string]namedSec, bool) {
 		}
 	}
 	return out, true
+}
+
+// needSourceHelperDexPatch reports whether prebuilt helper.dex must be rewritten
+// in the source tree before meson embeds it. deep (GUI default) rewrites the Vala
+// find_class("re/frida/HelperBackend") string via ProtocolAPI; the committed
+// helper.dex is binary and skipped by applyPlanNaive / StructureAwareStripOpts,
+// so without this step the embedded dex stays Lre/frida while native looks up
+// re/{magic} → backend_class != null (issue #41).
+func needSourceHelperDexPatch(cfg JobConfig) bool {
+	magic := strings.TrimSpace(cfg.MagicName)
+	if len(magic) != 5 || magic == "frida" {
+		return false
+	}
+	prof := strings.ToLower(strings.TrimSpace(cfg.DirectionProfile))
+	if prof == "" {
+		prof = "deep"
+	}
+	// Only deep applies ProtocolAPI string rewrite to the Vala JNI class path.
+	// safe / abi / full / explore keep re/frida in Vala at compile time; export
+	// PatchProductFile then rewrites native + embedded dex together.
+	return prof == "deep"
+}
+
+// PatchAndroidHelperDexFile rewrites re/frida → re/{magic} inside a standalone
+// helper.dex (Frida's prebuilt android-helper asset) and repairs Adler32/SHA-1.
+// No-op when magic length ≠ 5 or the file has no matching descriptors.
+func PatchAndroidHelperDexFile(path, magic string) (int, error) {
+	if len(magic) != 5 || magic == "frida" {
+		return 0, nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+	if info.IsDir() || info.Size() < 112 || info.Size() > 2*1024*1024 {
+		return 0, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	if !isDexMagic(data[:8]) {
+		return 0, nil
+	}
+	orig := append([]byte(nil), data...)
+	n := patchEmbeddedDexJavaPackage(data, magic)
+	if n == 0 || bytes.Equal(orig, data) {
+		return 0, nil
+	}
+	if err := os.WriteFile(path, data, info.Mode()); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
+// PatchAndroidHelperDexInTree finds frida-core android-helper/helper.dex under
+// sourceDir and patches each. Safe to call repeatedly.
+func PatchAndroidHelperDexInTree(sourceDir, magic string) (files, hits int, err error) {
+	if sourceDir == "" || len(magic) != 5 || magic == "frida" {
+		return 0, 0, nil
+	}
+	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info == nil || info.IsDir() {
+			return nil
+		}
+		if strings.ToLower(info.Name()) != "helper.dex" {
+			return nil
+		}
+		// Prefer the android-helper asset; skip unrelated helper.dex if any.
+		rel, _ := filepath.Rel(sourceDir, path)
+		relSlash := filepath.ToSlash(rel)
+		low := strings.ToLower(relSlash)
+		if !strings.Contains(low, "android-helper/") && !strings.HasSuffix(low, "android-helper/helper.dex") {
+			// Still accept bare .../android-helper/helper.dex via Contains check above;
+			// also accept if parent dir is android-helper.
+			if strings.ToLower(filepath.Base(filepath.Dir(path))) != "android-helper" {
+				return nil
+			}
+		}
+		n, perr := PatchAndroidHelperDexFile(path, magic)
+		if perr != nil {
+			return perr
+		}
+		if n > 0 {
+			files++
+			hits += n
+		}
+		return nil
+	})
+	return files, hits, err
+}
+
+// AndroidHelperDexAligned reports whether data looks like a patched Android
+// server helper: has a dex with re/{magic} descriptors, valid checksums,
+// MUTF-8-sorted string_ids (ART rejects out-of-order), and no leftover
+// Lre/frida when magic ≠ frida.
+func AndroidHelperDexAligned(data []byte, magic string) (ok bool, detail string) {
+	if len(magic) != 5 {
+		return true, "magic skipped"
+	}
+	old := []byte("re/frida")
+	neu := []byte("re/" + magic)
+	off := 0
+	found := 0
+	for {
+		i := bytes.Index(data[off:], []byte("dex\n"))
+		if i < 0 {
+			break
+		}
+		at := off + i
+		if at+40 > len(data) {
+			break
+		}
+		if !isDexMagic(data[at : at+8]) {
+			off = at + 4
+			continue
+		}
+		size := int(binary.LittleEndian.Uint32(data[at+32 : at+36]))
+		if size < 112 || size > 2*1024*1024 || at+size > len(data) {
+			off = at + 4
+			continue
+		}
+		dex := data[at : at+size]
+		found++
+		if magic != "frida" && bytes.Contains(dex, old) {
+			return false, fmt.Sprintf("dex@%d still has re/frida", at)
+		}
+		if magic != "frida" && !bytes.Contains(dex, neu) {
+			return false, fmt.Sprintf("dex@%d missing re/%s", at, magic)
+		}
+		if adler32.Checksum(dex[12:]) != binary.LittleEndian.Uint32(dex[8:12]) {
+			return false, fmt.Sprintf("dex@%d bad adler32", at)
+		}
+		sum := sha1.Sum(dex[32:])
+		if !bytes.Equal(sum[:], dex[12:32]) {
+			return false, fmt.Sprintf("dex@%d bad sha1", at)
+		}
+		if okOrder, detail := dexStringIdsOrdered(dex); !okOrder {
+			return false, fmt.Sprintf("dex@%d %s", at, detail)
+		}
+		off = at + size
+	}
+	if found == 0 {
+		// Non-Android server binaries have no helper dex — not a failure.
+		return true, "no embedded dex"
+	}
+	return true, fmt.Sprintf("ok dexes=%d", found)
 }

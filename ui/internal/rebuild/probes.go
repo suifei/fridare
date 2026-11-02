@@ -65,6 +65,7 @@ func (o *ProbeOptions) withDefaults() ProbeOptions {
 	if out.RunCommand == nil {
 		out.RunCommand = func(name string, args ...string) (string, error) {
 			cmd := exec.Command(name, args...)
+			hideConsoleCmd(cmd)
 			b, err := cmd.CombinedOutput()
 			return string(b), err
 		}

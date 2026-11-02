@@ -156,7 +156,7 @@ RUN set -ex; \
     tar -xJf /tmp/node.tar.xz -C /usr/local/node --strip-components=1; \
     rm -f /tmp/node.tar.xz; \
     node -v; npm -v; \
-    node -e "const M=process.versions.node.split('.')[0]|0; if(M<18) process.exit(1)"
+    node -e 'var M=parseInt(process.versions.node,10); if(M<18) process.exit(1)'
 # --- Go %s (Frida Compiler backend / ESBuild needs >=1.24) ---
 RUN set -ex; \
     export http_proxy="${http_proxy:-${HTTP_PROXY:-}}"; \
@@ -208,7 +208,7 @@ CMD ["bash"]
 // with the expected toolchain (NDK + Node + Go + aarch64 cross). Exit 0 if OK.
 func ImageHasBuilderFeaturesShell() string {
 	return fmt.Sprintf(
-		`set -e; test -f /etc/fridare-builder-features; grep -q %s /etc/fridare-builder-features; test -d "$ANDROID_NDK_ROOT" -o -d %s; test -d %s; command -v node >/dev/null; node -e "const M=process.versions.node.split('.')[0]|0; if(M<18) process.exit(1)"; command -v go >/dev/null; command -v aarch64-linux-gnu-gcc >/dev/null || { echo '[fridare] aarch64-linux-gnu-gcc missing (linux-arm64)'; exit 1; }; echo OK`,
+		`set -e; test -f /etc/fridare-builder-features; grep -q %s /etc/fridare-builder-features; test -d "$ANDROID_NDK_ROOT" -o -d %s; test -d %s; command -v node >/dev/null; node -e 'var M=parseInt(process.versions.node,10); if(M<18) process.exit(1)'; command -v go >/dev/null; command -v aarch64-linux-gnu-gcc >/dev/null; echo OK`,
 		shellQuote(BuilderImageFeatureTag), shellQuote(BuilderImageNDKPath), shellQuote(BuilderImageNDKR25Path),
 	)
 }
