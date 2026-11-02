@@ -23,7 +23,8 @@ Linux / macOS GUI 请本机 `cd ui && ./build.sh`（Fyne 需要本机 CGO）。�
 
 ## 预编译 Frida 产物（独立 tag，不是本 GUI）
 
+- [xcand-17.24.3](https://github.com/suifei/fridare/releases/tag/xcand-17.24.3) — **当前**；官方 17.24.3，Android arm64/x86_64 deep + host wheels，pip `frida==17.24.3`（magic `xcand`）
 - [kxmwp-16.7.19](https://github.com/suifei/fridare/releases/tag/kxmwp-16.7.19)
 - [kxmwp-17.17.1](https://github.com/suifei/fridare/releases/tag/kxmwp-17.17.1) — 官方 17.17.0，产品标签 17.17.1，pip `frida==17.17.0`
 
-这些 zip **没有**随 v4.1.0 重编。
+`xcand-17.24.3` 与 `main@03f0bb6` 对齐；kxmwp zip **没有**随 v4.1.0 重编。
